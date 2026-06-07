@@ -92,6 +92,16 @@
 
 		</com.google.android.material.button.MaterialButtonToggleGroup>
 
+		<androidx.recyclerview.widget.RecyclerView
+			android:id="@+id/recyclerView_remap"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="@dimen/margin_small"
+			android:nestedScrollingEnabled="false"
+			app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+			tools:itemCount="2"
+			tools:listitem="@layout/item_restore_remap" />
+
 	</LinearLayout>
 
 	<TextView

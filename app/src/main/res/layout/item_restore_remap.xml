@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:background="?attr/selectableItemBackground"
+	android:clickable="true"
+	android:focusable="true"
+	android:minHeight="?attr/listPreferredItemHeightSmall"
+	android:orientation="vertical"
+	android:paddingVertical="@dimen/margin_small">
+
+	<TextView
+		android:id="@+id/textView_title"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:textAppearance="?attr/textAppearanceBodyMedium"
+		tools:text="Batoto" />
+
+	<TextView
+		android:id="@+id/textView_target"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:textAppearance="?attr/textAppearanceBodySmall"
+		android:textColor="?android:textColorSecondary"
+		tools:text="Batoto (Extension)" />
+
+</LinearLayout>

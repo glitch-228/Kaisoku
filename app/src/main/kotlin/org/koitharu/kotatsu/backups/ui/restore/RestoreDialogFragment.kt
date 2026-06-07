@@ -40,6 +40,9 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 		super.onViewBindingCreated(binding, savedInstanceState)
 		val adapter = BackupSectionsAdapter(this)
 		binding.recyclerView.adapter = adapter
+		val remapAdapter = RestoreRemapAdapter(::onRemapItemClick)
+		binding.recyclerViewRemap.adapter = remapAdapter
+		viewModel.sourceRemapItems.observe(viewLifecycleOwner) { remapAdapter.submitList(it) }
 		binding.buttonCancel.setOnClickListener(this)
 		binding.buttonRestore.setOnClickListener(this)
 		binding.checkboxMerge.setOnCheckedChangeListener { _, isChecked ->
@@ -97,6 +100,19 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 
 	override fun onItemClick(item: BackupSectionModel, view: View) {
 		viewModel.onItemClick(item)
+	}
+
+	private fun onRemapItemClick(item: RestoreRemapItem) {
+		val labels = item.options.map { it.label }.toTypedArray()
+		val checked = item.options.indexOfFirst { it.targetName == item.selectedTargetName }.coerceAtLeast(0)
+		MaterialAlertDialogBuilder(context ?: return)
+			.setTitle(item.title)
+			.setSingleChoiceItems(labels, checked) { dialog, which ->
+				viewModel.onSourceTargetSelected(item.source, item.options[which].targetName)
+				dialog.dismiss()
+			}
+			.setNegativeButton(android.R.string.cancel, null)
+			.show()
 	}
 
 	private fun onLoadingChanged(value: Quadruple<Boolean, List<BackupSectionModel>, Date?, Boolean>) {

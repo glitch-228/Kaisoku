@@ -16,8 +16,12 @@ import org.koitharu.kotatsu.backups.domain.BackupSection
 import org.koitharu.kotatsu.backups.domain.SourceRemap
 import org.koitharu.kotatsu.backups.domain.SourceRemapPreference
 import org.koitharu.kotatsu.backups.domain.SourceRemapResolver
+import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.core.model.MangaSource
+import org.koitharu.kotatsu.core.model.getTitle
 import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.prefs.AppSettings
+import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toUriOrNull
@@ -40,6 +44,7 @@ class RestoreViewModel @Inject constructor(
 ) : BaseViewModel() {
 
 	val uri = savedStateHandle.get<String>(AppRouter.KEY_FILE)?.toUriOrNull()
+	private val appContext = context
 	private val contentResolver = context.contentResolver
 
 	val availableEntries = MutableStateFlow<List<BackupSectionModel>>(emptyList())
@@ -47,7 +52,9 @@ class RestoreViewModel @Inject constructor(
 	val isMergeEnabled = MutableStateFlow(false)
 	val sourcePreference = MutableStateFlow(settings.backupRestoreSourcePreference)
 	val hasAmbiguousSources = MutableStateFlow(false)
+	val sourceRemapItems = MutableStateFlow<List<RestoreRemapItem>>(emptyList())
 	private var remapPlan: Map<String, SourceRemapResolver.SourceCandidates> = emptyMap()
+	private val perSourceOverrides = LinkedHashMap<String, String>()
 
 	fun onMergeToggle(isChecked: Boolean) {
 		isMergeEnabled.value = isChecked
@@ -56,9 +63,47 @@ class RestoreViewModel @Inject constructor(
 	fun onSourcePreferenceChange(preference: SourceRemapPreference) {
 		sourcePreference.value = preference
 		settings.backupRestoreSourcePreference = preference
+		perSourceOverrides.clear()
+		rebuildRemapItems()
 	}
 
-	fun buildSourceRemap(): SourceRemap = sourceRemapResolver.defaultRemap(remapPlan, sourcePreference.value)
+	fun onSourceTargetSelected(source: String, targetName: String) {
+		perSourceOverrides[source] = targetName
+		rebuildRemapItems()
+	}
+
+	fun buildSourceRemap(): SourceRemap {
+		val base = sourceRemapResolver.defaultRemap(remapPlan, sourcePreference.value).perSource.toMutableMap()
+		for ((src, target) in perSourceOverrides) {
+			if (target == src) base.remove(src) else base[src] = target
+		}
+		return if (base.isEmpty()) SourceRemap.IDENTITY else SourceRemap(perSource = base)
+	}
+
+	private fun rebuildRemapItems() {
+		val preference = sourcePreference.value
+		val keepLabel = appContext.getString(R.string.backup_source_pref_keep)
+		val builtinWord = appContext.getString(R.string.backup_source_pref_builtin)
+		val extensionWord = appContext.getString(R.string.backup_source_pref_extension)
+		sourceRemapItems.value = remapPlan.values.filter { it.isAmbiguous }.map { group ->
+			val options = buildList {
+				add(RestoreRemapItem.Option(group.original, keepLabel))
+				group.candidates.forEach { candidate ->
+					val hint = if (candidate is MangaParserSource) builtinWord else extensionWord
+					add(RestoreRemapItem.Option(candidate.name, "${candidate.getTitle(appContext)} ($hint)"))
+				}
+			}.distinctBy { it.targetName }
+			val selected = perSourceOverrides[group.original]
+				?: sourceRemapResolver.pickByPreference(group, preference)?.name?.takeIf { preference != SourceRemapPreference.KEEP }
+				?: group.original
+			RestoreRemapItem(
+				source = group.original,
+				title = MangaSource(group.original).getTitle(appContext),
+				options = options,
+				selectedTargetName = selected,
+			)
+		}
+	}
 
 	init {
 		launchLoadingJob(Dispatchers.Default) {
@@ -77,6 +122,7 @@ class RestoreViewModel @Inject constructor(
 		val plan = sourceRemapResolver.buildPlan(samples)
 		remapPlan = plan
 		hasAmbiguousSources.value = plan.values.any { it.isAmbiguous }
+		rebuildRemapItems()
 	}
 
 	private suspend fun loadBackupInfo() {
