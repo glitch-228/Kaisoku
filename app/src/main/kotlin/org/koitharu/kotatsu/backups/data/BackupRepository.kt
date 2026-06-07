@@ -30,6 +30,7 @@ import org.koitharu.kotatsu.backups.data.model.ScrobblingBackup
 import org.koitharu.kotatsu.backups.data.model.SourceBackup
 import org.koitharu.kotatsu.backups.data.model.StatisticBackup
 import org.koitharu.kotatsu.backups.domain.BackupSection
+import org.koitharu.kotatsu.backups.domain.SourceRemap
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.db.migrations.MangaIdentityMerge
 import org.koitharu.kotatsu.core.prefs.AppSettings
@@ -153,6 +154,7 @@ class BackupRepository @Inject constructor(
         sections: Set<BackupSection>,
         progress: FlowCollector<Progress>?,
         isMerge: Boolean = false,
+        sourceRemap: SourceRemap = SourceRemap.IDENTITY,
     ): CompositeResult {
         progress?.emit(Progress.INDETERMINATE)
         var commonProgress = Progress(0, sections.size)
@@ -164,7 +166,7 @@ class BackupRepository @Inject constructor(
                 result += when (section) {
                     BackupSection.INDEX -> CompositeResult.EMPTY // useless in our case
                     BackupSection.HISTORY -> input.readJsonArray<HistoryBackup>(serializer()).restoreToDb {
-                        upsertManga(it.manga)
+                        upsertManga(it.manga, sourceRemap)
                         getHistoryDao().upsert(it.toEntity())
                     }
 
@@ -173,7 +175,7 @@ class BackupRepository @Inject constructor(
                     }
 
                     BackupSection.FAVOURITES -> input.readJsonArray<FavouriteBackup>(serializer()).restoreToDb {
-                        upsertManga(it.manga)
+                        upsertManga(it.manga, sourceRemap)
                         getFavouritesDao().upsert(it.toEntity())
                     }
 
@@ -188,12 +190,12 @@ class BackupRepository @Inject constructor(
                     }
 
                     BackupSection.BOOKMARKS -> input.readJsonArray<BookmarkBackup>(serializer()).restoreToDb {
-                        upsertManga(it.manga)
+                        upsertManga(it.manga, sourceRemap)
                         getBookmarksDao().upsert(it.bookmarks.map { b -> b.toEntity() })
                     }
 
                     BackupSection.SOURCES -> input.readJsonArray<SourceBackup>(serializer()).restoreToDb {
-                        getSourcesDao().upsert(it.toEntity())
+                        getSourcesDao().upsert(it.toEntity(sourceRemap.resolve(it.source, "")))
                     }
 
                     BackupSection.SCROBBLING -> input.readJsonArray<ScrobblingBackup>(serializer()).restoreToDb {
@@ -226,6 +228,36 @@ class BackupRepository @Inject constructor(
         }
         progress?.emit(commonProgress)
         return result
+    }
+
+    /**
+     * Pre-scan of a backup: distinct manga source string -> a sample manga public url for that
+     * source (null for sources that only appear in the SOURCES section). Used to compute the
+     * source-remap plan before the actual restore.
+     */
+    suspend fun collectSourceSamples(input: ZipInputStream): Map<String, String?> {
+        val samples = LinkedHashMap<String, String?>()
+        fun put(manga: MangaBackup) {
+            if (samples[manga.source].isNullOrEmpty()) {
+                samples[manga.source] = manga.publicUrl
+            }
+        }
+        var entry = input.nextEntry
+        while (entry != null) {
+            when (BackupSection.of(entry)) {
+                BackupSection.FAVOURITES -> input.readJsonArray<FavouriteBackup>(serializer()).forEach { put(it.manga) }
+                BackupSection.HISTORY -> input.readJsonArray<HistoryBackup>(serializer()).forEach { put(it.manga) }
+                BackupSection.BOOKMARKS -> input.readJsonArray<BookmarkBackup>(serializer()).forEach { put(it.manga) }
+                BackupSection.SOURCES -> input.readJsonArray<SourceBackup>(serializer()).forEach { s ->
+                    samples.putIfAbsent(s.source, null)
+                }
+
+                else -> Unit
+            }
+            input.closeEntry()
+            entry = input.nextEntry
+        }
+        return samples
     }
 
     private suspend fun <T> ZipOutputStream.writeJsonArray(
@@ -297,10 +329,11 @@ class BackupRepository @Inject constructor(
         return JSONObject(tapGridSettings.getAllValues()).toString()
     }
 
-    private suspend fun MangaDatabase.upsertManga(manga: MangaBackup) {
+    private suspend fun MangaDatabase.upsertManga(manga: MangaBackup, sourceRemap: SourceRemap) {
         val tags = manga.tags.map { it.toEntity() }
         getTagsDao().upsert(tags)
-        getMangaDao().upsert(manga.toEntity(), tags)
+        val source = sourceRemap.resolve(manga.source, manga.publicUrl)
+        getMangaDao().upsert(manga.toEntity(source), tags)
     }
 
     private suspend inline fun <T> Sequence<T>.restoreToDb(crossinline block: suspend MangaDatabase.(T) -> Unit): CompositeResult {

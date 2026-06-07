@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.backups.data.BackupRepository
 import org.koitharu.kotatsu.backups.domain.BackupSection
+import org.koitharu.kotatsu.backups.domain.SourceRemap
 import org.koitharu.kotatsu.backups.ui.BaseBackupRestoreService
 import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.util.ext.checkNotificationPermission
@@ -51,6 +52,7 @@ class RestoreService : BaseBackupRestoreService() {
 		val sections =
 			requireNotNull(intent.getSerializableExtraCompat<Array<BackupSection>>(AppRouter.KEY_ENTRIES)?.toSet())
 		val isMerge = intent.getBooleanExtra(KEY_MERGE, false)
+		val sourceRemap = SourceRemap.fromJson(intent.getStringExtra(KEY_REMAP))
 		powerManager.withPartialWakeLock(TAG) {
 			val progress = MutableStateFlow(Progress.INDETERMINATE)
 			val progressUpdateJob = if (checkNotificationPermission(CHANNEL_ID)) {
@@ -63,7 +65,7 @@ class RestoreService : BaseBackupRestoreService() {
 				null
 			}
 			val result = ZipInputStream(contentResolver.openInputStream(source)).use { input ->
-				repository.restoreBackup(input, sections, progress, isMerge)
+				repository.restoreBackup(input, sections, progress, isMerge, sourceRemap)
 			}
 			progressUpdateJob?.cancelAndJoin()
 			showResultNotification(source, result)
@@ -104,13 +106,23 @@ class RestoreService : BaseBackupRestoreService() {
 		private const val TAG = "RESTORE"
 		private const val FOREGROUND_NOTIFICATION_ID = 39
 		private const val KEY_MERGE = "merge"
+		private const val KEY_REMAP = "remap"
 
 		@CheckResult
-		fun start(context: Context, uri: Uri, sections: Set<BackupSection>, isMerge: Boolean): Boolean = try {
+		fun start(
+			context: Context,
+			uri: Uri,
+			sections: Set<BackupSection>,
+			isMerge: Boolean,
+			sourceRemap: SourceRemap = SourceRemap.IDENTITY,
+		): Boolean = try {
 			val intent = Intent(context, RestoreService::class.java)
 			intent.putExtra(AppRouter.KEY_DATA, uri.toString())
 			intent.putExtra(AppRouter.KEY_ENTRIES, sections.toTypedArray())
 			intent.putExtra(KEY_MERGE, isMerge)
+			if (!sourceRemap.isEmpty) {
+				intent.putExtra(KEY_REMAP, sourceRemap.toJson())
+			}
 			ContextCompat.startForegroundService(context, intent)
 			true
 		} catch (e: Exception) {

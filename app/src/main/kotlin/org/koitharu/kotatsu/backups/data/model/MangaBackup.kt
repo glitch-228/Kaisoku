@@ -42,7 +42,7 @@ class MangaBackup(
 		tags = entity.tags.mapToSet { TagBackup(it) },
 	)
 
-	fun toEntity() = MangaEntity(
+	fun toEntity(source: String = this.source) = MangaEntity(
 		id = id,
 		title = title,
 		altTitles = altTitles,

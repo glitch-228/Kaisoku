@@ -23,7 +23,7 @@ class SourceBackup(
 		isEnabled = entity.isEnabled,
 	)
 
-	fun toEntity() = MangaSourceEntity(
+	fun toEntity(source: String = this.source) = MangaSourceEntity(
 		source = source,
 		isEnabled = isEnabled,
 		sortKey = sortKey,

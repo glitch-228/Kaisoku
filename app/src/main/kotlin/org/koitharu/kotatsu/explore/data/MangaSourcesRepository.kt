@@ -684,6 +684,19 @@ class MangaSourcesRepository @Inject constructor(
 		mihonExtensionManager.getInstalledSources()
 	}
 
+	/**
+	 * Installed extension sources only (Mihon + Kotatsu plugins), excluding built-in parsers.
+	 * Used by backup restore to offer/auto-detect alternative restore targets for a site.
+	 */
+	suspend fun getInstalledExtensions(): List<MangaSource> {
+		val mihonSources = getMihonSources()
+		val pluginSources = getPluginSources()
+		return ArrayList<MangaSource>(mihonSources.size + pluginSources.size).apply {
+			addAll(pluginSources)
+			addAll(mihonSources)
+		}
+	}
+
 	private fun getPluginSources(): List<PluginMangaSource> =
 		MangaSourceRegistry.entries.filterIsInstance<PluginMangaSource>()
 

@@ -7,14 +7,21 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
+import org.koitharu.kotatsu.backups.data.BackupRepository
 import org.koitharu.kotatsu.backups.data.model.BackupIndex
 import org.koitharu.kotatsu.backups.domain.BackupSection
+import org.koitharu.kotatsu.backups.domain.SourceRemap
+import org.koitharu.kotatsu.backups.domain.SourceRemapPreference
+import org.koitharu.kotatsu.backups.domain.SourceRemapResolver
 import org.koitharu.kotatsu.core.nav.AppRouter
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toUriOrNull
+import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.util.Date
@@ -27,6 +34,9 @@ import javax.inject.Inject
 class RestoreViewModel @Inject constructor(
 	savedStateHandle: SavedStateHandle,
 	@ApplicationContext context: Context,
+	private val backupRepository: BackupRepository,
+	private val sourceRemapResolver: SourceRemapResolver,
+	private val settings: AppSettings,
 ) : BaseViewModel() {
 
 	val uri = savedStateHandle.get<String>(AppRouter.KEY_FILE)?.toUriOrNull()
@@ -35,15 +45,38 @@ class RestoreViewModel @Inject constructor(
 	val availableEntries = MutableStateFlow<List<BackupSectionModel>>(emptyList())
 	val backupDate = MutableStateFlow<Date?>(null)
 	val isMergeEnabled = MutableStateFlow(false)
+	val sourcePreference = MutableStateFlow(settings.backupRestoreSourcePreference)
+	val hasAmbiguousSources = MutableStateFlow(false)
+	private var remapPlan: Map<String, SourceRemapResolver.SourceCandidates> = emptyMap()
 
 	fun onMergeToggle(isChecked: Boolean) {
 		isMergeEnabled.value = isChecked
 	}
 
+	fun onSourcePreferenceChange(preference: SourceRemapPreference) {
+		sourcePreference.value = preference
+		settings.backupRestoreSourcePreference = preference
+	}
+
+	fun buildSourceRemap(): SourceRemap = sourceRemapResolver.defaultRemap(remapPlan, sourcePreference.value)
+
 	init {
 		launchLoadingJob(Dispatchers.Default) {
 			loadBackupInfo()
+			runCatchingCancellable { loadRemapPlan() }.onFailure { it.printStackTraceDebug() }
 		}
+	}
+
+	private suspend fun loadRemapPlan() {
+		val u = uri ?: return
+		val samples = withContext(Dispatchers.IO) {
+			ZipInputStream(contentResolver.openInputStream(u)).use { stream ->
+				backupRepository.collectSourceSamples(stream)
+			}
+		}
+		val plan = sourceRemapResolver.buildPlan(samples)
+		remapPlan = plan
+		hasAmbiguousSources.value = plan.values.any { it.isAmbiguous }
 	}
 
 	private suspend fun loadBackupInfo() {

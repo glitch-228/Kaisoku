@@ -24,6 +24,7 @@ import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.ZoomMode
 import org.koitharu.kotatsu.core.network.DoHProvider
 import org.koitharu.kotatsu.core.util.ext.connectivityManager
+import org.koitharu.kotatsu.backups.domain.SourceRemapPreference
 import org.koitharu.kotatsu.core.util.ext.getEnumValue
 import org.koitharu.kotatsu.core.util.ext.observeChanges
 import org.koitharu.kotatsu.core.util.ext.putAll
@@ -645,6 +646,10 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val backupTelegramBotToken: String?
 		get() = prefs.getString(KEY_BACKUP_TG_TOKEN, null)?.trim()?.nullIfEmpty()
 
+	var backupRestoreSourcePreference: SourceRemapPreference
+		get() = prefs.getEnumValue(KEY_BACKUP_SOURCE_PREFERENCE, SourceRemapPreference.KEEP)
+		set(value) = prefs.edit { putEnumValue(KEY_BACKUP_SOURCE_PREFERENCE, value) }
+
 	val isReadingTimeEstimationEnabled: Boolean
 		get() = prefs.getBoolean(KEY_READING_TIME, true)
 
@@ -941,6 +946,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_BACKUP_TG_ENABLED = "backup_periodic_tg_enabled"
 		const val KEY_BACKUP_TG_CHAT = "backup_periodic_tg_chat_id"
 		const val KEY_BACKUP_TG_TOKEN = "backup_periodic_tg_bot_token"
+		const val KEY_BACKUP_SOURCE_PREFERENCE = "backup_restore_source_preference"
 		const val KEY_MANGA_LIST_BADGES = "manga_list_badges"
 		const val KEY_DISCORD_RPC = "discord_rpc"
 		const val KEY_DISCORD_RPC_SKIP_NSFW = "discord_rpc_skip_nsfw"

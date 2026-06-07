@@ -12,6 +12,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.backups.domain.SourceRemapPreference
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.ui.AlertDialogFragment
 import org.koitharu.kotatsu.core.ui.list.OnListItemClickListener
@@ -43,6 +44,24 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 		binding.buttonRestore.setOnClickListener(this)
 		binding.checkboxMerge.setOnCheckedChangeListener { _, isChecked ->
 			viewModel.onMergeToggle(isChecked)
+		}
+		binding.toggleGroupSourcePref.check(
+			when (viewModel.sourcePreference.value) {
+				SourceRemapPreference.KEEP -> R.id.button_pref_keep
+				SourceRemapPreference.BUILT_IN -> R.id.button_pref_builtin
+				SourceRemapPreference.EXTENSION -> R.id.button_pref_extension
+			},
+		)
+		binding.toggleGroupSourcePref.addOnButtonCheckedListener { _, checkedId, isChecked ->
+			if (isChecked) {
+				viewModel.onSourcePreferenceChange(
+					when (checkedId) {
+						R.id.button_pref_builtin -> SourceRemapPreference.BUILT_IN
+						R.id.button_pref_extension -> SourceRemapPreference.EXTENSION
+						else -> SourceRemapPreference.KEEP
+					},
+				)
+			}
 		}
 		viewModel.availableEntries.observe(viewLifecycleOwner, adapter)
 		viewModel.onError.observeEvent(viewLifecycleOwner, this::onError)
@@ -94,6 +113,7 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 				}
 			checkboxMerge.isVisible = !isLoading && hasEntries
 			checkboxMerge.isChecked = isMergeEnabled
+			groupSourceConflict.isVisible = !isLoading && hasEntries && viewModel.hasAmbiguousSources.value
 			buttonRestore.isEnabled = !isLoading && entries.any { it.isChecked }
 		}
 	}
@@ -104,6 +124,7 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 			viewModel.uri ?: return false,
 			viewModel.getCheckedSections(),
 			viewModel.isMergeEnabled.value,
+			viewModel.buildSourceRemap(),
 		)
 	}
 

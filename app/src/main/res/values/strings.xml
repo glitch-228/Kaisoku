@@ -155,6 +155,10 @@
     <string name="create_backup">Create data backup</string>
     <string name="restore_backup">Restore from backup</string>
     <string name="merge_with_existing_data">Merge with existing data</string>
+    <string name="backup_source_conflict">Some sources are available in more than one place. Restore those titles to:</string>
+    <string name="backup_source_pref_keep">As saved</string>
+    <string name="backup_source_pref_builtin">Built-in</string>
+    <string name="backup_source_pref_extension">Extension</string>
     <string name="data_restored">Restored</string>
     <string name="preparing_">Preparing…</string>
     <string name="file_not_found">File not found</string>
