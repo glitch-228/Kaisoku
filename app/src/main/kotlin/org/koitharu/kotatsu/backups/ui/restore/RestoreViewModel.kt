@@ -23,6 +23,8 @@ import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.core.ui.BaseViewModel
+import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
+import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toUriOrNull
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
@@ -53,8 +55,10 @@ class RestoreViewModel @Inject constructor(
 	val sourcePreference = MutableStateFlow(settings.backupRestoreSourcePreference)
 	val hasAmbiguousSources = MutableStateFlow(false)
 	val sourceRemapItems = MutableStateFlow<List<RestoreRemapItem>>(emptyList())
+	val perTitlePrompt = MutableEventFlow<PerTitlePrompt>()
 	private var remapPlan: Map<String, SourceRemapResolver.SourceCandidates> = emptyMap()
 	private val perSourceOverrides = LinkedHashMap<String, String>()
+	private val perMangaOverrides = LinkedHashMap<String, String>()
 
 	fun onMergeToggle(isChecked: Boolean) {
 		isMergeEnabled.value = isChecked
@@ -72,12 +76,45 @@ class RestoreViewModel @Inject constructor(
 		rebuildRemapItems()
 	}
 
+	fun onMangaTargetSelected(source: String, url: String, targetName: String) {
+		val key = SourceRemap.key(source, url)
+		if (targetName == source) perMangaOverrides.remove(key) else perMangaOverrides[key] = targetName
+		rebuildRemapItems()
+	}
+
+	fun openPerTitle(item: RestoreRemapItem) {
+		val u = uri ?: return
+		launchJob(Dispatchers.Default) {
+			val refs = withContext(Dispatchers.IO) {
+				ZipInputStream(contentResolver.openInputStream(u)).use { stream ->
+					backupRepository.collectMangaForSource(stream, item.source)
+				}
+			}
+			val perSourceTarget = perSourceOverrides[item.source]
+				?: sourceRemapResolver.pickByPreference(remapPlan[item.source] ?: return@launchJob, sourcePreference.value)
+					?.name?.takeIf { sourcePreference.value != SourceRemapPreference.KEEP }
+				?: item.source
+			val titles = refs.map { ref ->
+				PerTitlePrompt.TitleChoice(
+					url = ref.url,
+					title = ref.title,
+					currentTargetName = perMangaOverrides[SourceRemap.key(item.source, ref.url)] ?: perSourceTarget,
+				)
+			}
+			perTitlePrompt.call(PerTitlePrompt(item.source, item.title, item.options, titles))
+		}
+	}
+
 	fun buildSourceRemap(): SourceRemap {
 		val base = sourceRemapResolver.defaultRemap(remapPlan, sourcePreference.value).perSource.toMutableMap()
 		for ((src, target) in perSourceOverrides) {
 			if (target == src) base.remove(src) else base[src] = target
 		}
-		return if (base.isEmpty()) SourceRemap.IDENTITY else SourceRemap(perSource = base)
+		return if (base.isEmpty() && perMangaOverrides.isEmpty()) {
+			SourceRemap.IDENTITY
+		} else {
+			SourceRemap(perSource = base, perManga = perMangaOverrides.toMap())
+		}
 	}
 
 	private fun rebuildRemapItems() {
@@ -101,6 +138,7 @@ class RestoreViewModel @Inject constructor(
 				title = MangaSource(group.original).getTitle(appContext),
 				options = options,
 				selectedTargetName = selected,
+				customTitleCount = perMangaOverrides.keys.count { it.substringBefore(' ') == group.original },
 			)
 		}
 	}

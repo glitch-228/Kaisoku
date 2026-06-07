@@ -43,6 +43,7 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 		val remapAdapter = RestoreRemapAdapter(::onRemapItemClick)
 		binding.recyclerViewRemap.adapter = remapAdapter
 		viewModel.sourceRemapItems.observe(viewLifecycleOwner) { remapAdapter.submitList(it) }
+		viewModel.perTitlePrompt.observeEvent(viewLifecycleOwner, this::onPerTitlePrompt)
 		binding.buttonCancel.setOnClickListener(this)
 		binding.buttonRestore.setOnClickListener(this)
 		binding.checkboxMerge.setOnCheckedChangeListener { _, isChecked ->
@@ -109,6 +110,36 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 			.setTitle(item.title)
 			.setSingleChoiceItems(labels, checked) { dialog, which ->
 				viewModel.onSourceTargetSelected(item.source, item.options[which].targetName)
+				dialog.dismiss()
+			}
+			.setNeutralButton(R.string.backup_source_per_title) { _, _ ->
+				viewModel.openPerTitle(item)
+			}
+			.setNegativeButton(android.R.string.cancel, null)
+			.show()
+	}
+
+	private fun onPerTitlePrompt(prompt: PerTitlePrompt) {
+		if (prompt.titles.isEmpty()) {
+			return
+		}
+		val titleLabels = prompt.titles.map { it.title }.toTypedArray()
+		MaterialAlertDialogBuilder(context ?: return)
+			.setTitle(prompt.sourceTitle)
+			.setItems(titleLabels) { _, which ->
+				onPerTitleChoice(prompt, prompt.titles[which])
+			}
+			.setNegativeButton(R.string.close, null)
+			.show()
+	}
+
+	private fun onPerTitleChoice(prompt: PerTitlePrompt, choice: PerTitlePrompt.TitleChoice) {
+		val labels = prompt.options.map { it.label }.toTypedArray()
+		val checked = prompt.options.indexOfFirst { it.targetName == choice.currentTargetName }.coerceAtLeast(0)
+		MaterialAlertDialogBuilder(context ?: return)
+			.setTitle(choice.title)
+			.setSingleChoiceItems(labels, checked) { dialog, which ->
+				viewModel.onMangaTargetSelected(prompt.source, choice.url, prompt.options[which].targetName)
 				dialog.dismiss()
 			}
 			.setNegativeButton(android.R.string.cancel, null)

@@ -13,6 +13,9 @@ enum class SourceRemapPreference {
 	EXTENSION, // prefer the extension/plugin
 }
 
+/** A single manga read from a backup, used by the per-title remap picker. */
+data class BackupMangaRef(val title: String, val url: String)
+
 /**
  * Decisions for rewriting manga `source` identifiers while restoring a backup so titles land on
  * the source the user actually has installed. Precedence when resolving a title:

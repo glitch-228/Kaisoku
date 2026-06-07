@@ -29,6 +29,7 @@ import org.koitharu.kotatsu.backups.data.model.MangaBackup
 import org.koitharu.kotatsu.backups.data.model.ScrobblingBackup
 import org.koitharu.kotatsu.backups.data.model.SourceBackup
 import org.koitharu.kotatsu.backups.data.model.StatisticBackup
+import org.koitharu.kotatsu.backups.domain.BackupMangaRef
 import org.koitharu.kotatsu.backups.domain.BackupSection
 import org.koitharu.kotatsu.backups.domain.SourceRemap
 import org.koitharu.kotatsu.core.db.MangaDatabase
@@ -258,6 +259,32 @@ class BackupRepository @Inject constructor(
             entry = input.nextEntry
         }
         return samples
+    }
+
+    /**
+     * All distinct manga (title + public url) belonging to [source], for the per-title remap
+     * picker. Read lazily only when the user opts into per-title resolution.
+     */
+    suspend fun collectMangaForSource(input: ZipInputStream, source: String): List<BackupMangaRef> {
+        // Keyed by public url because that is what the remap resolves on at restore time.
+        val byUrl = LinkedHashMap<String, BackupMangaRef>()
+        fun put(manga: MangaBackup) {
+            if (manga.source == source) {
+                byUrl.putIfAbsent(manga.publicUrl, BackupMangaRef(manga.title, manga.publicUrl))
+            }
+        }
+        var entry = input.nextEntry
+        while (entry != null) {
+            when (BackupSection.of(entry)) {
+                BackupSection.FAVOURITES -> input.readJsonArray<FavouriteBackup>(serializer()).forEach { put(it.manga) }
+                BackupSection.HISTORY -> input.readJsonArray<HistoryBackup>(serializer()).forEach { put(it.manga) }
+                BackupSection.BOOKMARKS -> input.readJsonArray<BookmarkBackup>(serializer()).forEach { put(it.manga) }
+                else -> Unit
+            }
+            input.closeEntry()
+            entry = input.nextEntry
+        }
+        return byUrl.values.toList()
     }
 
     private suspend fun <T> ZipOutputStream.writeJsonArray(

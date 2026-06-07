@@ -159,6 +159,7 @@
     <string name="backup_source_pref_keep">As saved</string>
     <string name="backup_source_pref_builtin">Built-in</string>
     <string name="backup_source_pref_extension">Extension</string>
+    <string name="backup_source_per_title">Per title…</string>
     <string name="data_restored">Restored</string>
     <string name="preparing_">Preparing…</string>
     <string name="file_not_found">File not found</string>
