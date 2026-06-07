@@ -160,6 +160,11 @@
     <string name="backup_source_pref_builtin">Built-in</string>
     <string name="backup_source_pref_extension">Extension</string>
     <string name="backup_source_per_title">Per title…</string>
+    <string name="mihon_import_category">Imported</string>
+    <string name="backup_mihon_category">Mihon (Tachiyomi)</string>
+    <string name="import_from_mihon">Import from Mihon</string>
+    <string name="export_to_mihon">Export to Mihon</string>
+    <string name="export_complete">Export complete</string>
     <string name="data_restored">Restored</string>
     <string name="preparing_">Preparing…</string>
     <string name="file_not_found">File not found</string>

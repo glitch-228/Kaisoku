@@ -43,6 +43,14 @@ class BackupsSettingsFragment : BasePreferenceFragment(R.string.backup_restore),
         }
     }
 
+    private val mihonExportCall = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.exportMihon(uri)
+        }
+    }
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.pref_backups)
     }
@@ -51,6 +59,10 @@ class BackupsSettingsFragment : BasePreferenceFragment(R.string.backup_restore),
         super.onViewCreated(view, savedInstanceState)
         bindPeriodicalBackupSummary()
         viewModel.onError.observeEvent(viewLifecycleOwner, SnackbarErrorObserver(listView, this))
+        viewModel.onMihonConverted.observeEvent(viewLifecycleOwner) { router.showBackupRestoreDialog(it) }
+        viewModel.onMihonExported.observeEvent(viewLifecycleOwner) {
+            Snackbar.make(listView, R.string.export_complete, Snackbar.LENGTH_SHORT).show()
+        }
     }
 
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
@@ -64,8 +76,17 @@ class BackupsSettingsFragment : BasePreferenceFragment(R.string.backup_restore),
                 true
             }
 
-            AppSettings.KEY_RESTORE -> {
+            AppSettings.KEY_RESTORE, AppSettings.KEY_IMPORT_MIHON -> {
                 if (!backupSelectCall.tryLaunch(arrayOf("*/*"))) {
+                    Snackbar.make(
+                        listView, R.string.operation_not_supported, Snackbar.LENGTH_SHORT,
+                    ).show()
+                }
+                true
+            }
+
+            AppSettings.KEY_EXPORT_MIHON -> {
+                if (!mihonExportCall.tryLaunch("kaisoku_${System.currentTimeMillis()}.tachibk")) {
                     Snackbar.make(
                         listView, R.string.operation_not_supported, Snackbar.LENGTH_SHORT,
                     ).show()
@@ -79,9 +100,20 @@ class BackupsSettingsFragment : BasePreferenceFragment(R.string.backup_restore),
 
     override fun onActivityResult(result: Uri?) {
         if (result != null) {
-            router.showBackupRestoreDialog(result)
+            if (isMihonBackup(result)) {
+                viewModel.importMihon(result)
+            } else {
+                router.showBackupRestoreDialog(result)
+            }
         }
     }
+
+    // Mihon `.tachibk` backups are gzip (magic bytes 1f 8b); Kaisoku backups are ZIP ("PK").
+    private fun isMihonBackup(uri: Uri): Boolean = runCatching {
+        requireContext().contentResolver.openInputStream(uri)?.use { stream ->
+            stream.read() == 0x1f && stream.read() == 0x8b
+        } == true
+    }.getOrDefault(false)
 
     private fun bindPeriodicalBackupSummary() {
         val preference = findPreference<Preference>(AppSettings.KEY_BACKUP_PERIODICAL_ENABLED) ?: return

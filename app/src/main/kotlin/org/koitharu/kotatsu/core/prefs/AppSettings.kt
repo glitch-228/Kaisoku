@@ -840,6 +840,8 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_ZOOM_MODE = "zoom_mode"
 		const val KEY_BACKUP = "backup"
 		const val KEY_RESTORE = "restore"
+		const val KEY_IMPORT_MIHON = "import_mihon"
+		const val KEY_EXPORT_MIHON = "export_mihon"
 		const val KEY_BACKUP_PERIODICAL_ENABLED = "backup_periodic"
 		const val KEY_BACKUP_PERIODICAL_FREQUENCY = "backup_periodic_freq"
 		const val KEY_BACKUP_PERIODICAL_TRIM = "backup_periodic_trim"

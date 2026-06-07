@@ -8,6 +8,8 @@ import org.koitharu.kotatsu.core.model.UnresolvedMangaSource
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
 import org.koitharu.kotatsu.core.parser.PluginMangaRepository
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaRepository
+import org.koitharu.kotatsu.core.parser.mihon.MihonSourceRegistry
 import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
 import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.parsers.model.MangaSource
@@ -96,9 +98,10 @@ class SourceRemapResolver @Inject constructor(
 		when (val repo = repositoryFactory.create(source)) {
 			is ParserMangaRepository -> repo.domains.toMutableSet().apply { add(repo.domain) }
 			is PluginMangaRepository -> repo.domains.toMutableSet().apply { add(repo.domain) }
+			is MihonMangaRepository -> setOfNotNull(MihonSourceRegistry.getDefaultReferer(repo.source))
 			else -> emptySet()
 		}
-	}.getOrDefault(emptySet()).mapNotNullTo(LinkedHashSet()) { normalizeHost(it) }
+	}.getOrDefault(emptySet()).mapNotNullTo(LinkedHashSet()) { normalizeHost(hostOf(it)) }
 
 	private fun matchHost(index: Map<String, List<MangaSource>>, host: String): List<MangaSource> {
 		index[host]?.let { return it }

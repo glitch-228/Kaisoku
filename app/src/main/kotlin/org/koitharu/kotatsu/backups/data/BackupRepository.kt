@@ -150,6 +150,22 @@ class BackupRepository @Inject constructor(
         progress?.emit(commonProgress)
     }
 
+    /**
+     * Writes a Kaisoku backup ZIP from already-prepared section lists (used by the Mihon importer,
+     * which converts a `.tachibk` into these models and then reuses the normal restore flow).
+     */
+    suspend fun writeBackup(
+        output: ZipOutputStream,
+        categories: List<CategoryBackup>,
+        favourites: List<FavouriteBackup>,
+        history: List<HistoryBackup>,
+    ) {
+        output.writeJsonArray(BackupSection.INDEX, flowOf(BackupIndex()), serializer())
+        output.writeJsonArray(BackupSection.CATEGORIES, categories.asFlow(), serializer())
+        output.writeJsonArray(BackupSection.FAVOURITES, favourites.asFlow(), serializer())
+        output.writeJsonArray(BackupSection.HISTORY, history.asFlow(), serializer())
+    }
+
     suspend fun restoreBackup(
         input: ZipInputStream,
         sections: Set<BackupSection>,

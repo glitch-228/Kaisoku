@@ -22,4 +22,18 @@
         android:persistent="false"
         android:title="@string/periodic_backups" />
 
+    <PreferenceCategory android:title="@string/backup_mihon_category">
+
+        <Preference
+            android:key="import_mihon"
+            android:persistent="false"
+            android:title="@string/import_from_mihon" />
+
+        <Preference
+            android:key="export_mihon"
+            android:persistent="false"
+            android:title="@string/export_to_mihon" />
+
+    </PreferenceCategory>
+
 </PreferenceScreen>
