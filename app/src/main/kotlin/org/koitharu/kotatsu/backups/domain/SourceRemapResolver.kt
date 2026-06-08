@@ -9,6 +9,7 @@ import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
 import org.koitharu.kotatsu.core.parser.PluginMangaRepository
 import org.koitharu.kotatsu.core.parser.mihon.MihonMangaRepository
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
 import org.koitharu.kotatsu.core.parser.mihon.MihonSourceRegistry
 import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
 import org.koitharu.kotatsu.parsers.model.MangaParserSource
@@ -59,10 +60,15 @@ class SourceRemapResolver @Inject constructor(
 			val exact = resolveInstalled(name)
 			val host = exact?.let { domainsOf(it).firstOrNull() } ?: normalizeHost(hostOf(sampleUrl))
 			val extMatches = host?.let { matchHost(extByHost, it) }.orEmpty()
-			// An unresolved source (e.g. a backup whose extension isn't installed) may still match a
-			// built-in by name — offered in the picker, never applied automatically.
-			val nameMatch = if (exact == null) nameToBuiltin(name) else null
-			val candidates = (listOfNotNull(exact, nameMatch) + extMatches).distinctBy { it.name }
+			// Offer a built-in alternative when the same site exists as a built-in: for an unresolved
+			// source match by its name; for an installed extension match by its display name (so a
+			// title that's in both a built-in and an installed extension is surfaced in the picker).
+			val builtinAlt = when {
+				exact == null -> nameToBuiltin(name)
+				exact is MangaParserSource -> null
+				else -> nameToBuiltin(displayNameOf(exact))
+			}
+			val candidates = (listOfNotNull(exact, builtinAlt) + extMatches).distinctBy { it.name }
 			result[name] = SourceCandidates(name, candidates, isOriginalInstalled = exact != null)
 		}
 		return result
@@ -74,6 +80,11 @@ class SourceRemapResolver @Inject constructor(
 		return MangaParserSource.entries.firstOrNull { src ->
 			normalizeName(src.title) == target || normalizeName(src.name) == target
 		}
+	}
+
+	private fun displayNameOf(source: MangaSource): String = when (source) {
+		is MihonMangaSource -> source.resolved().displayName ?: source.name
+		else -> source.name
 	}
 
 	private fun normalizeName(value: String): String =
