@@ -33,6 +33,7 @@ import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
 import org.koitharu.kotatsu.core.parser.PluginMangaRepository
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaRepository
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaRepository
 import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.faviconCacheOnlyKey
 import org.koitharu.kotatsu.core.util.ext.fetch
@@ -62,6 +63,7 @@ class FaviconFetcher(
 			is ParserMangaRepository -> fetchParserFavicon(repo)
 			is PluginMangaRepository -> fetchPluginParserFavicon(repo)
 			is ExternalMangaRepository -> fetchPluginIcon(repo)
+			is MihonMangaRepository -> fetchMihonIcon(repo)
 			is EmptyMangaRepository -> ImageFetchResult(
 				image = ColorImage(Color.WHITE),
 				isSampled = false,
@@ -144,6 +146,19 @@ class FaviconFetcher(
 			val provider = pm.resolveContentProvider(source.authority, 0)
 			provider?.loadIcon(pm) ?: pm.getApplicationIcon(source.packageName)
 		}
+		return ImageFetchResult(
+			image = icon.nonAdaptive().asImage(),
+			isSampled = false,
+			dataSource = DataSource.DISK,
+		)
+	}
+
+	private suspend fun fetchMihonIcon(repository: MihonMangaRepository): FetchResult {
+		val packageName = repository.source.packageName
+		val pm = options.context.packageManager
+		val icon = runInterruptible {
+			runCatching { pm.getApplicationIcon(packageName) }.getOrNull()
+		} ?: throw NoSuchElementException("No icon for Mihon source $packageName")
 		return ImageFetchResult(
 			image = icon.nonAdaptive().asImage(),
 			isSampled = false,

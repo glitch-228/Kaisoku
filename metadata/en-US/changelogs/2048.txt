@@ -1,0 +1,3 @@
+- fixed Mihon source icons not showing (#5)
+- fixed out-of-memory when loading source icons (#4)
+- parser pin → b4f8655d: westmanga domain, favicon fix
