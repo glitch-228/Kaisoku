@@ -72,7 +72,13 @@
 				android:layout_width="0dp"
 				android:layout_height="wrap_content"
 				android:layout_weight="1"
-				android:text="@string/backup_source_pref_keep" />
+				android:insetLeft="0dp"
+				android:insetRight="0dp"
+				android:minWidth="0dp"
+				android:paddingHorizontal="2dp"
+				android:textSize="12sp"
+				android:text="@string/backup_source_pref_keep"
+				app:textAllCaps="false" />
 
 			<Button
 				android:id="@+id/button_pref_builtin"
@@ -80,7 +86,13 @@
 				android:layout_width="0dp"
 				android:layout_height="wrap_content"
 				android:layout_weight="1"
-				android:text="@string/backup_source_pref_builtin" />
+				android:insetLeft="0dp"
+				android:insetRight="0dp"
+				android:minWidth="0dp"
+				android:paddingHorizontal="2dp"
+				android:textSize="12sp"
+				android:text="@string/backup_source_pref_builtin"
+				app:textAllCaps="false" />
 
 			<Button
 				android:id="@+id/button_pref_extension"
@@ -88,7 +100,13 @@
 				android:layout_width="0dp"
 				android:layout_height="wrap_content"
 				android:layout_weight="1"
-				android:text="@string/backup_source_pref_extension" />
+				android:insetLeft="0dp"
+				android:insetRight="0dp"
+				android:minWidth="0dp"
+				android:paddingHorizontal="2dp"
+				android:textSize="12sp"
+				android:text="@string/backup_source_pref_extension"
+				app:textAllCaps="false" />
 
 		</com.google.android.material.button.MaterialButtonToggleGroup>
 
