@@ -107,6 +107,14 @@ class RestoreViewModel @Inject constructor(
 
 	fun buildSourceRemap(): SourceRemap {
 		val base = sourceRemapResolver.defaultRemap(remapPlan, sourcePreference.value).perSource.toMutableMap()
+		// When the original extension isn't installed, the built-in is the only working target, so
+		// default to it (the prompt still lets the user choose "As saved"). Sources that are
+		// available in two installed places keep the "As saved" default — no presumptuous remap.
+		for (group in remapPlan.values) {
+			if (group.needsResolution && group.original !in perSourceOverrides) {
+				builtinOf(group)?.let { base[group.original] = it }
+			}
+		}
 		for ((src, target) in perSourceOverrides) {
 			if (target == src) base.remove(src) else base[src] = target
 		}
@@ -116,6 +124,9 @@ class RestoreViewModel @Inject constructor(
 			SourceRemap(perSource = base, perManga = perMangaOverrides.toMap())
 		}
 	}
+
+	private fun builtinOf(group: SourceRemapResolver.SourceCandidates): String? =
+		group.candidates.firstOrNull { it is MangaParserSource }?.name
 
 	private fun rebuildRemapItems() {
 		val preference = sourcePreference.value
@@ -131,6 +142,7 @@ class RestoreViewModel @Inject constructor(
 				}
 			}.distinctBy { it.targetName }
 			val selected = perSourceOverrides[group.original]
+				?: group.takeIf { it.needsResolution }?.let { builtinOf(it) }
 				?: sourceRemapResolver.pickByPreference(group, preference)?.name?.takeIf { preference != SourceRemapPreference.KEEP }
 				?: group.original
 			RestoreRemapItem(
