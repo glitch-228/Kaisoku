@@ -9,6 +9,7 @@ import org.koitharu.kotatsu.core.parser.PluginMangaRepository
 import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
 import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
 import org.koitharu.kotatsu.core.parser.mihon.MihonSourceRegistry
+import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import javax.inject.Inject
 
 private const val LONG_HASH_SEED = 1125899906842597L
@@ -47,6 +48,21 @@ class MihonSourceMatcher @Inject constructor(
 	/** Display name of an installed Mihon source by id, for the exported `backupSources` list. */
 	fun mihonDisplayName(id: Long): String? =
 		installedSources().firstOrNull { it.sourceId == id }?.displayName
+
+	/**
+	 * Matches a backup source's display name (e.g. "AllHentai") to a Kaisoku built-in parser by
+	 * its title/name. Lets a backed-up source whose extension isn't installed move to the built-in
+	 * equivalent on import. Returns the built-in source name, or null if there's no match.
+	 */
+	fun nameToBuiltinSource(name: String?): String? {
+		val target = normalizeName(name ?: return null).ifEmpty { return null }
+		return MangaParserSource.entries.firstOrNull { src ->
+			normalizeName(src.title) == target || normalizeName(src.name) == target
+		}?.name
+	}
+
+	private fun normalizeName(value: String): String =
+		value.lowercase().filter { it.isLetterOrDigit() }
 
 	/**
 	 * Kaisoku source name -> Mihon numeric source id for export. `mihon:pkg/id` reads the id

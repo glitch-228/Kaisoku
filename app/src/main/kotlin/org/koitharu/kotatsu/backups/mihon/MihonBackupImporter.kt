@@ -41,6 +41,7 @@ class MihonBackupImporter @Inject constructor(
 		// whole-library export can have zero favorites. When nothing is flagged favorite, treat
 		// every entry as a library item; otherwise honour the flag (standard Mihon behaviour).
 		val treatAllAsLibrary = mihon.backupManga.none { it.favorite }
+		val sourceNameById = mihon.backupSources.associate { it.sourceId to it.name }
 		val categories = ArrayList<CategoryBackup>(mihon.backupCategories.size + 1)
 		val categoryIdByOrder = HashMap<Long, Long>()
 		for (c in mihon.backupCategories) {
@@ -61,7 +62,11 @@ class MihonBackupImporter @Inject constructor(
 			val inLibrary = m.favorite || treatAllAsLibrary
 			val hasProgress = m.history.isNotEmpty() || m.chapters.any { it.read }
 			if (!inLibrary && !hasProgress) continue
-			val sourceName = sourceMatcher.mihonIdToSourceName(m.source) ?: continue
+			// Prefer the installed Mihon extension; otherwise fall back to a Kaisoku built-in with
+			// the same name (so titles aren't dropped just because the extension isn't installed).
+			val sourceName = sourceMatcher.mihonIdToSourceName(m.source)
+				?: sourceMatcher.nameToBuiltinSource(sourceNameById[m.source])
+				?: continue
 			val mangaId = kaisokuUid(sourceName, m.url)
 			val mangaBackup = buildManga(m, sourceName, mangaId)
 			if (inLibrary) {
