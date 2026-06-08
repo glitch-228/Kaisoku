@@ -37,6 +37,10 @@ class MihonBackupImporter @Inject constructor(
 	suspend fun import(input: InputStream): Uri = withContext(Dispatchers.Default) {
 		val mihon = MihonBackupCodec.decode(input)
 		val now = System.currentTimeMillis()
+		// Some forks (e.g. Tadami) don't set the Mihon `favorite` flag on library entries, so a
+		// whole-library export can have zero favorites. When nothing is flagged favorite, treat
+		// every entry as a library item; otherwise honour the flag (standard Mihon behaviour).
+		val treatAllAsLibrary = mihon.backupManga.none { it.favorite }
 		val categories = ArrayList<CategoryBackup>(mihon.backupCategories.size + 1)
 		val categoryIdByOrder = HashMap<Long, Long>()
 		for (c in mihon.backupCategories) {
@@ -54,12 +58,13 @@ class MihonBackupImporter @Inject constructor(
 		val favourites = ArrayList<FavouriteBackup>()
 		val history = ArrayList<HistoryBackup>()
 		for (m in mihon.backupManga) {
+			val inLibrary = m.favorite || treatAllAsLibrary
 			val hasProgress = m.history.isNotEmpty() || m.chapters.any { it.read }
-			if (!m.favorite && !hasProgress) continue
+			if (!inLibrary && !hasProgress) continue
 			val sourceName = sourceMatcher.mihonIdToSourceName(m.source) ?: continue
 			val mangaId = kaisokuUid(sourceName, m.url)
 			val mangaBackup = buildManga(m, sourceName, mangaId)
-			if (m.favorite) {
+			if (inLibrary) {
 				val categoryId = m.categories.firstNotNullOfOrNull { categoryIdByOrder[it] }
 					?: ensureFallbackCategory(categories, now).also { fallbackCategoryId = it }
 				favourites += FavouriteBackup(
