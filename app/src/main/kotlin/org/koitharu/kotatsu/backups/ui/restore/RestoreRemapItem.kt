@@ -11,6 +11,7 @@ data class RestoreRemapItem(
 	val options: List<Option>,
 	val selectedTargetName: String,
 	val customTitleCount: Int = 0,
+	val hint: String? = null,
 ) {
 
 	val selectedLabel: String

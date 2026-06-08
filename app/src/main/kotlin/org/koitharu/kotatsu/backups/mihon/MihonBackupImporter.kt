@@ -62,11 +62,16 @@ class MihonBackupImporter @Inject constructor(
 			val inLibrary = m.favorite || treatAllAsLibrary
 			val hasProgress = m.history.isNotEmpty() || m.chapters.any { it.read }
 			if (!inLibrary && !hasProgress) continue
-			// Prefer the installed Mihon extension; otherwise fall back to a Kaisoku built-in with
-			// the same name (so titles aren't dropped just because the extension isn't installed).
-			val sourceName = sourceMatcher.mihonIdToSourceName(m.source)
-				?: sourceMatcher.nameToBuiltinSource(sourceNameById[m.source])
-				?: continue
+			val installed = sourceMatcher.mihonIdToSourceName(m.source)
+			val backupName = sourceNameById[m.source]
+			// Use the installed extension if present. Otherwise keep the source's display name (kept
+			// unresolved on purpose) only when a built-in with that name exists, so the restore
+			// picker can prompt "extension not installed — use built-in?" rather than auto-applying.
+			val sourceName = when {
+				installed != null -> installed
+				backupName != null && sourceMatcher.nameToBuiltinSource(backupName) != null -> backupName
+				else -> continue
+			}
 			val mangaId = kaisokuUid(sourceName, m.url)
 			val mangaBackup = buildManga(m, sourceName, mangaId)
 			if (inLibrary) {

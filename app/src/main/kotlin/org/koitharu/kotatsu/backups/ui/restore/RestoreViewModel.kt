@@ -122,7 +122,7 @@ class RestoreViewModel @Inject constructor(
 		val keepLabel = appContext.getString(R.string.backup_source_pref_keep)
 		val builtinWord = appContext.getString(R.string.backup_source_pref_builtin)
 		val extensionWord = appContext.getString(R.string.backup_source_pref_extension)
-		sourceRemapItems.value = remapPlan.values.filter { it.isAmbiguous }.map { group ->
+		sourceRemapItems.value = remapPlan.values.filter { it.isAmbiguous || it.needsResolution }.map { group ->
 			val options = buildList {
 				add(RestoreRemapItem.Option(group.original, keepLabel))
 				group.candidates.forEach { candidate ->
@@ -139,6 +139,7 @@ class RestoreViewModel @Inject constructor(
 				options = options,
 				selectedTargetName = selected,
 				customTitleCount = perMangaOverrides.keys.count { it.substringBefore(' ') == group.original },
+				hint = if (group.needsResolution) appContext.getString(R.string.backup_source_extension_missing) else null,
 			)
 		}
 	}
@@ -159,7 +160,7 @@ class RestoreViewModel @Inject constructor(
 		}
 		val plan = sourceRemapResolver.buildPlan(samples)
 		remapPlan = plan
-		hasAmbiguousSources.value = plan.values.any { it.isAmbiguous }
+		hasAmbiguousSources.value = plan.values.any { it.isAmbiguous || it.needsResolution }
 		rebuildRemapItems()
 	}
 

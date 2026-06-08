@@ -32,9 +32,14 @@ class SourceRemapResolver @Inject constructor(
 	data class SourceCandidates(
 		val original: String,
 		val candidates: List<MangaSource>,
+		val isOriginalInstalled: Boolean = true,
 	) {
 		val isAmbiguous: Boolean
 			get() = candidates.distinctBy { it.name }.size >= 2
+
+		/** Original source isn't installed/resolvable but an alternative (e.g. built-in) exists. */
+		val needsResolution: Boolean
+			get() = !isOriginalInstalled && candidates.isNotEmpty()
 	}
 
 	/**
@@ -54,11 +59,25 @@ class SourceRemapResolver @Inject constructor(
 			val exact = resolveInstalled(name)
 			val host = exact?.let { domainsOf(it).firstOrNull() } ?: normalizeHost(hostOf(sampleUrl))
 			val extMatches = host?.let { matchHost(extByHost, it) }.orEmpty()
-			val candidates = (listOfNotNull(exact) + extMatches).distinctBy { it.name }
-			result[name] = SourceCandidates(name, candidates)
+			// An unresolved source (e.g. a backup whose extension isn't installed) may still match a
+			// built-in by name — offered in the picker, never applied automatically.
+			val nameMatch = if (exact == null) nameToBuiltin(name) else null
+			val candidates = (listOfNotNull(exact, nameMatch) + extMatches).distinctBy { it.name }
+			result[name] = SourceCandidates(name, candidates, isOriginalInstalled = exact != null)
 		}
 		return result
 	}
+
+	private fun nameToBuiltin(name: String): MangaSource? {
+		val target = normalizeName(name)
+		if (target.isEmpty()) return null
+		return MangaParserSource.entries.firstOrNull { src ->
+			normalizeName(src.title) == target || normalizeName(src.name) == target
+		}
+	}
+
+	private fun normalizeName(value: String): String =
+		value.lowercase().filter { it.isLetterOrDigit() }
 
 	/**
 	 * Auto-resolution for every source group according to [preference]; only emits an entry when

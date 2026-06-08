@@ -160,6 +160,7 @@
     <string name="backup_source_pref_builtin">Built-in</string>
     <string name="backup_source_pref_extension">Extension</string>
     <string name="backup_source_per_title">Per title…</string>
+    <string name="backup_source_extension_missing">extension not installed</string>
     <string name="mihon_import_category">Imported</string>
     <string name="backup_mihon_category">Mihon (Tachiyomi)</string>
     <string name="import_from_mihon">Import from Mihon</string>

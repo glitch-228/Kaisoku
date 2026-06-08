@@ -27,7 +27,11 @@ class RestoreRemapAdapter(
 
 	override fun onBindViewHolder(holder: ViewHolder, position: Int) {
 		val item = items[position]
-		holder.binding.textViewTitle.text = item.title
+		holder.binding.textViewTitle.text = if (item.hint != null) {
+			"${item.title} · ${item.hint}"
+		} else {
+			item.title
+		}
 		holder.binding.textViewTarget.text = if (item.customTitleCount > 0) {
 			"${item.selectedLabel}  ·  +${item.customTitleCount}"
 		} else {
