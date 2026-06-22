@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:orientation="vertical"
+	android:paddingBottom="@dimen/screen_padding">
+
+	<org.koitharu.kotatsu.core.ui.sheet.AdaptiveSheetHeaderBar
+		android:id="@+id/headerBar"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		app:title="@string/extract_text" />
+
+	<FrameLayout
+		android:id="@+id/container_state"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:minHeight="160dp"
+		android:padding="@dimen/screen_padding">
+
+		<LinearLayout
+			android:id="@+id/group_progress"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_gravity="center"
+			android:gravity="center"
+			android:orientation="vertical"
+			android:visibility="gone"
+			tools:visibility="visible">
+
+			<com.google.android.material.progressindicator.CircularProgressIndicator
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:indeterminate="true" />
+
+			<TextView
+				android:id="@+id/textView_status"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="@dimen/margin_normal"
+				android:textAppearance="?attr/textAppearanceBodyMedium"
+				tools:text="@string/ocr_recognizing" />
+
+		</LinearLayout>
+
+		<ScrollView
+			android:id="@+id/scrollView_result"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:visibility="gone">
+
+			<TextView
+				android:id="@+id/textView_result"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:fontFamily="monospace"
+				android:textAppearance="?attr/textAppearanceBodyMedium"
+				android:textIsSelectable="true"
+				tools:text="サンプルテキスト\nLine two" />
+
+		</ScrollView>
+
+	</FrameLayout>
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="end"
+		android:orientation="horizontal"
+		android:paddingHorizontal="@dimen/screen_padding">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/button_rerun"
+			style="?attr/materialButtonOutlinedStyle"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="@string/try_again" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/button_copy"
+			style="?attr/materialButtonOutlinedStyle"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="@dimen/margin_small"
+			android:text="@string/copy"
+			android:visibility="gone" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/button_share"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="@dimen/margin_small"
+			android:text="@string/share"
+			android:visibility="gone" />
+
+	</LinearLayout>
+
+</LinearLayout>

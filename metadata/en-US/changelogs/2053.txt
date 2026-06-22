@@ -1,0 +1,2 @@
+- beta: fixed webtoon page translation (tiled), added rate limiting & retry
+- beta: native Gemini now takes a base endpoint + the Model field

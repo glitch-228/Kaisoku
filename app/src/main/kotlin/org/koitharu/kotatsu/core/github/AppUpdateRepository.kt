@@ -98,7 +98,7 @@ class AppUpdateRepository @Inject constructor(
 		}
 	}
 
-	suspend fun fetchUpdate(): AppVersion? = withContext(Dispatchers.Default) {
+	suspend fun fetchUpdate(): AppVersion? = withContext(Dispatchers.IO) {
 		android.util.Log.d("UPDATE_DEBUG", "=== Starting fetchUpdate ===")
 
 		if (!isUpdateSupported()) {

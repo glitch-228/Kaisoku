@@ -2,7 +2,11 @@ name: Discord Release Webhook
 
 on:
   release:
-    types: [published, edited]
+    # 'published' fires exactly once per release (prereleases included — the jobs branch on the
+    # prerelease flag). Do NOT add 'edited': attaching a release asset fires a follow-up 'edited'
+    # event, so publishing with an APK would post to Discord twice. Re-post a failed run via the
+    # Actions UI -> Re-run jobs.
+    types: [published]
 
 jobs:
   releaseNotification:

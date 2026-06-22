@@ -14,6 +14,7 @@ import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
+import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.allowRgb565
 import coil3.svg.SvgDecoder
@@ -49,6 +50,7 @@ import org.koitharu.kotatsu.core.ui.util.ActivityRecreationHandle
 import org.koitharu.kotatsu.core.ui.util.ForegroundActivityHolder
 import org.koitharu.kotatsu.core.util.AcraScreenLogger
 import org.koitharu.kotatsu.core.util.FileSize
+import org.koitharu.kotatsu.core.util.ext.activityManager
 import org.koitharu.kotatsu.core.util.ext.connectivityManager
 import org.koitharu.kotatsu.core.util.ext.isLowRamDevice
 import org.koitharu.kotatsu.details.ui.pager.pages.MangaPageFetcher
@@ -124,6 +126,7 @@ interface AppModule {
 			return ImageLoader.Builder(context)
 				.interceptorCoroutineContext(Dispatchers.Default)
 				.diskCache(diskCacheFactory)
+				.memoryCache { MemoryCache.Builder().maxSizeBytes(imageMemoryCacheSize(context)).build() }
 				.logger(if (BuildConfig.DEBUG) DebugLogger() else null)
 				.allowRgb565(context.isLowRamDevice())
 				.eventListener(captchaHandler)
@@ -149,6 +152,23 @@ interface AppModule {
 					add(coverRestoreInterceptor)
 					add(MangaSourceHeaderInterceptor())
 				}.build()
+		}
+
+		// Coil sizes its memory cache off the *large* memory class when largeHeap is set, which on a
+		// 512 MB-cap device reserves ~100 MB of bitmaps held strong — enough, with in-use covers and
+		// pages, to exhaust the per-app heap cap while the system still has RAM (so onTrimMemory never
+		// fires and nothing gets trimmed). Cap it off the standard memory class instead, leaving the
+		// largeHeap headroom for in-use bitmaps rather than the cache.
+		private fun imageMemoryCacheSize(context: Context): Long {
+			val mb = 1024L * 1024L
+			return try {
+				val memoryClassMb = (context.activityManager?.memoryClass ?: 128).toLong()
+				val percent = if (context.isLowRamDevice()) 0.15 else 0.25
+				(memoryClassMb * mb * percent).toLong().coerceIn(16L * mb, 96L * mb)
+			} catch (_: Throwable) {
+				// Never let cache sizing break ImageLoader creation — fall back to a safe floor.
+				32L * mb
+			}
 		}
 
 		@Provides

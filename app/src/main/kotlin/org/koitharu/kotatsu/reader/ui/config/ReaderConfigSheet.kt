@@ -107,6 +107,16 @@ class ReaderConfigSheet :
         binding.buttonColorFilter.setOnClickListener(this)
         binding.buttonScrollTimer.setOnClickListener(this)
         binding.buttonBookmark.setOnClickListener(this)
+        binding.buttonTranslate.setOnClickListener(this)
+        binding.buttonOcr.setOnClickListener(this)
+        binding.switchAutoTranslate.isChecked = settings.translateTriggerMode ==
+            org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE
+        binding.switchAutoTranslate.setOnCheckedChangeListener(this)
+        // Master beta toggle: hide the page-translate / extract-text controls when disabled.
+        val translationEnabled = settings.isPageTranslationEnabled
+        binding.buttonTranslate.isVisible = translationEnabled
+        binding.buttonOcr.isVisible = translationEnabled
+        binding.switchAutoTranslate.isVisible = translationEnabled
         binding.switchDoubleReader.setOnCheckedChangeListener(this)
         binding.switchDoubleFoldable.setOnCheckedChangeListener(this)
         binding.switchDoubleCoverPage.setOnCheckedChangeListener(this)
@@ -174,6 +184,16 @@ class ReaderConfigSheet :
                     viewModel.switchChapterBy(0)
                 }
             }
+
+            R.id.button_translate -> {
+                viewModel.toggleTranslateCurrentPage()
+                dismissAllowingStateLoss()
+            }
+
+            R.id.button_ocr -> {
+                viewModel.requestOcrCurrentPage()
+                dismissAllowingStateLoss()
+            }
         }
     }
 
@@ -198,6 +218,15 @@ class ReaderConfigSheet :
             R.id.switch_double_cover_page -> {
                 settings.isReaderDoubleCoverPage = isChecked
                 findParentCallback(Callback::class.java)?.onDoubleModeChanged(settings.isReaderDoubleOnLandscape)
+            }
+
+            R.id.switch_auto_translate -> {
+                settings.translateTriggerMode = if (isChecked) {
+                    org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE
+                } else {
+                    org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.MANUAL
+                }
+                if (isChecked) viewModel.ensureTranslateCurrentPage()
             }
         }
     }

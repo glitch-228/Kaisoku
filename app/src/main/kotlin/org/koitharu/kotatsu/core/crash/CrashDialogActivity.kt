@@ -23,17 +23,22 @@ class CrashDialogActivity : AppCompatActivity() {
 			finishAndRemoveTask()
 			return
 		}
-		if (savedInstanceState == null) {
+		if (savedInstanceState == null && !report.isDegraded) {
 			copyReport(showToast = false)
 		}
 		showCrashDialog()
 	}
 
 	private fun showCrashDialog() {
+		val message = if (report.isDegraded) {
+			R.string.crash_dialog_message_degraded
+		} else {
+			R.string.crash_dialog_message
+		}
 		val dialog = MaterialAlertDialogBuilder(this)
 			.setTitle(R.string.error_occurred)
 			.setIcon(R.drawable.ic_alert_outline)
-			.setMessage(R.string.crash_dialog_message)
+			.setMessage(message)
 			.setNegativeButton(R.string.close) { _, _ ->
 				finishAndRemoveTask()
 			}

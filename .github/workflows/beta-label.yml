@@ -1,0 +1,58 @@
+name: Beta report labeler
+
+# Auto-applies the "beta" label to issues filed from an unstable / pre-release build.
+# Both the crash reporter (ACRA) and the bug-report form render the build under a
+# "### Kaisoku version" block, e.g. "9.8.0-beta1 (2052)" or "N20260616".
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+
+jobs:
+  label-beta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label reports from unstable builds
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || "";
+
+            // Grab the first version-looking token right after the "Kaisoku version" field.
+            const idx = body.search(/Kaisoku version/i);
+            if (idx < 0) {
+              core.info("No Kaisoku version field; skipping.");
+              return;
+            }
+            const window = body.slice(idx, idx + 120);
+            const vm = window.match(/(\d+\.\d+\.\d+(?:-[A-Za-z0-9]+)?|[Nn]\d{6,})/);
+            if (!vm) {
+              core.info(`No parseable version near the field; skipping.`);
+              return;
+            }
+            const version = vm[1];
+
+            // Unstable = nightly (N-prefixed) or a letter-bearing suffix after '-' (alpha/beta/rc...).
+            // A purely numeric suffix like "9.7.8-3" is a stable hotfix, not a pre-release.
+            const suffix = version.includes("-") ? version.split("-").pop() : version;
+            const isUnstable = /^n/i.test(version) || /[A-Za-z]/.test(suffix);
+            if (!isUnstable) {
+              core.info(`Version ${version} is stable; no beta label.`);
+              return;
+            }
+
+            const labels = (issue.labels || []).map(l => (typeof l === "string" ? l : l.name));
+            if (labels.includes("beta")) {
+              core.info("Already labelled beta.");
+              return;
+            }
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ["beta"],
+            });
+            core.info(`Labelled #${issue.number} as beta (version ${version}).`);

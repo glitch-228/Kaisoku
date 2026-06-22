@@ -56,6 +56,7 @@ import org.koitharu.kotatsu.core.ui.dialog.setCheckbox
 import org.koitharu.kotatsu.core.ui.util.MenuInvalidator
 import org.koitharu.kotatsu.core.ui.widgets.ZoomControl
 import org.koitharu.kotatsu.core.util.IdlingDetector
+import org.koitharu.kotatsu.core.util.ext.copyToClipboard
 import org.koitharu.kotatsu.core.util.ext.getThemeDimensionPixelOffset
 import org.koitharu.kotatsu.core.util.ext.hasGlobalPoint
 import org.koitharu.kotatsu.core.util.ext.isAnimationsEnabled
@@ -197,6 +198,56 @@ class ReaderActivity :
                 onResolved = null,
             ),
         )
+        viewModel.onShowOcrSheet.observeEvent(this) {
+            org.koitharu.kotatsu.reader.translate.OcrBottomSheet.show(supportFragmentManager)
+        }
+        viewModel.onTranslateConfigMissing.observeEvent(this) {
+            Snackbar.make(viewBinding.container, R.string.translate_setup_required, Snackbar.LENGTH_LONG).show()
+        }
+        viewModel.translationCoordinator.progress.observe(this) { p ->
+            val bar = viewBinding.progressTranslate
+            when {
+                p.total <= 0 -> bar.isVisible = false
+                p.done <= 0 -> {
+                    // first tile in flight — spin until we have a count to show
+                    if (!bar.isIndeterminate) {
+                        bar.isVisible = false
+                        bar.isIndeterminate = true
+                    }
+                    bar.isVisible = true
+                }
+                else -> {
+                    if (bar.isIndeterminate) {
+                        bar.isVisible = false
+                        bar.isIndeterminate = false
+                    }
+                    bar.isVisible = true
+                    bar.setProgressCompat(p.done * 100 / p.total, true)
+                }
+            }
+        }
+        viewModel.translationCoordinator.errors.observe(this) { error ->
+            if (error is org.koitharu.kotatsu.reader.translate.TranslateException.Partial) {
+                // Non-fatal: some tiles were kept and rendered; offer to retry the rest.
+                Snackbar.make(
+                    viewBinding.container,
+                    getString(R.string.translate_partial_failure, error.failedTiles),
+                    Snackbar.LENGTH_LONG,
+                ).setAction(R.string.retry) { viewModel.retryTranslateCurrentPage() }.show()
+                return@observe
+            }
+            val msg = when (error) {
+                is org.koitharu.kotatsu.reader.translate.TranslateException.NoEndpoint,
+                is org.koitharu.kotatsu.reader.translate.TranslateException.NoKey ->
+                    getString(R.string.translate_setup_required)
+                is org.koitharu.kotatsu.reader.translate.TranslateException.Http ->
+                    "HTTP ${error.code}: ${error.responseBody.take(120)}"
+                else -> error.localizedMessage ?: getString(R.string.error_occurred)
+            }
+            Snackbar.make(viewBinding.container, msg, Snackbar.LENGTH_INDEFINITE)
+                .setAction(R.string.copy) { copyToClipboard("Kaisoku error", msg) }
+                .show()
+        }
         viewModel.readerMode.observe(this, Lifecycle.State.STARTED, this::onInitReader)
         viewModel.onPageSaved.observeEvent(this, PagesSavedObserver(viewBinding.container))
         viewModel.uiState.zipWithPrevious().observe(this, this::onUiStateChanged)

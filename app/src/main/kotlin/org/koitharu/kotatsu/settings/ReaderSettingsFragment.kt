@@ -8,11 +8,17 @@ import androidx.preference.ListPreference
 import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.ZoomMode
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.EInkFlashColor
+import org.koitharu.kotatsu.reader.translate.TranslateProvider
+import org.koitharu.kotatsu.reader.translate.TranslationCoordinator
 import org.koitharu.kotatsu.core.prefs.ReaderAnimation
 import org.koitharu.kotatsu.core.prefs.ReaderBackground
 import org.koitharu.kotatsu.core.prefs.ReaderControl
@@ -30,6 +36,11 @@ import org.koitharu.kotatsu.settings.utils.SliderPreference
 class ReaderSettingsFragment :
 	BasePreferenceFragment(R.string.reader_settings),
 	SharedPreferences.OnSharedPreferenceChangeListener {
+
+	@Inject
+	lateinit var translationCoordinator: TranslationCoordinator
+
+	private val cacheScope = MainScope()
 
 	override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
 		addPreferencesFromResource(R.xml.pref_reader)
@@ -80,6 +91,7 @@ class ReaderSettingsFragment :
 			setDefaultValueCompat(EInkFlashColor.WHITE.name)
 		}
 		updateReaderModeDependency()
+		updateTranslateDependencies()
 	}
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -99,13 +111,39 @@ class ReaderSettingsFragment :
 				true
 			}
 
+			AppSettings.KEY_TRANSLATE_CLEAR_CACHE -> {
+				cacheScope.launch { translationCoordinator.clearAll() }
+				true
+			}
+
 			else -> super.onPreferenceTreeClick(preference)
 		}
+	}
+
+	override fun onDestroy() {
+		cacheScope.cancel()
+		super.onDestroy()
 	}
 
 	override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
 		when (key) {
 			AppSettings.KEY_READER_MODE -> updateReaderModeDependency()
+			AppSettings.KEY_TRANSLATE_PROVIDER, AppSettings.KEY_TRANSLATE_ENABLED -> updateTranslateDependencies()
+		}
+	}
+
+	/**
+	 * Gate every translation sub-setting on the master beta toggle, and hide the BYOK
+	 * endpoint/key/model/headers fields when the keyless Google Lens provider is selected.
+	 */
+	private fun updateTranslateDependencies() {
+		val enabled = settings.isPageTranslationEnabled
+		val isLens = settings.translateProvider == TranslateProvider.GOOGLE_LENS
+		for (key in TRANSLATE_CONFIG_KEYS) {
+			findPreference<Preference>(key)?.isEnabled = enabled
+		}
+		for (key in TRANSLATE_BYOK_KEYS) {
+			findPreference<Preference>(key)?.isVisible = !isLens
 		}
 	}
 
@@ -126,5 +164,31 @@ class ReaderSettingsFragment :
 			val value = preference.value
 			return preference.context.resources.getQuantityStringSafe(R.plurals.pages, value, value)
 		}
+	}
+
+	private companion object {
+		// BYOK fields hidden for the keyless Google Lens provider.
+		private val TRANSLATE_BYOK_KEYS = arrayOf(
+			AppSettings.KEY_TRANSLATE_ENDPOINT,
+			AppSettings.KEY_TRANSLATE_API_KEY,
+			AppSettings.KEY_TRANSLATE_MODEL,
+			AppSettings.KEY_TRANSLATE_CUSTOM_HEADERS,
+		)
+
+		// Everything under the category, disabled when the master toggle is off.
+		private val TRANSLATE_CONFIG_KEYS = arrayOf(
+			AppSettings.KEY_TRANSLATE_PROVIDER,
+			AppSettings.KEY_TRANSLATE_ENDPOINT,
+			AppSettings.KEY_TRANSLATE_API_KEY,
+			AppSettings.KEY_TRANSLATE_MODEL,
+			AppSettings.KEY_TRANSLATE_CUSTOM_HEADERS,
+			AppSettings.KEY_TRANSLATE_SOURCE_LANG,
+			AppSettings.KEY_TRANSLATE_TARGET_LANG,
+			AppSettings.KEY_TRANSLATE_TRIGGER_MODE,
+			AppSettings.KEY_TRANSLATE_OVERLAY_BG,
+			AppSettings.KEY_TRANSLATE_CONCURRENCY,
+			AppSettings.KEY_TRANSLATE_RPM,
+			AppSettings.KEY_TRANSLATE_CLEAR_CACHE,
+		)
 	}
 }

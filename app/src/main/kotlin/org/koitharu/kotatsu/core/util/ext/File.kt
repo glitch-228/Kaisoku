@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.storage.StorageManager
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.core.database.getStringOrNull
 import kotlinx.coroutines.Dispatchers
@@ -60,19 +61,38 @@ suspend fun File.deleteAwait() = runInterruptible(Dispatchers.IO) {
 }
 
 fun ContentResolver.resolveName(uri: Uri): String? {
-	val fallback = uri.lastPathSegment
+	val fallback = uri.lastPathSegment?.substringAfterLast('/')
 	if (uri.scheme != "content") {
 		return fallback
 	}
-	query(uri, null, null, null, null)?.use {
-		if (it.moveToFirst()) {
-			it.getStringOrNull(it.getColumnIndex(OpenableColumns.DISPLAY_NAME))?.let { name ->
-				return name
+	// A tree uri (ACTION_OPEN_DOCUMENT_TREE) can't be queried directly: the DocumentsProvider
+	// throws UnsupportedOperationException (#7). Resolve it to its document uri first, and never
+	// let a provider that rejects the query crash the import — fall back to the path name.
+	val queryUri = uri.toQueryableDocumentUri()
+	val name = runCatching {
+		query(queryUri, null, null, null, null)?.use {
+			if (it.moveToFirst()) {
+				it.getStringOrNull(it.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+			} else {
+				null
 			}
 		}
-	}
-	return fallback
+	}.getOrNull()
+	return name ?: fallback
 }
+
+private fun Uri.toQueryableDocumentUri(): Uri = runCatching {
+	val isTree = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+		DocumentsContract.isTreeUri(this)
+	} else {
+		pathSegments.firstOrNull() == "tree"
+	}
+	if (isTree) {
+		DocumentsContract.buildDocumentUriUsingTree(this, DocumentsContract.getTreeDocumentId(this))
+	} else {
+		this
+	}
+}.getOrDefault(this)
 
 suspend fun File.computeSize(): Long = runInterruptible(Dispatchers.IO) {
 	walkCompat(includeDirectories = false).sumOf { it.length() }

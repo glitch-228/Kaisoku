@@ -73,6 +73,12 @@
 -keep interface keiyoushi.** { *; }
 -dontwarn keiyoushi.**
 
+# QuickJS (app.cash.quickjs) — only referenced by dynamically-loaded extensions, so R8 would
+# otherwise strip it and release builds would fail with "Failed resolution of: Lapp/cash/quickjs/QuickJs;".
+-keep class app.cash.quickjs.** { *; }
+-keep interface app.cash.quickjs.** { *; }
+-dontwarn app.cash.quickjs.**
+
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
 -keeppackagenames okhttp3.**
@@ -142,3 +148,14 @@
 -keep public class org.koitharu.kotatsu.parsers.util.** { public protected *; }
 -keep,allowobfuscation @org.koitharu.kotatsu.parsers.MangaSourceParser class * { *; }
 -keep,allowobfuscation @org.koitharu.kotatsu.parsers.InternalParsersApi class * { *; }
+
+# INVARIANT: keep every external library kaisoku-parsers links against. R8 keeps the parser classes
+# as frozen entry points (above) but still optimizes/shrinks the libraries they call — it can't see
+# the parser's call sites, so it rewrites/strips Kotlin default-arg synthetic constructors & methods
+# (the trailing int-mask / DefaultConstructorMarker params), and the parser then hits a runtime
+# NoSuchMethodError (release-only). Seen with MangaLoaderContext (v9.7.7-2, #2/#3) and with
+# SparseArrayCompat (Paginator -> SparseArrayCompat()).
+# Parser deps (kaisoku-parsers/build.gradle.kts): kotlinx.coroutines (kept below), okhttp3 + okio
+# (kept above), jsoup (kept above), org.json (Android platform, never shrunk), androidx.collection
+# (kept here). When kaisoku-parsers gains a new library dependency, add a keep for it here too.
+-keep class androidx.collection.** { *; }

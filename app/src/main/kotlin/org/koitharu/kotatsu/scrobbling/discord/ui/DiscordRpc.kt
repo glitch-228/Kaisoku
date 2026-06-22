@@ -9,6 +9,7 @@ import com.my.kizzyrpc.entities.presence.Activity
 import com.my.kizzyrpc.entities.presence.Assets
 import com.my.kizzyrpc.entities.presence.Metadata
 import com.my.kizzyrpc.entities.presence.Timestamps
+import dagger.Lazy
 import dagger.hilt.android.ViewModelLifecycle
 import dagger.hilt.android.lifecycle.RetainedLifecycle
 import dagger.hilt.android.scopes.ViewModelScoped
@@ -45,6 +46,7 @@ class DiscordRpc @Inject constructor(
 	@LocalizedAppContext private val context: Context,
 	private val settings: AppSettings,
 	private val repository: DiscordRepository,
+	private val oauthRpc: Lazy<DiscordOauthRpc>,
 	lifecycle: ViewModelLifecycle,
 ) : RetainedLifecycle.OnClearedListener {
 
@@ -67,16 +69,30 @@ class DiscordRpc @Inject constructor(
 	}
 
 	override fun onCleared() {
-		clearRpc()
+		synchronized(this) {
+			rpc?.closeRPC()
+			rpc = null
+			lastUpdate = 0L
+		}
 	}
 
-	fun clearRpc() = synchronized(this) {
-		rpc?.closeRPC()
-		rpc = null
-		lastUpdate = 0L
+	fun clearRpc() {
+		if (settings.isDiscordRpcOauth) {
+			oauthRpc.get().clearRpc()
+			return
+		}
+		synchronized(this) {
+			rpc?.closeRPC()
+			rpc = null
+			lastUpdate = 0L
+		}
 	}
 
 	fun setIdle() {
+		if (settings.isDiscordRpcOauth) {
+			oauthRpc.get().setIdle()
+			return
+		}
 		lastActivity?.let { activity ->
 			getRpc()?.updateRpcAsync(activity, idle = true)
 		}
@@ -84,6 +100,10 @@ class DiscordRpc @Inject constructor(
 
 	@AnyThread
 	fun updateRpc(manga: Manga, state: ReaderUiState) {
+		if (settings.isDiscordRpcOauth) {
+			oauthRpc.get().updateRpc(manga, state)
+			return
+		}
 		getRpc()?.run {
 			if (settings.isDiscordRpcSkipNsfw && manga.isNsfw()) {
 				clearRpc()

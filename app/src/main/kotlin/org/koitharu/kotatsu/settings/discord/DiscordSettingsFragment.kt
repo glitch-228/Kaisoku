@@ -9,6 +9,7 @@ import androidx.fragment.app.viewModels
 import androidx.preference.EditTextPreference
 import androidx.preference.EditTextPreferenceDialogFragmentCompat
 import androidx.preference.Preference
+import androidx.preference.SwitchPreferenceCompat
 import dagger.hilt.android.AndroidEntryPoint
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.prefs.AppSettings
@@ -16,6 +17,7 @@ import org.koitharu.kotatsu.core.ui.BasePreferenceFragment
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.withArgs
 import org.koitharu.kotatsu.scrobbling.discord.ui.DiscordAuthActivity
+import org.koitharu.kotatsu.scrobbling.discord.ui.DiscordOauthActivity
 
 @AndroidEntryPoint
 class DiscordSettingsFragment : BasePreferenceFragment(R.string.discord) {
@@ -34,6 +36,22 @@ class DiscordSettingsFragment : BasePreferenceFragment(R.string.discord) {
 				it.inputType = EditorInfo.TYPE_CLASS_TEXT or EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
 			}
 		}
+		findPreference<Preference>(AppSettings.KEY_DISCORD_OAUTH_SIGNIN)?.setOnPreferenceClickListener {
+			startActivity(Intent(context, DiscordOauthActivity::class.java))
+			true
+		}
+		findPreference<SwitchPreferenceCompat>(AppSettings.KEY_DISCORD_RPC_OAUTH)?.let { pref ->
+			updateAuthMethodVisibility(pref.isChecked)
+			pref.setOnPreferenceChangeListener { _, newValue ->
+				updateAuthMethodVisibility(newValue as Boolean)
+				true
+			}
+		}
+	}
+
+	private fun updateAuthMethodVisibility(isOauth: Boolean) {
+		findPreference<EditTextPreference>(AppSettings.KEY_DISCORD_TOKEN)?.isVisible = !isOauth
+		findPreference<Preference>(AppSettings.KEY_DISCORD_OAUTH_SIGNIN)?.isVisible = isOauth
 	}
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

@@ -243,4 +243,91 @@
 		android:title="@string/preload_pages"
 		app:useSimpleSummaryProvider="true" />
 
+	<PreferenceCategory
+		android:key="cat_ai_translation"
+		android:title="@string/ai_translation_beta">
+
+		<SwitchPreferenceCompat
+			android:defaultValue="false"
+			android:key="translate_enabled"
+			android:summary="@string/translate_enabled_summary"
+			android:title="@string/translate_enabled" />
+
+		<ListPreference
+			android:defaultValue="OPENAI_COMPATIBLE"
+			android:entries="@array/translate_providers"
+			android:entryValues="@array/translate_providers_values"
+			android:key="translate_provider"
+			android:title="@string/translate_provider"
+			app:useSimpleSummaryProvider="true" />
+
+		<EditTextPreference
+			android:key="translate_endpoint"
+			android:title="@string/translate_endpoint"
+			app:useSimpleSummaryProvider="true" />
+
+		<EditTextPreference
+			android:key="translate_api_key"
+			android:title="@string/translate_api_key" />
+
+		<EditTextPreference
+			android:key="translate_model"
+			android:title="@string/translate_model"
+			app:useSimpleSummaryProvider="true" />
+
+		<EditTextPreference
+			android:key="translate_custom_headers"
+			android:title="@string/translate_custom_headers" />
+
+		<ListPreference
+			android:defaultValue="auto"
+			android:entries="@array/translate_languages"
+			android:entryValues="@array/translate_languages_values"
+			android:key="translate_source_lang"
+			android:title="@string/translate_source_lang"
+			app:useSimpleSummaryProvider="true" />
+
+		<ListPreference
+			android:entries="@array/translate_languages"
+			android:entryValues="@array/translate_languages_values"
+			android:key="translate_target_lang"
+			android:title="@string/translate_target_lang"
+			app:useSimpleSummaryProvider="true" />
+
+		<ListPreference
+			android:defaultValue="MANUAL"
+			android:entries="@array/translate_trigger_modes"
+			android:entryValues="@array/translate_trigger_modes_values"
+			android:key="translate_trigger_mode"
+			android:title="@string/translate_trigger_mode"
+			app:useSimpleSummaryProvider="true" />
+
+		<SwitchPreferenceCompat
+			android:defaultValue="true"
+			android:key="translate_overlay_bg"
+			android:summary="@string/translate_overlay_bg_summary"
+			android:title="@string/translate_overlay_bg" />
+
+		<SeekBarPreference
+			android:defaultValue="1"
+			android:key="translate_concurrency"
+			android:max="4"
+			android:title="@string/translate_concurrency"
+			app:min="1"
+			app:showSeekBarValue="true" />
+
+		<SeekBarPreference
+			android:defaultValue="10"
+			android:key="translate_rpm"
+			android:max="60"
+			android:title="@string/translate_rpm"
+			app:min="1"
+			app:showSeekBarValue="true" />
+
+		<Preference
+			android:key="translate_clear_cache"
+			android:title="@string/translate_clear_cache" />
+
+	</PreferenceCategory>
+
 </PreferenceScreen>

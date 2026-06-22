@@ -384,6 +384,21 @@
 			android:name="org.koitharu.kotatsu.scrobbling.discord.ui.DiscordAuthActivity"
 			android:label="@string/discord" />
 
+		<activity
+			android:name="org.koitharu.kotatsu.scrobbling.discord.ui.DiscordOauthActivity"
+			android:exported="true"
+			android:launchMode="singleTask"
+			android:label="@string/discord">
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="kaisoku" />
+				<data android:scheme="kotatsu" />
+				<data android:host="discord-auth" />
+			</intent-filter>
+		</activity>
+
 		<service
 			android:name="androidx.work.impl.foreground.SystemForegroundService"
 			android:foregroundServiceType="dataSync"

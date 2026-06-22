@@ -111,9 +111,14 @@ class ProxyProvider @Inject constructor(
 
 	private fun isBypassEnabled() = settings.isProxyBypassEnabled
 
-	private fun isRegularProxyEnabled() = settings.proxyType != Proxy.Type.DIRECT && !isBypassEnabled()
+	// A regular proxy only counts as configured when it has both a non-DIRECT type and an address; a
+	// type without an address (e.g. restored from such a backup) is treated as no proxy everywhere.
+	private fun isRegularProxyConfigured() =
+		settings.proxyType != Proxy.Type.DIRECT && !settings.proxyAddress.isNullOrEmpty()
 
-	private fun isProxyEnabled() = isBypassEnabled() || settings.proxyType != Proxy.Type.DIRECT
+	private fun isRegularProxyEnabled() = isRegularProxyConfigured() && !isBypassEnabled()
+
+	private fun isProxyEnabled() = isBypassEnabled() || isRegularProxyConfigured()
 
 	private fun getProxy(): Proxy {
 		if (isBypassEnabled()) {
@@ -124,10 +129,13 @@ class ProxyProvider @Inject constructor(
 		val type = settings.proxyType
 		val address = settings.proxyAddress
 		val port = settings.proxyPort
-		if (type == Proxy.Type.DIRECT) {
+		// A proxy type with no address can't proxy anything (e.g. a backup that carried proxy_type
+		// without an address). Use a direct connection instead of throwing on every request: that
+		// storm retained ~631k ProxyConfigException instances (~400 MB of stack backtraces) -> OOM.
+		if (type == Proxy.Type.DIRECT || address.isNullOrEmpty()) {
 			return Proxy.NO_PROXY
 		}
-		if (address.isNullOrEmpty() || port < 0 || port > 0xFFFF) {
+		if (port < 0 || port > 0xFFFF) {
 			throw ProxyConfigException()
 		}
 		cachedProxy?.let {

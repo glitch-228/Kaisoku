@@ -1,0 +1,2 @@
+- fixed out-of-memory crash linked to proxy settings (#6)
+- more reliable crash reporting

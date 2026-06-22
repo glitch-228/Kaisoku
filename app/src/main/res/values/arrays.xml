@@ -1,5 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+	<string-array name="translate_providers">
+		<item>@string/translate_provider_openai</item>
+		<item>@string/translate_provider_gemini</item>
+		<item>@string/translate_provider_google_lens</item>
+	</string-array>
+	<string-array name="translate_providers_values" translatable="false">
+		<item>OPENAI_COMPATIBLE</item>
+		<item>GEMINI</item>
+		<item>GOOGLE_LENS</item>
+	</string-array>
+	<string-array name="translate_trigger_modes">
+		<item>@string/translate_trigger_manual</item>
+		<item>@string/translate_trigger_auto</item>
+	</string-array>
+	<string-array name="translate_trigger_modes_values" translatable="false">
+		<item>MANUAL</item>
+		<item>AUTO_ON_PAGE</item>
+	</string-array>
+	<string-array name="translate_languages">
+		<item>@string/lang_auto</item>
+		<item>English</item>
+		<item>日本語</item>
+		<item>中文 (简体)</item>
+		<item>中文 (繁體)</item>
+		<item>한국어</item>
+		<item>Español</item>
+		<item>Français</item>
+		<item>Deutsch</item>
+		<item>Italiano</item>
+		<item>Português</item>
+		<item>Русский</item>
+	</string-array>
+	<string-array name="translate_languages_values" translatable="false">
+		<item>auto</item>
+		<item>en</item>
+		<item>ja</item>
+		<item>zh-CN</item>
+		<item>zh-TW</item>
+		<item>ko</item>
+		<item>es</item>
+		<item>fr</item>
+		<item>de</item>
+		<item>it</item>
+		<item>pt</item>
+		<item>ru</item>
+	</string-array>
 	<string-array name="themes" translatable="false">
 		<item>@string/follow_system</item>
 		<item>@string/light</item>

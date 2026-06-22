@@ -8,11 +8,24 @@
 		android:layout="@layout/preference_toggle_header"
 		android:title="@string/discord_rpc" />
 
+	<SwitchPreferenceCompat
+		android:defaultValue="false"
+		android:dependency="discord_rpc"
+		android:key="discord_rpc_oauth"
+		android:summary="@string/discord_rpc_oauth_summary"
+		android:title="@string/discord_rpc_oauth" />
+
 	<EditTextPreference
 		android:dependency="discord_rpc"
 		android:key="discord_token"
 		android:summary="@string/discord_token_summary"
 		android:title="@string/discord_token" />
+
+	<Preference
+		android:dependency="discord_rpc"
+		android:key="discord_oauth_signin"
+		android:summary="@string/discord_rpc_oauth_summary"
+		android:title="@string/sign_in" />
 
 	<SwitchPreferenceCompat
 		android:dependency="discord_rpc"

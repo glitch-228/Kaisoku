@@ -1,0 +1,1 @@
+- fixed sources crashing to open on the release build

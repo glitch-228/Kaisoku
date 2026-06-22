@@ -12,8 +12,12 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.viewbinding.ViewBinding
 import com.davemorrissey.labs.subscaleview.DefaultOnImageEventListener
+import com.davemorrissey.labs.subscaleview.ImageSource
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koitharu.kotatsu.BuildConfig
@@ -34,6 +38,15 @@ import org.koitharu.kotatsu.reader.ui.config.ReaderSettings
 import org.koitharu.kotatsu.reader.ui.pager.vm.PageState
 import org.koitharu.kotatsu.reader.ui.pager.vm.PageViewModel
 import org.koitharu.kotatsu.reader.ui.pager.webtoon.WebtoonHolder
+
+private fun Context.findActivity(): android.app.Activity {
+	var ctx: Context? = this
+	while (ctx is android.content.ContextWrapper) {
+		if (ctx is android.app.Activity) return ctx
+		ctx = ctx.baseContext
+	}
+	error("Holder context is not attached to an Activity")
+}
 
 abstract class BasePageHolder<B : ViewBinding>(
 	protected val binding: B,
@@ -67,6 +80,15 @@ abstract class BasePageHolder<B : ViewBinding>(
 	var boundData: ReaderPage? = null
 		private set
 
+	private val translateEntryPoint by lazy {
+		EntryPointAccessors.fromActivity(
+			context.findActivity(),
+			org.koitharu.kotatsu.reader.translate.ReaderPageEntryPoint::class.java,
+		)
+	}
+	private var translationJob: Job? = null
+	private var translationOverlayActive = false
+
 	init {
 		lifecycleScope.launch(Dispatchers.Main) {
 			ssiv.bindToLifecycle(this@BasePageHolder)
@@ -99,9 +121,15 @@ abstract class BasePageHolder<B : ViewBinding>(
 		ssiv.applyDownSampling(isResumed())
 	}
 
-	fun reloadImage() {
+	fun reloadImage(preserveState: Boolean = false) {
 		val source = (viewModel.state.value as? PageState.Shown)?.source ?: return
-		ssiv.setImage(source)
+		// On untranslate, keep the current pan/zoom so going back doesn't jump either.
+		val viewState = if (preserveState) ssiv.getState() else null
+		if (viewState != null) {
+			ssiv.setImage(source, null, viewState)
+		} else {
+			ssiv.setImage(source)
+		}
 	}
 
 	fun bind(data: ReaderPage) {
@@ -109,8 +137,49 @@ abstract class BasePageHolder<B : ViewBinding>(
 		ssiv.isVisible = true
 		animatedView?.isVisible = false
 		animatedView?.disposeImage()
+		translationOverlayActive = false
 		viewModel.onBind(data.toMangaPage())
 		onBind(data)
+		observeTranslationState(data)
+	}
+
+	private fun observeTranslationState(data: ReaderPage) {
+		translationJob?.cancel()
+		val page = data.toMangaPage()
+		val coordinator = translateEntryPoint.translationCoordinator()
+		val appSettings = translateEntryPoint.appSettings()
+		translationJob = lifecycleScope.launch(Dispatchers.Main) {
+			coordinator.stateFor(page.id).collectLatest { state ->
+				when (state) {
+					is org.koitharu.kotatsu.reader.translate.PageTranslationState.Done -> {
+						translationOverlayActive = true
+						// Keep the current pan/zoom: the translated bitmap has the same dimensions,
+						// so reusing the view state stops the page from jumping on overlay swap.
+						val viewState = ssiv.getState()
+						val rendered = ImageSource.cachedBitmap(state.rendered)
+						if (viewState != null) {
+							ssiv.setImage(rendered, null, viewState)
+						} else {
+							ssiv.setImage(rendered)
+						}
+					}
+					org.koitharu.kotatsu.reader.translate.PageTranslationState.Idle,
+					is org.koitharu.kotatsu.reader.translate.PageTranslationState.Failed -> {
+						if (translationOverlayActive) {
+							translationOverlayActive = false
+							reloadImage(preserveState = true)
+						}
+					}
+					org.koitharu.kotatsu.reader.translate.PageTranslationState.Loading -> Unit
+				}
+			}
+		}
+		if (appSettings.translateTriggerMode == org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE &&
+			appSettings.isPageTranslationEnabled &&
+			appSettings.isPageTranslationConfigured
+		) {
+			coordinator.requestTranslate(page)
+		}
 	}
 
 	@CallSuper
@@ -147,6 +216,9 @@ abstract class BasePageHolder<B : ViewBinding>(
 
 	@CallSuper
 	open fun onRecycled() {
+		translationJob?.cancel()
+		translationJob = null
+		translationOverlayActive = false
 		viewModel.onRecycle()
 		ssiv.recycle()
 		animatedView?.disposeImage()

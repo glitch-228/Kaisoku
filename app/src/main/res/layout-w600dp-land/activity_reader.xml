@@ -34,6 +34,18 @@
 		android:visibility="gone"
 		tools:visibility="visible" />
 
+	<com.google.android.material.progressindicator.CircularProgressIndicator
+		android:id="@+id/progressTranslate"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_gravity="top|end"
+		android:layout_margin="16dp"
+		android:indeterminate="true"
+		android:visibility="gone"
+		app:indicatorSize="28dp"
+		app:trackThickness="3dp"
+		tools:visibility="visible" />
+
 	<org.koitharu.kotatsu.reader.ui.ScrollTimerControlView
 		android:id="@+id/timerControl"
 		android:layout_width="320dp"

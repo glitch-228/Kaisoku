@@ -4,6 +4,7 @@ import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.core.text.bold
 import androidx.core.text.buildSpannedString
+import androidx.viewpager2.widget.MarginPageTransformer
 import com.hannesdorfmann.adapterdelegates4.dsl.adapterDelegateViewBinding
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.getSummary
@@ -59,7 +60,15 @@ fun exploreRecommendationItemAD(
 	val adapter = BaseListAdapter<MangaCompactListModel>()
 		.addDelegate(ListItemType.MANGA_LIST, recommendationMangaItemAD(itemClickListener))
 	binding.pager.adapter = adapter
-	binding.pager.recyclerView?.isNestedScrollingEnabled = false
+	binding.pager.offscreenPageLimit = 1
+	val peek = context.resources.getDimensionPixelOffset(R.dimen.margin_normal)
+	val gap = context.resources.getDimensionPixelOffset(R.dimen.margin_small)
+	binding.pager.recyclerView?.apply {
+		isNestedScrollingEnabled = false
+		clipToPadding = false
+		setPadding(peek, 0, peek, 0)
+	}
+	binding.pager.setPageTransformer(MarginPageTransformer(gap))
 	binding.dots.bindToViewPager(binding.pager)
 
 	bind {

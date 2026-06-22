@@ -27,7 +27,13 @@ abstract class BaseReaderFragment<B : ViewBinding> : BaseFragment<B>(), ZoomCont
 		viewModel.content.observe(viewLifecycleOwner) {
 			val currentState = viewModel.getCurrentState()
 			val pendingState = when {
-				readerAdapter?.hasItems == true -> null
+				// Loading the prev/next chapter re-emits content with a null state while items already
+				// exist, and the page list shifts (front-trim on next, prepend on prev). Re-anchor to the
+				// page the user is on, otherwise the pager keeps a now-stale index and jumps to a
+				// different page (e.g. back to the start of the chapter). Guard on non-empty pages so the
+				// transient empty-list "clear" emitted by switchChapter() isn't treated as a navigation
+				// target (which would otherwise show "content not found").
+				readerAdapter?.hasItems == true -> if (it.state == null && it.pages.isNotEmpty()) currentState else null
 				it.state == null
 					&& it.pages.isNotEmpty() -> currentState
 				it.state != currentState
@@ -35,7 +41,6 @@ abstract class BaseReaderFragment<B : ViewBinding> : BaseFragment<B>(), ZoomCont
 					&& it.pages.any { page -> page.chapterId == currentState.chapterId } -> currentState
 				else -> it.state
 			}
-			android.util.Log.d("WS", "BaseFragment observer: hasItems=${readerAdapter?.hasItems} contentState=${it.state} currentState=$currentState pendingState=$pendingState pageCount=${it.pages.size}")
 			onPagesChanged(it.pages, pendingState)
 		}
 	}
@@ -45,7 +50,6 @@ abstract class BaseReaderFragment<B : ViewBinding> : BaseFragment<B>(), ZoomCont
 	override fun onPause() {
 		super.onPause()
 		val state = getCurrentState()
-		android.util.Log.d("WS", "onPause: saving state=$state")
 		viewModel.saveCurrentState(state)
 	}
 

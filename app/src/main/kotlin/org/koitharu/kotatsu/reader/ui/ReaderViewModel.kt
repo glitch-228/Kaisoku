@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -91,6 +92,7 @@ class ReaderViewModel @Inject constructor(
     private val detectReaderModeUseCase: DetectReaderModeUseCase,
     private val statsCollector: StatsCollector,
     private val discordRpc: DiscordRpc,
+    val translationCoordinator: org.koitharu.kotatsu.reader.translate.TranslationCoordinator,
     @LocalStorageChanges localStorageChanges: SharedFlow<LocalManga?>,
     interactor: DetailsInteractor,
     deleteLocalMangaUseCase: DeleteLocalMangaUseCase,
@@ -123,6 +125,12 @@ class ReaderViewModel @Inject constructor(
     val onLoadingError = MutableEventFlow<Throwable>()
     val onShowToast = MutableEventFlow<Int>()
     val onAskNsfwIncognito = MutableEventFlow<Unit>()
+    val onShowOcrSheet = MutableEventFlow<Unit>()
+    val onTranslateConfigMissing = MutableEventFlow<Unit>()
+    val ocrSheetState = MutableStateFlow<org.koitharu.kotatsu.reader.translate.OcrSheetState>(
+        org.koitharu.kotatsu.reader.translate.OcrSheetState.Idle,
+    )
+    private var ocrJob: Job? = null
     val uiState = MutableStateFlow<ReaderUiState?>(null)
 
     val isIncognitoMode = MutableStateFlow(savedStateHandle.get<Boolean>(ReaderIntent.EXTRA_INCOGNITO))
@@ -294,6 +302,78 @@ class ReaderViewModel @Inject constructor(
         return content.value.pages.find {
             it.chapterId == state.chapterId && it.index == state.page
         }?.toMangaPage()
+    }
+
+    fun requestOcrCurrentPage() {
+        val page = getCurrentPage() ?: return
+        if (!isTranslateConfigured()) {
+            onTranslateConfigMissing.call(Unit)
+            return
+        }
+        onShowOcrSheet.call(Unit)
+        ocrJob?.cancel()
+        ocrSheetState.value = org.koitharu.kotatsu.reader.translate.OcrSheetState.Loading
+        ocrJob = viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val blocks = translationCoordinator.requestOcr(page)
+                val text = blocks.joinToString("\n") { it.originalText }.trim()
+                ocrSheetState.value = org.koitharu.kotatsu.reader.translate.OcrSheetState.Done(text, blocks)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                ocrSheetState.value = org.koitharu.kotatsu.reader.translate.OcrSheetState.Failed(e)
+            }
+        }
+    }
+
+    fun toggleTranslateCurrentPage() {
+        val page = getCurrentPage() ?: return
+        if (!isTranslateConfigured()) {
+            onTranslateConfigMissing.call(Unit)
+            return
+        }
+        val currentState = translationCoordinator.stateFor(page.id).value
+        if (currentState is org.koitharu.kotatsu.reader.translate.PageTranslationState.Done) {
+            translationCoordinator.hideTranslation(page.id)
+        } else {
+            translationCoordinator.requestTranslate(page)
+        }
+    }
+
+    /** Always request translation for the current page (no toggle). Used by AUTO switch. */
+    fun ensureTranslateCurrentPage() {
+        val page = getCurrentPage() ?: return
+        if (!isTranslateConfigured()) {
+            onTranslateConfigMissing.call(Unit)
+            return
+        }
+        translationCoordinator.requestTranslate(page)
+    }
+
+    /** Re-run translation for the current page, re-attempting the tiles that failed last time. */
+    fun retryTranslateCurrentPage() {
+        val page = getCurrentPage() ?: return
+        if (!isTranslateConfigured()) {
+            onTranslateConfigMissing.call(Unit)
+            return
+        }
+        translationCoordinator.requestTranslate(page, force = true)
+    }
+
+    private fun isTranslateConfigured(): Boolean = settings.isPageTranslationConfigured
+
+    /** Flip between manual and auto trigger mode. Returns the new mode. */
+    fun toggleAutoTrigger(): org.koitharu.kotatsu.reader.translate.TranslateTriggerMode {
+        val next = if (settings.translateTriggerMode == org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE) {
+            org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.MANUAL
+        } else {
+            org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE
+        }
+        settings.translateTriggerMode = next
+        if (next == org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE && isTranslateConfigured()) {
+            getCurrentPage()?.let { translationCoordinator.requestTranslate(it) }
+        }
+        return next
     }
 
     fun switchChapter(id: Long, page: Int) {

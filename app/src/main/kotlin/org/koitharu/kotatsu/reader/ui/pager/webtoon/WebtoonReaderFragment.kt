@@ -170,7 +170,6 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 	}
 
 	override suspend fun onPagesChanged(pages: List<ReaderPage>, pendingState: ReaderState?) = coroutineScope {
-		android.util.Log.d("WS", "onPagesChanged pageCount=${pages.size} pendingState=$pendingState hasItems=${readerAdapter?.hasItems}")
 		val setItems = launch {
 			requireAdapter().setItems(pages)
 			yield()
@@ -184,7 +183,6 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 			}
 			setItems.join()
 			if (position != -1) {
-				android.util.Log.d("WS", "onPagesChanged: restoring position=$position scroll=${pendingState.scroll}")
 				with(requireViewBinding().recyclerView) {
 					firstVisibleItemPosition = position
 					postRestoreScroll(this, position, pendingState.scroll)
@@ -219,7 +217,6 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 		} else {
 			fallbackScroll
 		}
-		android.util.Log.d("WS", "getCurrentState item=$currentItem chapterId=${page.chapterId} page=${page.index} progress=$progress scroll=$scroll")
 		ReaderState(
 			chapterId = page.chapterId,
 			page = page.index,
@@ -245,7 +242,6 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 				val holder = rv.getChildViewHolder(view) as? WebtoonHolder
 				if (holder != null && holder.bindingAdapterPosition == position) {
 					rv.removeOnChildAttachStateChangeListener(this)
-					android.util.Log.d("WS", "postRestoreScroll: holder attached at pos=$position, restoring scroll=$scrollPercent")
 					holder.restoreScrollPercent(scrollPercent)
 				}
 			}

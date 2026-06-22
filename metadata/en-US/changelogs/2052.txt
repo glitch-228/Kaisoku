@@ -1,0 +1,1 @@
+- beta: in-reader AI page translation & OCR (bring-your-own-key LLM)

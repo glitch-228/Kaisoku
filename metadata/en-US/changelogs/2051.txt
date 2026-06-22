@@ -1,0 +1,2 @@
+- redesigned the suggestions section
+- fixed a crash when importing a local manga folder

@@ -175,18 +175,26 @@ class TrackingRepository @Inject constructor(
 
 	suspend fun saveUpdates(updates: MangaUpdates) {
 		db.withTransaction {
-			val track = getOrCreateTrack(updates.manga.id).mergeWith(updates)
-			db.getTracksDao().upsert(track)
-			if (updates is MangaUpdates.Success && updates.isValid && updates.newChapters.isNotEmpty()) {
+			val track = getOrCreateTrack(updates.manga.id)
+			if (updates is MangaUpdates.Success && updates.isValid && updates.isNotEmpty()) {
+				val chaptersText = updates.newChapters.joinToString("\n") { x -> x.name }
+				// Tracker re-checks an unread title still report its chapters as "new"; skip re-logging
+				// (and re-notifying) when the latest log already holds the exact same chapters.
+				if (db.getTrackLogsDao().findLast(updates.manga.id)?.chapters == chaptersText) {
+					db.getTracksDao().upsert(track.copy(lastCheckTime = System.currentTimeMillis()))
+					return@withTransaction
+				}
 				progressUpdateUseCase(updates.manga)
-				val logEntity = TrackLogEntity(
-					mangaId = updates.manga.id,
-					chapters = updates.newChapters.joinToString("\n") { x -> x.name },
-					createdAt = System.currentTimeMillis(),
-					isUnread = true,
+				db.getTrackLogsDao().insert(
+					TrackLogEntity(
+						mangaId = updates.manga.id,
+						chapters = chaptersText,
+						createdAt = System.currentTimeMillis(),
+						isUnread = true,
+					),
 				)
-				db.getTrackLogsDao().insert(logEntity)
 			}
+			db.getTracksDao().upsert(track.mergeWith(updates))
 		}
 	}
 
@@ -271,7 +279,7 @@ class TrackingRepository @Inject constructor(
 
 			is MangaUpdates.Success -> TrackEntity(
 				mangaId = mangaId,
-				lastChapterId = updates.manga.getChapters(updates.branch).lastOrNull()?.id ?: NO_ID,
+				lastChapterId = updates.lastChapterId(),
 				newChapters = if (updates.isValid) newChapters + updates.newChapters.size else 0,
 				lastCheckTime = System.currentTimeMillis(),
 				lastChapterDate = updates.lastChapterDate().ifZero { lastChapterDate },

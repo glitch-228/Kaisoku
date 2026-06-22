@@ -57,6 +57,60 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getBoolean(KEY_FIRST_LAUNCH, true)
 		set(value) = prefs.edit { putBoolean(KEY_FIRST_LAUNCH, value) }
 
+	var translateProvider: org.koitharu.kotatsu.reader.translate.TranslateProvider
+		get() = prefs.getEnumValue(KEY_TRANSLATE_PROVIDER, org.koitharu.kotatsu.reader.translate.TranslateProvider.OPENAI_COMPATIBLE)
+		set(value) = prefs.edit { putEnumValue(KEY_TRANSLATE_PROVIDER, value) }
+
+	var translateEndpoint: String
+		get() = prefs.getString(KEY_TRANSLATE_ENDPOINT, null).orEmpty()
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_ENDPOINT, value) }
+
+	var translateApiKey: String
+		get() = prefs.getString(KEY_TRANSLATE_API_KEY, null).orEmpty()
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_API_KEY, value) }
+
+	var translateModel: String
+		get() = prefs.getString(KEY_TRANSLATE_MODEL, null).orEmpty()
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_MODEL, value) }
+
+	var translateCustomHeaders: String
+		get() = prefs.getString(KEY_TRANSLATE_CUSTOM_HEADERS, null).orEmpty()
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_CUSTOM_HEADERS, value) }
+
+	var translateSourceLanguage: String
+		get() = prefs.getString(KEY_TRANSLATE_SOURCE_LANG, null) ?: "auto"
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_SOURCE_LANG, value) }
+
+	var translateTargetLanguage: String
+		get() = prefs.getString(KEY_TRANSLATE_TARGET_LANG, null)
+			?: java.util.Locale.getDefault().language
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_TARGET_LANG, value) }
+
+	var translateTriggerMode: org.koitharu.kotatsu.reader.translate.TranslateTriggerMode
+		get() = prefs.getEnumValue(KEY_TRANSLATE_TRIGGER_MODE, org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.MANUAL)
+		set(value) = prefs.edit { putEnumValue(KEY_TRANSLATE_TRIGGER_MODE, value) }
+
+	var translateOverlayBackground: Boolean
+		get() = prefs.getBoolean(KEY_TRANSLATE_OVERLAY_BG, true)
+		set(value) = prefs.edit { putBoolean(KEY_TRANSLATE_OVERLAY_BG, value) }
+
+	var translateConcurrency: Int
+		get() = prefs.getInt(KEY_TRANSLATE_CONCURRENCY, 1).coerceIn(1, 4)
+		set(value) = prefs.edit { putInt(KEY_TRANSLATE_CONCURRENCY, value.coerceIn(1, 4)) }
+
+	var translateRpm: Int
+		get() = prefs.getInt(KEY_TRANSLATE_RPM, 10).coerceIn(1, 60)
+		set(value) = prefs.edit { putInt(KEY_TRANSLATE_RPM, value.coerceIn(1, 60)) }
+
+	var isPageTranslationEnabled: Boolean
+		get() = prefs.getBoolean(KEY_TRANSLATE_ENABLED, false)
+		set(value) = prefs.edit { putBoolean(KEY_TRANSLATE_ENABLED, value) }
+
+	/** Whether the selected provider has everything it needs to run (Google Lens needs no key). */
+	val isPageTranslationConfigured: Boolean
+		get() = translateProvider == org.koitharu.kotatsu.reader.translate.TranslateProvider.GOOGLE_LENS ||
+			(translateApiKey.isNotBlank() && translateEndpoint.isNotBlank())
+
 	var listMode: ListMode
 		get() = prefs.getEnumValue(KEY_LIST_MODE, ListMode.GRID)
 		set(value) = prefs.edit { putEnumValue(KEY_LIST_MODE, value) }
@@ -617,6 +671,19 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getString(KEY_DISCORD_TOKEN, null)?.trim()?.nullIfEmpty()
 		set(value) = prefs.edit { putString(KEY_DISCORD_TOKEN, value?.nullIfEmpty()) }
 
+	val isDiscordRpcOauth: Boolean
+		get() = prefs.getBoolean(KEY_DISCORD_RPC_OAUTH, false)
+
+	var discordRefreshToken: String?
+		get() = prefs.getString(KEY_DISCORD_REFRESH_TOKEN, null)?.trim()?.nullIfEmpty()
+		set(value) = prefs.edit { putString(KEY_DISCORD_REFRESH_TOKEN, value?.nullIfEmpty()) }
+
+	var discordCodeVerifier: String?
+		get() = prefs.getString(KEY_DISCORD_CODE_VERIFIER, null)
+		set(value) = prefs.edit {
+			if (value != null) putString(KEY_DISCORD_CODE_VERIFIER, value) else remove(KEY_DISCORD_CODE_VERIFIER)
+		}
+
 	val isPeriodicalBackupEnabled: Boolean
 		get() = prefs.getBoolean(KEY_BACKUP_PERIODICAL_ENABLED, false)
 
@@ -953,6 +1020,24 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_DISCORD_RPC = "discord_rpc"
 		const val KEY_DISCORD_RPC_SKIP_NSFW = "discord_rpc_skip_nsfw"
 		const val KEY_DISCORD_TOKEN = "discord_token"
+		const val KEY_DISCORD_RPC_OAUTH = "discord_rpc_oauth"
+		const val KEY_DISCORD_REFRESH_TOKEN = "discord_refresh_token"
+		const val KEY_DISCORD_CODE_VERIFIER = "discord_code_verifier"
+		const val KEY_DISCORD_OAUTH_SIGNIN = "discord_oauth_signin"
+
+		const val KEY_TRANSLATE_PROVIDER = "translate_provider"
+		const val KEY_TRANSLATE_ENDPOINT = "translate_endpoint"
+		const val KEY_TRANSLATE_API_KEY = "translate_api_key"
+		const val KEY_TRANSLATE_MODEL = "translate_model"
+		const val KEY_TRANSLATE_CUSTOM_HEADERS = "translate_custom_headers"
+		const val KEY_TRANSLATE_SOURCE_LANG = "translate_source_lang"
+		const val KEY_TRANSLATE_TARGET_LANG = "translate_target_lang"
+		const val KEY_TRANSLATE_TRIGGER_MODE = "translate_trigger_mode"
+		const val KEY_TRANSLATE_OVERLAY_BG = "translate_overlay_bg"
+		const val KEY_TRANSLATE_CONCURRENCY = "translate_concurrency"
+		const val KEY_TRANSLATE_RPM = "translate_rpm"
+		const val KEY_TRANSLATE_ENABLED = "translate_enabled"
+		const val KEY_TRANSLATE_CLEAR_CACHE = "translate_clear_cache"
 
 		// keys for non-persistent preferences
 		const val KEY_APP_VERSION = "app_version"

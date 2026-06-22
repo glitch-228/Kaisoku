@@ -1,6 +1,5 @@
 package org.koitharu.kotatsu.reader.ui.pager.webtoon
 
-import android.util.Log
 import android.view.View
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -43,21 +42,17 @@ class WebtoonHolder(
 		scrollPercentToRestore = -1
 		scrollToRestore = 0
 		isInitialScrollApplied = false
-		Log.d("WS", "onBind pos=$bindingAdapterPosition chapterId=${data.chapterId} page=${data.index}")
 	}
 
 	override fun onReady() {
 		binding.ssiv.colorFilter = settings.colorFilter?.toColorFilter()
-		Log.d("WS", "onReady pos=$bindingAdapterPosition scrollPercent=$scrollPercentToRestore scrollRestore=$scrollToRestore initialApplied=$isInitialScrollApplied isReady=${binding.ssiv.isReady} scrollRange=${binding.ssiv.getScrollRange()}")
 		when {
 			scrollPercentToRestore >= 0 -> {
 				val percent = scrollPercentToRestore
 				scrollPercentToRestore = -1
 				scrollToRestore = 0
 				isInitialScrollApplied = true
-				Log.d("WS", "onReady: DEFERRED percent restore=$percent")
 				binding.ssiv.post {
-					Log.d("WS", "onReady: POST executing percent=$percent scrollRange=${binding.ssiv.getScrollRange()}")
 					applyScrollPercent(percent)
 				}
 			}
@@ -66,7 +61,6 @@ class WebtoonHolder(
 				val scroll = scrollToRestore
 				scrollToRestore = 0
 				isInitialScrollApplied = true
-				Log.d("WS", "onReady: DEFERRED scrollRestore=$scroll")
 				binding.ssiv.post {
 					binding.ssiv.scrollTo(scroll)
 				}
@@ -74,7 +68,6 @@ class WebtoonHolder(
 
 			!isInitialScrollApplied -> {
 				isInitialScrollApplied = true
-				Log.d("WS", "onReady: INITIAL scroll, itemTop=${itemView.top}")
 				binding.ssiv.post {
 					binding.ssiv.scrollTo(
 						if (itemView.top < 0) {
@@ -86,7 +79,6 @@ class WebtoonHolder(
 				}
 			}
 			else -> {
-				Log.d("WS", "onReady: SKIP (re-config/resume)")
 			}
 		}
 	}
@@ -127,13 +119,11 @@ class WebtoonHolder(
 	 */
 	fun restoreScrollPercent(percentTimes10000: Int) {
 		val normalized = percentTimes10000.coerceAtLeast(0)
-		Log.d("WS", "restoreScrollPercent percent=$normalized isReady=${binding.ssiv.isReady} pos=$bindingAdapterPosition")
 		if (binding.ssiv.isReady) {
 			applyScrollPercent(normalized)
 			scrollPercentToRestore = -1
 		} else {
 			scrollPercentToRestore = normalized
-			Log.d("WS", "restoreScrollPercent: DEFERRED (SSIV not ready)")
 		}
 	}
 
@@ -147,7 +137,6 @@ class WebtoonHolder(
 		val rvOffset = ssivScroll - targetOffset
 
 		val adapterPosition = bindingAdapterPosition
-		Log.d("WS", "applyScrollPercent pct=${percentTimes10000} frac=$fraction scrollRange=$scrollRange totalH=$totalHeight target=$targetOffset ssivScroll=$ssivScroll rvOff=$rvOffset pos=$adapterPosition")
 		if (adapterPosition != RecyclerView.NO_POSITION) {
 			val layoutManager = (itemView.parent as? RecyclerView)?.layoutManager as? LinearLayoutManager
 			layoutManager?.scrollToPositionWithOffset(adapterPosition, rvOffset)

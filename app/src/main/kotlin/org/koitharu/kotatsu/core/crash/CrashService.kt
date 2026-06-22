@@ -96,6 +96,7 @@ class CrashService : Service() {
 		internal const val EXTRA_TITLE = "crash.title"
 		internal const val EXTRA_BODY = "crash.body"
 		internal const val EXTRA_ISSUE_URL = "crash.issue_url"
+		internal const val EXTRA_DEGRADED = "crash.degraded"
 
 		internal fun start(context: Context, report: CrashReportData) {
 			val intent = newIntent(context, report)
@@ -117,11 +118,13 @@ internal fun Intent.putCrashReportData(report: CrashReportData): Intent {
 	return putExtra(CrashService.EXTRA_TITLE, report.title)
 		.putExtra(CrashService.EXTRA_BODY, report.body)
 		.putExtra(CrashService.EXTRA_ISSUE_URL, report.issueUrl)
+		.putExtra(CrashService.EXTRA_DEGRADED, report.isDegraded)
 }
 
 internal fun Intent.toCrashReportData(): CrashReportData? {
 	val title = getStringExtra(CrashService.EXTRA_TITLE) ?: return null
 	val body = getStringExtra(CrashService.EXTRA_BODY) ?: return null
 	val issueUrl = getStringExtra(CrashService.EXTRA_ISSUE_URL) ?: return null
-	return CrashReportData(title, body, issueUrl)
+	val isDegraded = getBooleanExtra(CrashService.EXTRA_DEGRADED, false)
+	return CrashReportData(title, body, issueUrl, isDegraded)
 }

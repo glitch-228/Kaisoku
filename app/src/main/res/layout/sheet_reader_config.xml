@@ -42,6 +42,33 @@
                 app:drawableStartCompat="@drawable/ic_bookmark" />
 
             <org.koitharu.kotatsu.core.ui.widgets.ListItemTextView
+                android:id="@+id/button_translate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/translate_page"
+                app:drawableStartCompat="@drawable/ic_translate" />
+
+            <org.koitharu.kotatsu.core.ui.widgets.ListItemTextView
+                android:id="@+id/button_ocr"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/extract_text"
+                app:drawableStartCompat="@drawable/ic_text_recognition" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_auto_translate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:drawablePadding="?android:listPreferredItemPaddingStart"
+                android:minHeight="?android:listPreferredItemHeightSmall"
+                android:paddingStart="?android:listPreferredItemPaddingStart"
+                android:paddingEnd="?android:listPreferredItemPaddingEnd"
+                android:text="@string/translate_trigger_auto"
+                android:textAppearance="?textAppearanceListItem"
+                android:textColor="?colorOnSurfaceVariant"
+                app:drawableStartCompat="@drawable/ic_translate" />
+
+            <org.koitharu.kotatsu.core.ui.widgets.ListItemTextView
                 android:id="@+id/button_image_server"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -1,6 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name" translatable="false">Kaisoku</string>
+    <string name="extract_text">Extract text</string>
+    <string name="translate_page">Translate page</string>
+    <string name="copy">Copy</string>
+    <string name="ocr_recognizing">Recognizing…</string>
+    <string name="ocr_no_text">No text detected.</string>
+    <string name="translate_setup_required">Configure an AI provider in Settings → Reader → AI translation</string>
+    <string name="translate_partial_failure">%1$d part(s) failed — tap to retry</string>
+    <string name="ai_translation">AI translation</string>
+    <string name="ai_translation_beta">AI translation (Beta)</string>
+    <string name="ai_translation_summary">OCR + translate a page via your own LLM API (BYOK)</string>
+    <string name="translate_enabled">Enable page translation</string>
+    <string name="translate_enabled_summary">Beta — adds the translate &amp; extract-text actions in the reader</string>
+    <string name="translate_provider">Provider</string>
+    <string name="translate_endpoint">API endpoint</string>
+    <string name="translate_api_key">API key</string>
+    <string name="translate_model">Model</string>
+    <string name="translate_custom_headers">Custom headers (JSON)</string>
+    <string name="translate_source_lang">Source language</string>
+    <string name="translate_target_lang">Target language</string>
+    <string name="translate_trigger_mode">Trigger</string>
+    <string name="translate_trigger_manual">Manual (menu)</string>
+    <string name="translate_trigger_auto">Auto on each page</string>
+    <string name="translate_overlay_bg">Overlay background</string>
+    <string name="translate_overlay_bg_summary">Paint a white box behind each translated bubble</string>
+    <string name="translate_concurrency">Concurrent requests</string>
+    <string name="translate_rpm">Max requests per minute</string>
+    <string name="translate_clear_cache">Clear translation cache</string>
+    <string name="translate_provider_openai">OpenAI-compatible</string>
+    <string name="translate_provider_gemini">Native Gemini</string>
+    <string name="translate_provider_google_lens">Google Lens (keyless OCR + translate)</string>
+    <string name="lang_auto">Auto-detect</string>
     <string name="local_storage">Local storage</string>
     <string name="favourites">Favorites</string>
     <string name="history">History</string>
@@ -293,6 +324,8 @@
     <string name="disable_battery_optimization_summary">Helps with background updates checks</string>
     <string name="crash_text">Something went wrong. Please submit a bug report to the developers to help us fix it.</string>
     <string name="crash_dialog_message">Kaisoku crashed. The crash report was copied to the clipboard. Open GitHub Issues and paste the crash message or stack trace there if the form is not filled automatically.</string>
+    <string name="crash_dialog_message_degraded">Kaisoku crashed, but the crash report couldn\'t be collected. You can still report the crash itself on GitHub Issues.</string>
+    <string name="crash_collecting">Collecting crash report… please don\'t close the app.</string>
     <string name="copy_crash_report">Copy report</string>
     <string name="crash_report_copied">Crash report copied</string>
     <string name="open_github_issues">Open GitHub Issues</string>
@@ -964,6 +997,8 @@
     <string name="discord_rpc_summary">Show your reading status on Discord</string>
     <string name="obtain">Obtain</string>
     <string name="discord_rpc_description">Reading manga on Kaisoku - a manga reader app</string>
+    <string name="discord_rpc_oauth">Sign in with OAuth</string>
+    <string name="discord_rpc_oauth_summary">Use Discord OAuth login instead of a user token</string>
     <string name="reading_s">Reading %s</string>
     <string name="read_on_s">Read on %s</string>
     <string name="rpc_skip_nsfw_summary">Do not use RPC for adult content</string>
