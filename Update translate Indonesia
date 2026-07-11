@@ -1,0 +1,12 @@
+<resources>
+    <string name="favourites">Favorit</string>
+    <string name="new_chapters">Bab baru</string>
+    <string name="flash_on_page_change_summary">Segarkan layar dengan kilatan layar untuk mengurangi bayangan pada tampilan E-Ink</string>
+    <string name="disable_captcha_auto_solve_summary">Jangan mencoba menyelesaikan CAPTCHA secara diam-diam di latar belakang. Anda akan diminta untuk menyelesaikannya secara manual sebagai gantinya</string>
+    <string name="disable_captcha_auto_solve">Nonaktifkan penyelesaian CAPTCHA otomatis</string>
+    <string name="flash_on_page_change">Kilatan saat halaman berganti</string>
+    <string name="source_presets">Preset sumber</string>
+    <string name="source_pinned">Sematkan sumber</string>
+    <string name="flash_duration">Durasi kilatan</string>
+    <string name="flash_every">Kilatan setiap</string>
+    <string name="flash_with">Warna kilatan</string>
