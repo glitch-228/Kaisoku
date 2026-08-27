@@ -29,6 +29,7 @@ import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaSource
 import org.koitharu.kotatsu.parsers.util.levenshteinDistance
 import org.koitharu.kotatsu.search.domain.SearchKind
+import java.time.Instant
 import javax.inject.Inject
 
 @Reusable
@@ -165,6 +166,12 @@ class FavouritesRepository @Inject constructor(
 
 	suspend fun getCategoriesIds(mangaId: Long): Set<Long> {
 		return db.getFavouritesDao().findCategoriesIds(mangaId).toSet()
+	}
+
+	suspend fun getCategoriesAddedAt(mangaId: Long): Map<Long, Instant> {
+		return db.getFavouritesDao().findAllRaw(mangaId).associate { entity ->
+			entity.categoryId to Instant.ofEpochMilli(entity.createdAt)
+		}
 	}
 
 	suspend fun findPopularSources(categoryId: Long, limit: Int): List<MangaSource> {

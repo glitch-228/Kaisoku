@@ -6,17 +6,33 @@
 	android:layout_height="wrap_content"
 	android:background="?selectableItemBackground"
 	android:minHeight="?listPreferredItemHeightSmall"
-	android:orientation="vertical"
+	android:gravity="center_vertical"
+	android:orientation="horizontal"
 	android:paddingStart="?listPreferredItemPaddingStart"
 	android:paddingEnd="?listPreferredItemPaddingEnd">
 
 	<com.google.android.material.checkbox.MaterialCheckBox
 		android:id="@+id/checkBox"
-		android:layout_width="match_parent"
+		android:layout_width="0dp"
 		android:layout_height="wrap_content"
+		android:layout_weight="1"
 		android:clickable="false"
 		android:gravity="center_vertical"
 		tools:checkedState="indeterminate"
 		tools:text="@tools:sample/cities" />
+
+	<TextView
+		android:id="@+id/textDate"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_marginStart="8dp"
+		android:ellipsize="end"
+		android:gravity="end"
+		android:maxLines="1"
+		android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+		android:textColor="?android:textColorSecondary"
+		android:visibility="gone"
+		tools:text="3 дня назад"
+		tools:visibility="visible" />
 
 </LinearLayout>
