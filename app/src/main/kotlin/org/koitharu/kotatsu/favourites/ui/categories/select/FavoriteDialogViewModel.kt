@@ -73,6 +73,11 @@ class FavoriteDialogViewModel @Inject constructor(
 		}
 		val cats = MutableLongObjectMap<MutableLongSet>(categories.size)
 		categories.forEach { cats[it.id] = MutableLongSet(manga.size) }
+		val addedAtByCategory = if (manga.size == 1) {
+			favouritesRepository.getCategoriesAddedAt(manga.first().id)
+		} else {
+			emptyMap()
+		}
 		for (m in manga) {
 			val ids = favouritesRepository.getCategoriesIds(m.id)
 			ids.forEach { id -> cats[id]?.add(m.id) }
@@ -86,6 +91,7 @@ class FavoriteDialogViewModel @Inject constructor(
 					else -> MaterialCheckBox.STATE_INDETERMINATE
 				},
 				isTrackerEnabled = tracker,
+				addedAt = addedAtByCategory[cat.id],
 			)
 		}
 	}

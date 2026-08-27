@@ -4,11 +4,13 @@ import com.google.android.material.checkbox.MaterialCheckBox.CheckedState
 import org.koitharu.kotatsu.core.model.FavouriteCategory
 import org.koitharu.kotatsu.list.ui.ListModelDiffCallback
 import org.koitharu.kotatsu.list.ui.model.ListModel
+import java.time.Instant
 
 data class MangaCategoryItem(
 	val category: FavouriteCategory,
 	@CheckedState val checkedState: Int,
 	val isTrackerEnabled: Boolean,
+	val addedAt: Instant?,
 ) : ListModel {
 
 	override fun areItemsTheSame(other: ListModel): Boolean {
