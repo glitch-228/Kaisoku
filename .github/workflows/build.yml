@@ -1,0 +1,78 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+      - .github/screenshots/**
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+      - .github/screenshots/**
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local.properties
+        env:
+          TG_TOKEN: ${{ secrets.TG_BACKUP_BOT_TOKEN }}
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          if [ -n "$TG_TOKEN" ]; then
+            echo "tg_backup_bot_token=$TG_TOKEN" >> local.properties
+          fi
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Decode keystore
+        if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/keystore.jks"
+          fi
+
+      - name: Assemble debug and release APKs
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -f "$RUNNER_TEMP/keystore.jks" ]; then
+            export KEYSTORE_FILE="$RUNNER_TEMP/keystore.jks"
+          fi
+          ./gradlew :app:assembleDebug :app:assembleRelease
+
+      - name: Prepare build artifacts
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/debug/*.apk artifacts/ 2>/dev/null || true
+          cp app/build/outputs/apk/release/*.apk artifacts/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kaisoku-apks
+          path: artifacts/*.apk
+          if-no-files-found: error

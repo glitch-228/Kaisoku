@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags: ["*"]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android Release Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local.properties
+        env:
+          TG_TOKEN: ${{ secrets.TG_BACKUP_BOT_TOKEN }}
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          if [ -n "$TG_TOKEN" ]; then
+            echo "tg_backup_bot_token=$TG_TOKEN" >> local.properties
+          fi
+
+      - name: Decode keystore
+        env:
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/keystore.jks"
+          fi
+
+      - name: Assemble signed release APKs
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -f "$RUNNER_TEMP/keystore.jks" ]; then
+            export KEYSTORE_FILE="$RUNNER_TEMP/keystore.jks"
+          fi
+          ./gradlew :app:assembleRelease
+
+      - name: Prepare named release APK
+        run: |
+          TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          if [[ "$TAG" != v* ]]; then
+            TAG="v${TAG}"
+          fi
+          mkdir -p artifacts
+          for apk in app/build/outputs/apk/release/*.apk; do
+            if [ -f "$apk" ]; then
+              NEW_NAME="kaisoku-${TAG}-installable.apk"
+              cp "$apk" "artifacts/${NEW_NAME}"
+              echo "Prepared APK: artifacts/${NEW_NAME}"
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: artifacts/*.apk
+          if-no-files-found: error
+
+  publish:
+    name: Publish Release Assets
+    needs: [android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
+          files: |
+            artifacts/*.apk
