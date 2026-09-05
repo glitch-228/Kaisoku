@@ -8,10 +8,6 @@
 	android:gravity="center_vertical"
 	android:minHeight="?listPreferredItemHeightSmall"
 	android:orientation="horizontal"
-<<<<<<< HEAD
-=======
-	android:gravity="center_vertical"
->>>>>>> 9c2522be0 (feat: add publication status dropdown filter and favorite creation date tracking)
 	android:paddingStart="?listPreferredItemPaddingStart"
 	android:paddingEnd="?listPreferredItemPaddingEnd">
 
@@ -26,7 +22,6 @@
 		tools:text="@tools:sample/cities" />
 
 	<TextView
-<<<<<<< HEAD
 		android:id="@+id/textDate"
 		android:layout_width="wrap_content"
 		android:layout_height="wrap_content"
@@ -34,20 +29,10 @@
 		android:ellipsize="end"
 		android:gravity="end"
 		android:maxLines="1"
-		android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-		android:textColor="?android:textColorSecondary"
-		android:visibility="gone"
-		tools:text="3 days ago"
-=======
-		android:id="@+id/textViewDate"
-		android:layout_width="wrap_content"
-		android:layout_height="wrap_content"
-		android:layout_marginStart="8dp"
 		android:textAppearance="?textAppearanceLabelSmall"
 		android:textColor="?android:textColorSecondary"
 		android:visibility="gone"
-		tools:text="14.05.2024"
->>>>>>> 9c2522be0 (feat: add publication status dropdown filter and favorite creation date tracking)
+		tools:text="3 days ago"
 		tools:visibility="visible" />
 
 </LinearLayout>
