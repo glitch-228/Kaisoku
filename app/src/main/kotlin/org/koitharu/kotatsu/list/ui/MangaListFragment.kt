@@ -43,6 +43,9 @@ import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.observeEvent
 import org.koitharu.kotatsu.core.util.ext.viewLifecycleScope
 import org.koitharu.kotatsu.databinding.FragmentListBinding
+import androidx.appcompat.widget.PopupMenu
+import org.koitharu.kotatsu.core.model.titleResId
+import org.koitharu.kotatsu.parsers.model.MangaState
 import org.koitharu.kotatsu.list.domain.ListFilterOption
 import org.koitharu.kotatsu.list.domain.QuickFilterListener
 import org.koitharu.kotatsu.list.ui.adapter.ListItemType
@@ -229,9 +232,18 @@ abstract class MangaListFragment :
 		)
 	}
 
-	override fun onFilterOptionClick(option: ListFilterOption) {
+	override fun onFilterOptionClick(view: View, option: ListFilterOption) {
 		selectionController?.clear()
-		(viewModel as? QuickFilterListener)?.toggleFilterOption(option)
+		if (option is ListFilterOption.State) {
+			showStateFilterPopupMenu(view, option) { selectedState ->
+				(viewModel as? QuickFilterListener)?.setFilterOption(
+					ListFilterOption.State(selectedState),
+					isApplied = selectedState != null,
+				)
+			}
+		} else {
+			(viewModel as? QuickFilterListener)?.toggleFilterOption(option)
+		}
 	}
 
 	override fun onFilterClick(view: View?) = Unit

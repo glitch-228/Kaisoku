@@ -17,6 +17,8 @@ jobs:
       - name: Send release embed to Discord
         env:
           WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          DISCORD_ROLE_ID: ${{ secrets.DISCORD_RELEASE_ROLE_ID || secrets.DISCORD_ROLE_ID }}
+          REPO_FULL_NAME: ${{ github.repository }}
           REPO: ${{ github.event.repository.name }}
           TAG: ${{ github.event.release.tag_name }}
           URL: ${{ github.event.release.html_url }}
@@ -24,13 +26,32 @@ jobs:
           ACTOR: ${{ github.actor }}
           TIMESTAMP: ${{ github.event.release.published_at }}
         run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "No DISCORD_RELEASE_WEBHOOK secret configured, skipping notification."
+            exit 0
+          fi
+
+          DEFAULT_ROLE_ID="1506992583744684175"
+          ROLE_ID="$DISCORD_ROLE_ID"
+          if [ -z "$ROLE_ID" ] && [ "$REPO_FULL_NAME" = "glitch-228/Kaisoku" ]; then
+            ROLE_ID="$DEFAULT_ROLE_ID"
+          fi
+
+          CONTENT=""
+          ROLE_MENTIONS="[]"
+          if [ -n "$ROLE_ID" ]; then
+            CONTENT="<@&${ROLE_ID}>"
+            ROLE_MENTIONS="[\"${ROLE_ID}\"]"
+          fi
+
           # Discord caps embed description at 4096 chars; release notes can grow past that.
           DESC="${BODY}"
           if [ ${#DESC} -gt 3800 ]; then
             DESC="${DESC:0:3800}"$'\n\n'"…(truncated; open the release for full notes)"
           fi
           jq -n \
-            --arg content "<@&1506992583744684175>" \
+            --arg content "$CONTENT" \
+            --argjson roles "$ROLE_MENTIONS" \
             --arg title "🚀 New Release: ${REPO} v${TAG}" \
             --arg url "${URL}" \
             --arg description "${DESC}" \
@@ -40,7 +61,7 @@ jobs:
             --arg timestamp "${TIMESTAMP}" \
             '{
               content: $content,
-              allowed_mentions: { roles: ["1506992583744684175"] },
+              allowed_mentions: { roles: $roles },
               embeds: [{
                 title: $title,
                 url: $url,
@@ -60,6 +81,8 @@ jobs:
       - name: Send prerelease embed to Discord
         env:
           WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          DISCORD_ROLE_ID: ${{ secrets.DISCORD_RELEASE_ROLE_ID || secrets.DISCORD_ROLE_ID }}
+          REPO_FULL_NAME: ${{ github.repository }}
           REPO: ${{ github.event.repository.name }}
           TAG: ${{ github.event.release.tag_name }}
           URL: ${{ github.event.release.html_url }}
@@ -67,11 +90,27 @@ jobs:
           ACTOR: ${{ github.actor }}
           TIMESTAMP: ${{ github.event.release.published_at }}
         run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "No DISCORD_RELEASE_WEBHOOK secret configured, skipping notification."
+            exit 0
+          fi
+
+          ROLE_ID="$DISCORD_ROLE_ID"
+
+          CONTENT=""
+          ROLE_MENTIONS="[]"
+          if [ -n "$ROLE_ID" ]; then
+            CONTENT="<@&${ROLE_ID}>"
+            ROLE_MENTIONS="[\"${ROLE_ID}\"]"
+          fi
+
           DESC="${BODY}"
           if [ ${#DESC} -gt 3800 ]; then
             DESC="${DESC:0:3800}"$'\n\n'"…(truncated; open the release for full notes)"
           fi
           jq -n \
+            --arg content "$CONTENT" \
+            --argjson roles "$ROLE_MENTIONS" \
             --arg title "🧪 Pre-Release: ${REPO} ${TAG}" \
             --arg url "${URL}" \
             --arg description "${DESC}" \
@@ -80,7 +119,8 @@ jobs:
             --arg footer "Pre-release build" \
             --arg timestamp "${TIMESTAMP}" \
             '{
-              allowed_mentions: { parse: [] },
+              content: $content,
+              allowed_mentions: { roles: $roles },
               embeds: [{
                 title: $title,
                 url: $url,

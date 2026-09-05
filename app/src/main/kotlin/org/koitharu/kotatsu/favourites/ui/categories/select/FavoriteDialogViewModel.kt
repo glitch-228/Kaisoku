@@ -83,15 +83,16 @@ class FavoriteDialogViewModel @Inject constructor(
 			ids.forEach { id -> cats[id]?.add(m.id) }
 		}
 		return categories.map { cat ->
+			val checkedState = when (cats[cat.id]?.size ?: 0) {
+				0 -> MaterialCheckBox.STATE_UNCHECKED
+				manga.size -> MaterialCheckBox.STATE_CHECKED
+				else -> MaterialCheckBox.STATE_INDETERMINATE
+			}
 			MangaCategoryItem(
 				category = cat,
-				checkedState = when (cats[cat.id]?.size ?: 0) {
-					0 -> MaterialCheckBox.STATE_UNCHECKED
-					manga.size -> MaterialCheckBox.STATE_CHECKED
-					else -> MaterialCheckBox.STATE_INDETERMINATE
-				},
+				checkedState = checkedState,
 				isTrackerEnabled = tracker,
-				addedAt = addedAtByCategory[cat.id],
+				addedAt = if (checkedState == MaterialCheckBox.STATE_CHECKED) addedAtByCategory[cat.id] else null,
 			)
 		}
 	}

@@ -881,4 +881,6 @@
     <string name="available_pattern">%1$s доступно</string>
     <string name="enter_name">Введите имя</string>
     <string name="translate_page">Перевести страницу</string>
+    <string name="added_to_favourites">В избранном с</string>
+    <string name="added_to_category_at">Добавлено в категорию «%1$s»: %2$s</string>
 </resources>

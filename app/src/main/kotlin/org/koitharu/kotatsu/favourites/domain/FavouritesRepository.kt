@@ -149,6 +149,14 @@ class FavouritesRepository @Inject constructor(
 		}
 	}
 
+	fun observeFavoriteDate(mangaId: Long): Flow<Long?> {
+		return db.getFavouritesDao().observeFavoriteDate(mangaId).distinctUntilChanged()
+	}
+
+	suspend fun getCategoryDates(mangaId: Long): Map<Long, Long> {
+		return db.getFavouritesDao().findCategoryDates(mangaId).associateBy({ it.categoryId }, { it.createdAt })
+	}
+
 	suspend fun getCategory(id: Long): FavouriteCategory {
 		return db.getFavouriteCategoriesDao().find(id.toInt()).toFavouriteCategory()
 	}

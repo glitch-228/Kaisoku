@@ -1225,6 +1225,8 @@
 	<string name="every_12_hours">Every 12 hours</string>
 	<string name="daily">Daily</string>
 	<string name="drive_sync_queued">Google Drive sync queued</string>
+	<string name="added_to_favourites">In favorites since</string>
+	<string name="added_to_category_at">Added to category \"%1$s\": %2$s</string>
 	<string name="manga_preferences">Per-manga reader settings and overrides</string>
 	<string name="sync_content">Content to synchronize</string>
 </resources>
