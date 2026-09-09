@@ -3,6 +3,7 @@ package org.koitharu.kotatsu.browser
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebViewClient
 import androidx.core.view.WindowInsetsCompat
@@ -82,6 +83,10 @@ abstract class BaseBrowserActivity : BaseActivity<ActivityBrowserBinding>(), Bro
 	}
 
 	override fun onPause() {
+		// Make WebView cookie writes visible to the shared okhttp cookie jar immediately; without a
+		// flush they can stay RAM-only until the next WebView flush and a refresh inside this pause
+		// window misses the just-set cookies.
+		runCatching { CookieManager.getInstance().flush() }
 		viewBinding.webView.onPause()
 		super.onPause()
 	}
@@ -93,6 +98,7 @@ abstract class BaseBrowserActivity : BaseActivity<ActivityBrowserBinding>(), Bro
 
 	override fun onDestroy() {
 		if (hasViewBinding()) {
+			runCatching { CookieManager.getInstance().flush() }
 			val webView = viewBinding.webView
 			webView.stopLoading()
 			// Both clients can retain this Activity through their callbacks. Detach the WebView from
