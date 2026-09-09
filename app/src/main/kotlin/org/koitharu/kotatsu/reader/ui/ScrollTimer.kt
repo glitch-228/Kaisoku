@@ -76,6 +76,10 @@ class ScrollTimer @AssistedInject constructor(
 		get() = boostMultiplier
 
 	init {
+		// Seed synchronously: the flow below delivers on another dispatcher, and until it does the
+		// multiplier stays at its minimum — restored controls re-arm the timer during layout before
+		// any flow emission. Mirrors the page-delay seeding contract.
+		onSpeedChanged(settings.readerAutoscrollSpeed)
 		settings.observeAsFlow(AppSettings.KEY_READER_AUTOSCROLL_SPEED) {
 			readerAutoscrollSpeed
 		}.flowOn(Dispatchers.Default)
