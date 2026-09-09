@@ -69,7 +69,7 @@ class LNReaderRepository(
 	/**
 	 * Download a plugin's JS bundle from its URL and install it as a novel source.
 	 */
-	suspend fun installPlugin(plugin: LNReaderPluginInfo): Result<Int> =
+	suspend fun installPlugin(plugin: LNReaderPluginInfo): Result<Long> =
 		withContext(Dispatchers.IO) {
 			try {
 				val request = Request.Builder().url(plugin.url).build()
@@ -129,7 +129,7 @@ fun interface LNReaderPluginInstaller {
 	/**
 	 * Store the downloaded JS bundle as a novel source; return the new row id.
 	 */
-	fun install(jsContent: String, metadataOverride: LNReaderPluginMetadata): Result<Int>
+	suspend fun install(jsContent: String, metadataOverride: LNReaderPluginMetadata): Result<Long>
 }
 
 /**

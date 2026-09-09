@@ -607,6 +607,13 @@
     <string name="extension_repositories">Extension repositories</string>
     <string name="extension_repositories_summary">Add and manage Mihon-compatible extension repositories</string>
     <string name="add_mihon_sources_from_link">Add Mihon sources from link</string>
+    <string name="lnreader_repositories">LNReader plugin repositories</string>
+    <string name="lnreader_repositories_summary">Browse and install novel sources from LNReader plugin repositories</string>
+    <string name="lnreader_plugins">LNReader plugins</string>
+    <string name="add_lnreader_sources">Add novel sources (LNReader)</string>
+    <string name="lnreader_repo_url_hint">Plugin index link (plugins.min.json)</string>
+    <string name="no_lnreader_repositories">No plugin repositories</string>
+    <string name="no_lnreader_repositories_text">Add a plugins.min.json repository link to browse and install novel sources.</string>
     <string name="add_extension_repo">Add extension repository</string>
     <string name="extension_repo_url">Repository link</string>
     <string name="use_suggested_repo">Use suggested</string>

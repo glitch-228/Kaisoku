@@ -105,6 +105,8 @@ import org.koitharu.kotatsu.settings.sources.auth.SourceAuthActivity
 import org.koitharu.kotatsu.settings.sources.catalog.SourcesCatalogActivity
 import org.koitharu.kotatsu.settings.sources.repo.MihonExtensionReposActivity
 import org.koitharu.kotatsu.settings.sources.repo.MihonRepoExtensionsActivity
+import org.koitharu.kotatsu.settings.sources.lnreader.LnReaderReposActivity
+import org.koitharu.kotatsu.settings.sources.lnreader.LnReaderPluginsActivity
 import org.koitharu.kotatsu.settings.storage.MangaDirectorySelectDialog
 import org.koitharu.kotatsu.settings.storage.directories.MangaDirectoriesActivity
 import org.koitharu.kotatsu.settings.tracker.categories.TrackerCategoriesConfigSheet
@@ -230,6 +232,16 @@ class AppRouter private constructor(
     fun openMihonRepoExtensions(baseUrl: String, title: String? = null) {
         startActivity(
             Intent(contextOrNull() ?: return, MihonRepoExtensionsActivity::class.java)
+                .putExtra(KEY_URL, baseUrl)
+                .putExtra(KEY_TITLE, title),
+        )
+    }
+
+    fun openLnReaderRepos() = startActivity(LnReaderReposActivity::class.java)
+
+    fun openLnReaderPlugins(baseUrl: String, title: String? = null) {
+        startActivity(
+            Intent(contextOrNull() ?: return, LnReaderPluginsActivity::class.java)
                 .putExtra(KEY_URL, baseUrl)
                 .putExtra(KEY_TITLE, title),
         )
