@@ -198,13 +198,7 @@ class NovelReaderActivity :
 	}
 
 	private fun renderChapter(index: Int, text: String) {
-		val initialRatio = if (lastLoadedChapterIndex == viewModel.currentChapterIndex.value ||
-			lastLoadedChapterIndex < 0
-		) {
-			viewModel.initialRatio.value
-		} else {
-			null
-		}
+		val initialRatio = viewModel.restoreRatioFor(index)
 		if (isScrollMode) {
 			continuousAdapter?.setInitialChapter(NovelChapterData(chapterIndex = index, content = text))
 		} else {
@@ -214,7 +208,6 @@ class NovelReaderActivity :
 				initialProgressRatio = initialRatio,
 			)
 		}
-		viewModel.initialRatio.value = null
 		updateProgressUi()
 		preloadBoundary(index)
 	}

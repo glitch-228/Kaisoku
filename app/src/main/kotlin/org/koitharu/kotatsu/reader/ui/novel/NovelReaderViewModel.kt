@@ -50,6 +50,7 @@ class NovelReaderViewModel @Inject constructor(
 	val initialRatio = MutableStateFlow<Float?>(null)
 
 	private var lastSavedState: ReaderState? = null
+	private var lastSavedRatio = 0f
 
 	init {
 		launchLoadingJob(Dispatchers.Default) {
@@ -95,11 +96,29 @@ class NovelReaderViewModel @Inject constructor(
 			page = 0,
 			scroll = (ratio * SCROLL_RATIO_SCALE).toInt(),
 		)
+		lastSavedRatio = ratio
 		if (lastSavedState == state) return
 		lastSavedState = state
 		launchJob(Dispatchers.Default) {
 			historyUpdateUseCase(target, state, percent.coerceIn(0f, 1f))
 		}
+	}
+
+	/**
+	 * Ratio to restore for [chapterIndex]: an explicitly requested position wins
+	 * (chapter navigation), otherwise the live position of the current chapter is
+	 * reused so activity recreation does not jump back to the chapter start.
+	 */
+	fun restoreRatioFor(chapterIndex: Int): Float? {
+		val explicit = initialRatio.value
+		if (explicit != null) {
+			initialRatio.value = null
+			return explicit
+		}
+		if (chapterIndex == currentChapterIndex.value) {
+			return lastSavedRatio
+		}
+		return null
 	}
 
 	fun switchChapter(index: Int) {
