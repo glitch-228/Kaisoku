@@ -356,6 +356,10 @@
 			android:name="org.koitharu.kotatsu.settings.sources.lnreader.LnReaderPluginsActivity"
 			android:label="@string/lnreader_plugins" />
 		<activity
+			android:name="org.koitharu.kotatsu.reader.ui.novel.NovelReaderActivity"
+			android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|uiMode"
+			android:label="@string/read" />
+		<activity
 			android:name="org.koitharu.kotatsu.scrobbling.kitsu.ui.KitsuAuthActivity"
 			android:exported="false"
 			android:label="@string/kitsu"

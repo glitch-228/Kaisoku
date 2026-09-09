@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+
+	<item
+		android:id="@+id/action_chapters"
+		android:icon="@drawable/ic_list"
+		android:title="@string/chapters"
+		app:showAsAction="always" />
+
+	<item
+		android:id="@+id/action_settings"
+		android:title="@string/novel_reader_settings"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/action_bookmark"
+		android:title="@string/bookmark_add"
+		android:visible="false"
+		app:showAsAction="never" />
+
+</menu>

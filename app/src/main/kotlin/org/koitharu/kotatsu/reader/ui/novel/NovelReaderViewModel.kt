@@ -1,0 +1,143 @@
+/*
+ * Novel reader state holder, modeled after the manga ReaderViewModel
+ * but much simpler: chapters are loaded on demand, progress stored as
+ * within-chapter character ratio in `scroll` (ratio * 10000).
+ * Ported in part from Kototoro (Apache-2.0).
+ * Copyright 2025 Kototoro contributors.
+ * Copyright 2026 Kaisoku contributors.
+ */
+package org.koitharu.kotatsu.reader.ui.novel
+
+import androidx.lifecycle.SavedStateHandle
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Headers
+import okhttp3.Request
+import org.koitharu.kotatsu.core.model.MangaHistory
+import org.koitharu.kotatsu.core.nav.MangaIntent
+import org.koitharu.kotatsu.core.parser.MangaDataRepository
+import org.koitharu.kotatsu.core.parser.MangaRepository
+import org.koitharu.kotatsu.core.ui.BaseViewModel
+import org.koitharu.kotatsu.history.data.HistoryRepository
+import org.koitharu.kotatsu.history.domain.HistoryUpdateUseCase
+import org.koitharu.kotatsu.parsers.model.Manga
+import org.koitharu.kotatsu.parsers.model.MangaChapter
+import org.koitharu.kotatsu.reader.ui.ReaderState
+import android.content.Context
+import javax.inject.Inject
+
+@HiltViewModel
+class NovelReaderViewModel @Inject constructor(
+	@ApplicationContext appContext: Context,
+	savedStateHandle: SavedStateHandle,
+	private val dataRepository: MangaDataRepository,
+	private val repositoryFactory: MangaRepository.Factory,
+	private val historyRepository: HistoryRepository,
+	private val historyUpdateUseCase: HistoryUpdateUseCase,
+) : BaseViewModel() {
+
+	private val intent = MangaIntent(savedStateHandle)
+
+	val manga = MutableStateFlow<Manga?>(null)
+	val chapters = MutableStateFlow<List<MangaChapter>>(emptyList())
+	val currentChapterIndex = MutableStateFlow(-1)
+	val isUiLoading = MutableStateFlow(false)
+	val readerSettings = MutableStateFlow(NovelReaderSettings.load(appContext))
+	val initialRatio = MutableStateFlow<Float?>(null)
+
+	private var lastSavedState: ReaderState? = null
+
+	init {
+		launchLoadingJob(Dispatchers.Default) {
+			val target = dataRepository.resolveIntent(intent, withChapters = true)
+				?: error("Cannot resolve novel ${intent.mangaId}")
+			manga.value = target
+			chapters.value = target.chapters.orEmpty()
+			val history = historyRepository.getOne(target)
+			val requestedState = savedState2State()
+			currentChapterIndex.value = resolveInitialChapterIndex(target, requestedState, history)
+			initialRatio.value = resolveInitialRatio(requestedState, history)
+		}
+	}
+
+	private fun savedState2State(): ReaderState? = null
+
+	private fun resolveInitialChapterIndex(
+		target: Manga,
+		requestedState: ReaderState?,
+		history: MangaHistory?,
+	): Int {
+		val chaptersList = target.chapters.orEmpty()
+		if (chaptersList.isEmpty()) return -1
+		val state = requestedState ?: history?.let { ReaderState(it) }
+		val index = state?.let { s -> chaptersList.indexOfFirst { it.id == s.chapterId } }
+		return if (index != null && index >= 0) index else 0
+	}
+
+	private fun resolveInitialRatio(requestedState: ReaderState?, history: MangaHistory?): Float? {
+		val scroll = requestedState?.scroll ?: history?.scroll ?: 0
+		if (scroll <= 0) return null
+		return (scroll / SCROLL_RATIO_SCALE).coerceIn(0f, 1f)
+	}
+
+	/** Persist the current reading position. Ratio: 0..1 within the chapter. */
+	fun saveProgress(chapterIndex: Int, ratio: Float) {
+		val target = manga.value ?: return
+		val chapter = chapters.value.getOrNull(chapterIndex) ?: return
+		val total = chapters.value.size
+		val percent = if (total > 0) (chapterIndex + ratio) / total else 0f
+		val state = ReaderState(
+			chapterId = chapter.id,
+			page = 0,
+			scroll = (ratio * SCROLL_RATIO_SCALE).toInt(),
+		)
+		if (lastSavedState == state) return
+		lastSavedState = state
+		launchJob(Dispatchers.Default) {
+			historyUpdateUseCase(target, state, percent.coerceIn(0f, 1f))
+		}
+	}
+
+	fun switchChapter(index: Int) {
+		if (index in chapters.value.indices) {
+			currentChapterIndex.value = index
+		}
+	}
+
+	suspend fun loadChapterHtml(index: Int): String? {
+		val target = manga.value ?: return null
+		val chapter = chapters.value.getOrNull(index) ?: return null
+		val repository = repositoryFactory.create(target.source)
+		val novelRepository = repository as? org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaRepository
+			?: return null
+		return novelRepository.getChapterHtml(chapter)
+	}
+
+	suspend fun getImageHeaders(url: String): Map<String, String> = runCatching {
+		if (!url.startsWith("http")) return@runCatching emptyMap()
+		val target = manga.value ?: return@runCatching emptyMap()
+		val repository = repositoryFactory.create(target.source)
+		val client = repository.getImageClient() ?: return@runCatching emptyMap()
+		val request = Request.Builder().url(url).build()
+		withContext(Dispatchers.IO) {
+			client.newCall(request).execute().use { response ->
+				HeadersToMap(response.request.headers)
+			}
+		}
+	}.getOrDefault(emptyMap())
+
+	private fun HeadersToMap(headers: Headers): Map<String, String> = buildMap {
+		for (name in headers.names()) {
+			put(name, headers[name] ?: continue)
+		}
+	}
+
+	private companion object {
+
+		const val SCROLL_RATIO_SCALE = 10_000f
+	}
+}

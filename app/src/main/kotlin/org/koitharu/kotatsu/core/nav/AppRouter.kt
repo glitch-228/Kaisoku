@@ -44,6 +44,9 @@ import org.koitharu.kotatsu.core.model.isLocal
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableMangaListFilter
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableMangaPage
+import org.koitharu.kotatsu.core.model.unwrap
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaSource
+import org.koitharu.kotatsu.reader.ui.novel.NovelReaderActivity
 import org.koitharu.kotatsu.core.network.CommonHeaders
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
 import org.koitharu.kotatsu.core.prefs.AppSettings
@@ -164,6 +167,14 @@ class AppRouter private constructor(
     }
 
     fun openReader(manga: Manga, anchor: View? = null) {
+        if (manga.source.unwrap() is LnReaderMangaSource) {
+            startActivity(
+                Intent(contextOrNull() ?: return, NovelReaderActivity::class.java)
+                    .putExtra(KEY_MANGA, ParcelableManga(manga)),
+                anchor?.let { view -> scaleUpActivityOptionsOf(view) },
+            )
+            return
+        }
         openReader(
             ReaderIntent.Builder(contextOrNull() ?: return)
                 .manga(manga)
