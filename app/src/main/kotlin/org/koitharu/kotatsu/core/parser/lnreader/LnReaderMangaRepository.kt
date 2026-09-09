@@ -16,6 +16,7 @@ import org.koitharu.kotatsu.parsers.model.MangaPage
 import org.koitharu.kotatsu.parsers.model.MangaState
 import org.koitharu.kotatsu.parsers.model.MangaTag
 import org.koitharu.kotatsu.parsers.model.SortOrder
+import java.io.File
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
@@ -32,6 +33,7 @@ class LnReaderMangaRepository(
 	val entity: LnReaderSourceEntity,
 	private val httpClient: OkHttpClient,
 	cache: MemoryContentCache,
+	private val diskCacheDir: File? = null,
 ) : CachingMangaRepository(cache) {
 
 	override val source: LnReaderMangaSource = entity.toMangaSource()
@@ -187,6 +189,16 @@ class LnReaderMangaRepository(
 			synchronized(chapterHtmlCache) {
 				chapterHtmlCache[cacheKey]?.let { return@withLock it }
 			}
+			val diskFile = diskFileFor(cacheKey)
+			val cached = diskFile?.takeIf { it.isFile }?.let { file ->
+				runCatching { withContext(Dispatchers.IO) { file.readText() } }.getOrNull()
+			}
+			if (cached != null && cached.isNotBlank()) {
+				synchronized(chapterHtmlCache) {
+					chapterHtmlCache[cacheKey] = cached
+				}
+				return@withLock cached
+			}
 			val chapterPath = chapter.url.split(CHAPTER_SEPARATOR, limit = 2).getOrNull(1) ?: chapter.url
 			val html = executeInPluginContext { bridge ->
 				bridge.parseChapter(chapterPath)
@@ -195,9 +207,29 @@ class LnReaderMangaRepository(
 				synchronized(chapterHtmlCache) {
 					chapterHtmlCache[cacheKey] = html
 				}
+				diskFile?.let { file ->
+					withContext(Dispatchers.IO) {
+						runCatching {
+							file.parentFile?.mkdirs()
+							val tmp = File(file.parentFile, file.name + ".tmp")
+							tmp.writeText(html)
+							if (!tmp.renameTo(file)) {
+								tmp.delete()
+							}
+						}
+					}
+				}
 			}
 			html
 		}
+	}
+
+	private fun diskFileFor(cacheKey: String): File? {
+		val dir = diskCacheDir ?: return null
+		val digest = java.security.MessageDigest.getInstance("SHA-256")
+			.digest((entity.pluginId + '\n' + cacheKey).toByteArray(Charsets.UTF_8))
+		val name = digest.joinToString("") { "%02x".format(it) }
+		return File(dir, name)
 	}
 
 	private fun LNReaderNovelItem.toManga(): Manga = Manga(

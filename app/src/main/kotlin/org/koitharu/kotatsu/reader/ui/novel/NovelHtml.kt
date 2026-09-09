@@ -37,6 +37,9 @@ object NovelHtml {
 			val src = m.groupValues.getOrNull(1).orEmpty()
 			if (src.isNotBlank()) "\n📷 [图片: $src]\n" else ""
 		}
+		.replace(Regex("(?i)<br\\s*/?>"), "\n")
+		.replace(Regex("(?i)</(p|div|h[1-6]|li|blockquote)>"), "\n")
+		.replace(Regex("(?i)<(p|div|h[1-6]|li|blockquote)(\\s[^>]*)?>"), "\n")
 		.replace(Regex("<[^>]+>"), "")
 		.replace("&nbsp;", " ")
 		.replace("&lt;", "<")

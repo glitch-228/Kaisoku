@@ -184,6 +184,7 @@ interface MangaRepository {
 						entity = entity,
 						httpClient = lnReaderSourceManager.httpClient,
 						cache = contentCache,
+						diskCacheDir = java.io.File(context.cacheDir, "lnreader_chapters"),
 					)
 				}
 			}.getOrNull() ?: EmptyMangaRepository(source)
