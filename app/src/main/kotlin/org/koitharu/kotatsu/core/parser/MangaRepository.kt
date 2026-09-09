@@ -17,6 +17,9 @@ import org.koitharu.kotatsu.core.prefs.SourceSettings
 import org.koitharu.kotatsu.core.network.CommonHeaders
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaRepository
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaRepository
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaSource
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderSourceManager
 import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
 import org.koitharu.kotatsu.core.parser.mihon.MihonMangaRepository
 import org.koitharu.kotatsu.browsersource.data.BrowserSourceMangaRepository
@@ -118,6 +121,7 @@ interface MangaRepository {
 		private val contentCache: MemoryContentCache,
 		private val mirrorSwitcher: MirrorSwitcher,
 		private val mihonExtensionManager: MihonExtensionManager,
+		private val lnReaderSourceManager: LnReaderSourceManager,
 	) {
 
 		private val cache = ArrayMap<MangaSource, WeakReference<MangaRepository>>()
@@ -171,6 +175,18 @@ interface MangaRepository {
 					cache = contentCache,
 				)
 			} ?: EmptyMangaRepository(source)
+
+			// Installed LNReader novel plugin: resolve the entity from the manager's
+			// registry-backed snapshot; a missing plugin degrades to an empty source.
+			is LnReaderMangaSource -> runCatchingCancellable {
+				lnReaderSourceManager.peekEntity(source.pluginId)?.let { entity ->
+					LnReaderMangaRepository(
+						entity = entity,
+						httpClient = lnReaderSourceManager.httpClient,
+						cache = contentCache,
+					)
+				}
+			}.getOrNull() ?: EmptyMangaRepository(source)
 
 			// User-defined in-app browser source: pages are stashed by BrowserSourceActivity and served
 			// back from the page store (only BROWSER_SOURCE custom sources exist in this build).

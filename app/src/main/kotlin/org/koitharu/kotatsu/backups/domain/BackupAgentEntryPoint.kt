@@ -4,6 +4,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import org.koitharu.kotatsu.core.model.NsfwOverridesLoader
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderSourceManager
 import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
 
 @EntryPoint
@@ -11,4 +12,5 @@ import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
 interface BackupAgentEntryPoint {
 	val mihonExtensionManager: MihonExtensionManager
 	val nsfwOverridesLoader: NsfwOverridesLoader
+	val lnReaderSourceManager: LnReaderSourceManager
 }
