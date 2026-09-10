@@ -15,6 +15,13 @@ fun hasZipExtension(string: String): Boolean {
 	return isZipExtension(ext)
 }
 
+fun hasImageExtension(string: String): Boolean {
+	val ext = string.substringAfterLast('.', "")
+	return IMAGE_EXTENSIONS.contains(ext)
+}
+
+private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif", "avif", "heif", "bmp")
+
 fun hasRarComicExtension(string: String): Boolean {
 	val ext = string.substringAfterLast('.', "")
 	return isRarComicExtension(ext)
