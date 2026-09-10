@@ -21,6 +21,10 @@ import kotlinx.coroutines.plus
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.db.TABLE_SOURCES
+import org.koitharu.kotatsu.core.model.MangaSourceInfo
+import org.koitharu.kotatsu.core.model.PluginMangaSource
+import org.koitharu.kotatsu.core.model.isExternalSource
+import org.koitharu.kotatsu.core.model.unwrap
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.core.ui.util.ReversibleAction
@@ -33,6 +37,7 @@ import org.koitharu.kotatsu.explore.data.SourcesSortOrder
 import org.koitharu.kotatsu.list.ui.model.ListModel
 import org.koitharu.kotatsu.list.ui.model.LoadingState
 import org.koitharu.kotatsu.parsers.model.ContentType
+import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.parsers.model.MangaSource
 import java.util.EnumSet
 import javax.inject.Inject
@@ -137,9 +142,26 @@ class SourcesCatalogViewModel @Inject constructor(
 
 	fun addSource(source: MangaSource) {
 		launchJob(Dispatchers.Default) {
-			val rollback = repository.setSourcesEnabled(setOf(source), true)
+			// Enable every source that is really the same one, not just every source sharing the
+			// title: a plugin jar and a builtin source can carry the same name, and enabling both
+			// would leave a duplicate entry in Explore.
+			val plugin = (source as? PluginMangaSource)
+				?: (source as? MangaSourceInfo)?.mangaSource as? PluginMangaSource
+			val all = repository.allMangaSources.filter { s ->
+				val p = (s as? PluginMangaSource) ?: (s as? MangaSourceInfo)?.mangaSource as? PluginMangaSource
+				p?.jarName == plugin?.jarName &&
+					s.isExternalSource() == source.isExternalSource() &&
+					s.title.equals(sourceTitle(source), true)
+			}.ifEmpty { listOf(source) }
+			val rollback = repository.setSourcesEnabled(all, true)
 			onActionDone.call(ReversibleAction(R.string.source_enabled, rollback))
 		}
+	}
+
+	private fun sourceTitle(source: MangaSource): String = when (val s = source.unwrap()) {
+		is PluginMangaSource -> s.title
+		is MangaParserSource -> s.title
+		else -> s.name
 	}
 
 	fun setContentType(value: ContentType, isAdd: Boolean) {
