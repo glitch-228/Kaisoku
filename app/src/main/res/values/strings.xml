@@ -926,6 +926,12 @@
     <string name="manga_unavailable_message_no_source">\"%1$s\" could not be loaded. It may have been removed or moved to another address.</string>
     <string name="manga_unavailable_search_alternatives">Find on other sources</string>
     <string name="manga_unavailable_hint">Alternatives searches the other enabled sources for the same title, so you can carry on reading where you left off.</string>
+    <!-- Picking a cover from other sources, from the cover editor -->
+    <string name="alternative_covers">Covers from other sources</string>
+    <string name="current_cover">Current cover</string>
+    <string name="use_this_cover">Use this cover</string>
+    <string name="alternative_covers_progress">%1$d / %2$d sources</string>
+    <string name="no_alternative_covers">No other covers found for this title</string>
     <string name="manga_replaced">Manga \"%1$s\" (%2$s) replaced with \"%3$s\" (%4$s)</string>
     <string name="fixing_manga">Fixing manga</string>
     <string name="fixed">Fixed successfully</string>
