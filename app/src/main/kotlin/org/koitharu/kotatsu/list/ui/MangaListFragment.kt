@@ -29,6 +29,7 @@ import org.koitharu.kotatsu.core.ui.BaseFragment
 import org.koitharu.kotatsu.core.ui.dialog.buildAlertDialog
 import org.koitharu.kotatsu.core.ui.list.FitHeightGridLayoutManager
 import org.koitharu.kotatsu.core.ui.list.FitHeightLinearLayoutManager
+import org.koitharu.kotatsu.core.ui.list.ListCheckpoint
 import org.koitharu.kotatsu.core.ui.list.ListSelectionController
 import org.koitharu.kotatsu.core.ui.list.PaginationScrollListener
 import org.koitharu.kotatsu.core.ui.list.fastscroll.FastScroller
@@ -54,6 +55,7 @@ import org.koitharu.kotatsu.list.ui.model.ListModel
 import org.koitharu.kotatsu.list.ui.model.MangaListModel
 import org.koitharu.kotatsu.list.ui.size.DynamicItemSizeResolver
 import org.koitharu.kotatsu.main.ui.owners.AppBarOwner
+import org.koitharu.kotatsu.main.ui.owners.ListCheckpointOwner
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaTag
 import org.koitharu.kotatsu.search.ui.MangaListActivity
@@ -80,8 +82,16 @@ abstract class MangaListFragment :
 	private var selectionController: ListSelectionController? = null
 	private var spanResolver: GridSpanResolver? = null
 	private var currentListMode: ListMode? = null
+	private var checkpoint: ListCheckpoint? = null
 	private val spanSizeLookup = SpanSizeLookup()
 	open val isSwipeRefreshEnabled = true
+
+	/**
+	 * Identifies this list for the "where you left off" pill, or `null` to opt out of it.
+	 * Must be stable across recreations — it keys the stored position.
+	 */
+	protected open val checkpointScope: String?
+		get() = null
 
 	protected abstract val viewModel: MangaListViewModel
 
@@ -123,6 +133,16 @@ abstract class MangaListFragment :
 			isEnabled = isSwipeRefreshEnabled
 		}
 		addMenuProvider(MangaListMenuProvider(this))
+		checkpointScope?.let { scope ->
+			checkpoint = ListCheckpoint(scope, settings).also {
+				it.attach(
+					recyclerView = binding.recyclerView,
+					button = (activity as? ListCheckpointOwner)?.listCheckpointButton,
+					onLoadMore = ::onScrolledToEnd,
+					onDisableRequested = ::confirmDisableCheckpoint,
+				)
+			}
+		}
 
 		viewModel.listMode.observe(viewLifecycleOwner, Lifecycle.State.STARTED, ::onListModeChanged)
 		viewModel.gridScale.observe(viewLifecycleOwner, Lifecycle.State.STARTED, ::onGridScaleChanged)
@@ -146,6 +166,8 @@ abstract class MangaListFragment :
 	}
 
 	override fun onDestroyView() {
+		checkpoint?.detach()
+		checkpoint = null
 		viewBinding?.recyclerView?.fastScroller?.setFastScrollListener(null)
 		viewBinding?.recyclerView?.fastScroller?.setSectionIndexer(null)
 		viewBinding?.recyclerView?.adapter = null
@@ -193,12 +215,36 @@ abstract class MangaListFragment :
 		viewModel.onRefresh()
 	}
 
+	override fun onResume() {
+		super.onResume()
+		checkpoint?.onResume()
+	}
+
+	override fun onPause() {
+		checkpoint?.onPause()
+		super.onPause()
+	}
+
 	private suspend fun onListChanged(list: List<ListModel>) {
 		listAdapter?.emit(list)
 		spanSizeLookup.invalidateCache()
 		viewBinding?.recyclerView?.let {
 			paginationListener?.postInvalidate(it)
 		}
+		checkpoint?.onContentChanged()
+	}
+
+	private fun confirmDisableCheckpoint() {
+		checkpoint?.hide()
+		buildAlertDialog(context ?: return, isCentered = true) {
+			setIcon(R.drawable.ic_jump_back)
+			setTitle(R.string.list_checkpoint)
+			setMessage(R.string.list_checkpoint_disable_prompt)
+			setNegativeButton(android.R.string.cancel, null)
+			setPositiveButton(R.string.disable) { _, _ ->
+				settings.isListCheckpointEnabled = false
+			}
+		}.show()
 	}
 
 	private fun resolveException(e: Throwable) {

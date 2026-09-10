@@ -938,6 +938,10 @@
     <string name="no_alternative_covers">No other covers found for this title</string>
     <string name="duplicate_manga">Already in library</string>
     <string name="duplicate_manga_summary">Manga \"%1$s\" from \"%2$s\" is already in your favorites. Do you want to continue?</string>
+    <string name="list_checkpoint">Last position</string>
+    <string name="list_checkpoint_settings">Jump back to where you left off</string>
+    <string name="list_checkpoint_settings_summary">Show a button in History that returns you to the spot you last scrolled to</string>
+    <string name="list_checkpoint_disable_prompt">Stop showing the “Jump back” button? You can turn it back on in Settings.</string>
     <string name="manga_replaced">Manga \"%1$s\" (%2$s) replaced with \"%3$s\" (%4$s)</string>
     <string name="fixing_manga">Fixing manga</string>
     <string name="fixed">Fixed successfully</string>

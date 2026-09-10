@@ -169,6 +169,26 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val isQuickFilterEnabled: Boolean
 		get() = prefs.getBoolean(KEY_QUICK_FILTER, true)
 
+	var isListCheckpointEnabled: Boolean
+		get() = prefs.getBoolean(KEY_LIST_CHECKPOINT, true)
+		set(value) = prefs.edit { putBoolean(KEY_LIST_CHECKPOINT, value) }
+
+	/** Opaque record of where the user was in the list identified by [scope]. */
+	fun getListCheckpoint(scope: String): String? {
+		val key = KEY_LIST_CHECKPOINT + '_' + scope
+		return try {
+			prefs.getString(key, null)
+		} catch (e: ClassCastException) {
+			// An earlier build stored a bare manga id under this key - drop it and start over.
+			prefs.edit { remove(key) }
+			null
+		}
+	}
+
+	fun setListCheckpoint(scope: String, value: String) {
+		prefs.edit { putString(KEY_LIST_CHECKPOINT + '_' + scope, value) }
+	}
+
 	val isDescriptionExpanded: Boolean
 		get() = !prefs.getBoolean(KEY_COLLAPSE_DESCRIPTION, true)
 
@@ -891,6 +911,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_ADBLOCK = "adblock"
 		const val KEY_LIST_MODE = "list_mode_2"
 		const val KEY_LIST_MODE_HISTORY = "list_mode_history"
+		const val KEY_LIST_CHECKPOINT = "list_checkpoint"
 		const val KEY_LIST_MODE_FAVORITES = "list_mode_favorites"
 		const val KEY_LIST_MODE_SUGGESTIONS = "list_mode_suggestions"
 		const val KEY_THEME = "theme"
