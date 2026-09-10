@@ -18,8 +18,11 @@ object NovelTypography {
 
 	private val titleLinePattern =
 		Regex("""^[《【].+[》】]$|^第[0-9一二三四五六七八九十百千零〇两]+[章节卷回部篇话集].*$""")
+	// Literal code-point ranges, not Unicode script-name classes: the ICU regex on older Android
+	// (API 28 and below) rejects those and blows up the whole object in <clinit>.
+	private val hanRanges = """[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]"""
 	private val westernSpacingPattern =
-		Regex("""([\p{IsHan}])([A-Za-z0-9@#&])|([A-Za-z0-9@#&])([\p{IsHan}])""")
+		Regex("""($hanRanges)([A-Za-z0-9@#&])|([A-Za-z0-9@#&])($hanRanges)""")
 
 	fun prepareContentText(
 		text: String,
