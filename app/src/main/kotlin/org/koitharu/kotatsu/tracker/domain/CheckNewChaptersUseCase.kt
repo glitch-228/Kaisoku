@@ -54,6 +54,11 @@ class CheckNewChaptersUseCase @Inject constructor(
 		invokeImpl(fresh)
 	}
 
+	suspend operator fun invoke(mangaList: Collection<Manga>) =
+		mangaList.forEach { manga ->
+			runCatchingCancellable { invoke(repository.getTrack(manga)) }
+		}
+
 	suspend operator fun invoke(manga: Manga, currentChapterId: Long) = mutex.withLock(manga.id) {
 		runCatchingCancellable {
 			repository.updateTracks()

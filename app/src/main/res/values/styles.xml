@@ -246,6 +246,12 @@
 		<item name="cornerSize">12dp</item>
 	</style>
 
+	<!-- Cover thumbnail inside the "content unavailable" dialog: rounder than a list cover so it sits
+	     comfortably against the dialog's own corner radius. -->
+	<style name="ShapeAppearanceOverlay.Kotatsu.Cover.Large" parent="">
+		<item name="cornerSize">20dp</item>
+	</style>
+
 	<style name="ShapeAppearanceOverlay.Kotatsu.Cover.Medium" parent="">
 		<item name="cornerSize">8dp</item>
 	</style>

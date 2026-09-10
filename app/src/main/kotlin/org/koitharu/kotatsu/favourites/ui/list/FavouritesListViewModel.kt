@@ -38,6 +38,7 @@ import org.koitharu.kotatsu.list.ui.model.ListModel
 import org.koitharu.kotatsu.list.ui.model.LoadingState
 import org.koitharu.kotatsu.list.ui.model.toErrorState
 import org.koitharu.kotatsu.parsers.model.Manga
+import org.koitharu.kotatsu.tracker.domain.CheckNewChaptersUseCase
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import org.koitharu.kotatsu.local.data.LocalStorageChanges
@@ -57,6 +58,7 @@ class FavouritesListViewModel @Inject constructor(
 	settings: AppSettings,
 	mangaDataRepository: MangaDataRepository,
 	@LocalStorageChanges localStorageChanges: SharedFlow<LocalManga?>,
+	private val checkNewChaptersUseCase: CheckNewChaptersUseCase,
 ) : MangaListViewModel(settings, mangaDataRepository, localStorageChanges), QuickFilterListener {
 
 	val categoryId: Long = savedStateHandle[AppRouter.KEY_ID] ?: NO_ID
@@ -98,7 +100,13 @@ class FavouritesListViewModel @Inject constructor(
 	)
 
 	override fun onRefresh() {
-		refreshTrigger.value = Any()
+		launchLoadingJob(Dispatchers.Default) {
+			val list = repository.run {
+				if (categoryId == NO_ID) getAllManga() else getManga(categoryId)
+			}
+			checkNewChaptersUseCase(list)
+			refreshTrigger.value = Any()
+		}
 	}
 
 	override fun onRetry() = Unit

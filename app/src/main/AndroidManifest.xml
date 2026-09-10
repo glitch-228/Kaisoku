@@ -264,6 +264,9 @@
 			android:name="org.koitharu.kotatsu.settings.override.OverrideConfigActivity"
 			android:label="@string/edit" />
 		<activity
+			android:name="org.koitharu.kotatsu.alternatives.ui.covers.AlternativeCoversActivity"
+			android:label="@string/alternative_covers" />
+		<activity
 			android:name="org.koitharu.kotatsu.sync.ui.SyncAuthActivity"
 			android:exported="true"
 			android:label="@string/sync" />

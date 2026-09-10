@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import okio.buffer
 import okio.sink
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
 import org.koitharu.kotatsu.core.nav.AppRouter
+import org.koitharu.kotatsu.core.network.MangaHttpClient
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.core.ui.model.MangaOverride
@@ -19,13 +22,16 @@ import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
 import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.util.ext.isFileUri
+import org.koitharu.kotatsu.core.util.ext.isHttpUrl
 import org.koitharu.kotatsu.core.util.ext.openSource
 import org.koitharu.kotatsu.core.util.ext.require
 import org.koitharu.kotatsu.core.util.ext.toMimeTypeOrNull
 import org.koitharu.kotatsu.core.util.ext.toUriOrNull
 import org.koitharu.kotatsu.parsers.model.Manga
+import org.koitharu.kotatsu.parsers.util.ifNullOrEmpty
 import org.koitharu.kotatsu.parsers.util.md5
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 
 private const val DIR_COVERS = "covers"
@@ -35,6 +41,7 @@ class OverrideConfigViewModel @Inject constructor(
 	savedStateHandle: SavedStateHandle,
 	@ApplicationContext private val context: Context,
 	private val dataRepository: MangaDataRepository,
+	@MangaHttpClient private val httpClient: OkHttpClient,
 ) : BaseViewModel() {
 
 	private val manga = savedStateHandle.require<ParcelableManga>(AppRouter.KEY_MANGA).manga
@@ -69,6 +76,12 @@ class OverrideConfigViewModel @Inject constructor(
 	}
 
 	private suspend fun String.cachedFile(): String {
+		// A cover chosen from another source is a remote url, which the ContentResolver cannot open.
+		// Download it instead, so the override keeps working even if that site later blocks hotlinking
+		// or moves the file.
+		if (isHttpUrl()) {
+			return downloadCover(context.getExternalFilesDir(DIR_COVERS) ?: return this)
+		}
 		val uri = toUriOrNull()
 		if (uri == null || uri.isFileUri()) {
 			return this
@@ -94,6 +107,38 @@ class OverrideConfigViewModel @Inject constructor(
 			}
 			dest
 		}.toUri().toString()
+	}
+
+	private suspend fun String.downloadCover(cacheDir: File): String = withContext(Dispatchers.IO) {
+		val request = Request.Builder().url(this@downloadCover).get().build()
+		// Already on Dispatchers.IO, so a blocking call is fine and keeps the imports honest.
+		httpClient.newCall(request).execute().use { response ->
+			if (!response.isSuccessful) {
+				throw IOException("Cannot download cover: HTTP ${response.code}")
+			}
+			val ext = response.body.contentType()?.toString()?.substringBefore(';')
+				?.toMimeTypeOrNull()
+				?.let { MimeTypes.getExtension(it) }
+				.ifNullOrEmpty {
+					// Some CDNs answer with a generic content type; the url usually still names the format.
+					this@downloadCover.substringBefore('?').substringAfterLast('.', "")
+						.takeIf { it.length in 1..4 }
+				}
+			val dest = File(
+				cacheDir,
+				buildString {
+					append(this@downloadCover.md5())
+					if (!ext.isNullOrEmpty()) {
+						append('.')
+						append(ext)
+					}
+				},
+			)
+			dest.sink().buffer().use { sink ->
+				sink.writeAll(response.body.source())
+			}
+			dest.toUri().toString()
+		}
 	}
 
 	private fun emptyOverride() = MangaOverride(null, null, null)
