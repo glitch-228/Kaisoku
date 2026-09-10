@@ -42,7 +42,10 @@ class LnReaderSourceManager @Inject constructor(
 	/**
 	 * HTTP client for plugin fetches: the manga stack minus the interceptors whose
 	 * behaviour the plugin bridge handles itself (the bridge's cause-chain matcher
-	 * converts `CloudFlareProtectedException` into the native captcha flow).
+	 * converts `CloudFlareProtectedException` into the native captcha flow). The
+	 * rate limiter is also dropped: a browser `fetch` resolves on 429 and lets the
+	 * plugin decide, whereas the app-wide limiter throws and would abort plugins
+	 * that legitimately hit a 429-happy site.
 	 */
 	val httpClient: OkHttpClient
 		get() = clientLock.read {
@@ -52,7 +55,8 @@ class LnReaderSourceManager @Inject constructor(
 						val filtered = baseHttpClient.interceptors.filterNot {
 							val name = it.javaClass.simpleName
 							name == "CloudFlareInterceptor" ||
-								name == "CommonHeadersInterceptor"
+								name == "CommonHeadersInterceptor" ||
+								name == "RateLimitInterceptor"
 						}
 						interceptors().clear()
 						filtered.forEach(::addInterceptor)
