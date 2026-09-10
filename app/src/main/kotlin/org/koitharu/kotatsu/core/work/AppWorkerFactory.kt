@@ -24,6 +24,7 @@ import org.koitharu.kotatsu.history.data.HistoryRepository
 import org.koitharu.kotatsu.local.data.LocalMangaRepository
 import org.koitharu.kotatsu.local.data.LocalStorageCache
 import org.koitharu.kotatsu.local.data.LocalStorageChanges
+import org.koitharu.kotatsu.local.data.LocalStorageManager
 import org.koitharu.kotatsu.local.data.PageCache
 import org.koitharu.kotatsu.local.domain.DeleteReadChaptersUseCase
 import org.koitharu.kotatsu.local.domain.MangaLock
@@ -62,6 +63,8 @@ class AppWorkerFactory @Inject constructor(
 	private val workManager: Provider<WorkManager>,
 	private val localRepositoryLazy: Lazy<LocalMangaRepository>,
 	private val downloadSchedulerLazy: Lazy<DownloadWorker.Scheduler>,
+	private val historyRepositoryLazy: Lazy<HistoryRepository>,
+	private val storageManagerLazy: Lazy<LocalStorageManager>,
 	private val deleteReadChaptersUseCase: Provider<DeleteReadChaptersUseCase>,
 	private val coil: Provider<ImageLoader>,
 	private val suggestionRepository: Provider<SuggestionRepository>,
@@ -104,6 +107,8 @@ class AppWorkerFactory @Inject constructor(
 			workManager = workManager.get(),
 			localRepositoryLazy = localRepositoryLazy,
 			downloadSchedulerLazy = downloadSchedulerLazy,
+			historyRepositoryLazy = historyRepositoryLazy,
+			storageManagerLazy = storageManagerLazy,
 		)
 
 		LocalStorageCleanupWorker::class.java.name -> LocalStorageCleanupWorker(
