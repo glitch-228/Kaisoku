@@ -172,6 +172,7 @@
     <string name="size_s">Size: %s</string>
     <string name="clear_updates_feed">Clear updates feed</string>
     <string name="updates_feed_cleared">Cleared</string>
+    <string name="update_removed">Update removed</string>
     <string name="rotate_screen">Rotate screen</string>
     <string name="update">Update</string>
     <string name="refresh_extensions">Refresh extensions</string>
@@ -918,6 +919,13 @@
     <string name="downloads_background">Background downloads</string>
     <string name="download_new_chapters">Download new chapters</string>
     <string name="manga_with_downloaded_chapters">Manga with downloaded chapters</string>
+    <string name="recently_read_manga">Recently read manga</string>
+    <!-- "Content not found / removed" prompt shown when opening a manga that the source no longer serves -->
+    <string name="manga_unavailable_title">Content unavailable</string>
+    <string name="manga_unavailable_message">\"%1$s\" could not be loaded from %2$s. It may have been removed or moved to another address.</string>
+    <string name="manga_unavailable_message_no_source">\"%1$s\" could not be loaded. It may have been removed or moved to another address.</string>
+    <string name="manga_unavailable_search_alternatives">Find on other sources</string>
+    <string name="manga_unavailable_hint">Alternatives searches the other enabled sources for the same title, so you can carry on reading where you left off.</string>
     <string name="manga_replaced">Manga \"%1$s\" (%2$s) replaced with \"%3$s\" (%4$s)</string>
     <string name="fixing_manga">Fixing manga</string>
     <string name="fixed">Fixed successfully</string>
