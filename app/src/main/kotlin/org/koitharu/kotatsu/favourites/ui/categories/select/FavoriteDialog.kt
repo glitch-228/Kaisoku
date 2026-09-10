@@ -11,6 +11,7 @@ import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.core.model.getTitle
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.ui.AlertDialogFragment
 import org.koitharu.kotatsu.core.ui.list.OnListItemClickListener
@@ -48,6 +49,26 @@ class FavoriteDialog : AlertDialogFragment<DialogFavoriteBinding>(),
 		binding.recyclerViewCategories.adapter = adapter
 		viewModel.content.observe(viewLifecycleOwner, adapter)
 		viewModel.onError.observeEvent(viewLifecycleOwner, ::onError)
+		viewModel.onMigrated.observeEvent(viewLifecycleOwner) { dup ->
+			router.openDetails(dup)
+			dismiss()
+		}
+		viewModel.onDuplicate.observeEvent(viewLifecycleOwner) { (dup, categoryId) ->
+			MaterialAlertDialogBuilder(requireContext())
+				.setIcon(R.drawable.ic_manga_source)
+				.setTitle(R.string.duplicate_manga)
+				.setMessage(
+					getString(
+						R.string.duplicate_manga_summary,
+						dup.title,
+						dup.source.getTitle(requireContext()),
+					),
+				).setNegativeButton(android.R.string.cancel, null)
+				.setPositiveButton(android.R.string.ok) { _, _ ->
+					viewModel.setChecked(categoryId, isChecked = true, force = true)
+				}.setNeutralButton(R.string.migrate) { _, _ -> viewModel.migrate(dup) }
+				.show()
+		}
 		bindHeader()
 	}
 

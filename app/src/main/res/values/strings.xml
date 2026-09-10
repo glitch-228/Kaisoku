@@ -932,6 +932,8 @@
     <string name="use_this_cover">Use this cover</string>
     <string name="alternative_covers_progress">%1$d / %2$d sources</string>
     <string name="no_alternative_covers">No other covers found for this title</string>
+    <string name="duplicate_manga">Already in library</string>
+    <string name="duplicate_manga_summary">Manga \"%1$s\" from \"%2$s\" is already in your favorites. Do you want to continue?</string>
     <string name="manga_replaced">Manga \"%1$s\" (%2$s) replaced with \"%3$s\" (%4$s)</string>
     <string name="fixing_manga">Fixing manga</string>
     <string name="fixed">Fixed successfully</string>
