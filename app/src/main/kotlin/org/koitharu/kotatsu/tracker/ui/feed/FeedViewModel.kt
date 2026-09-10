@@ -138,6 +138,17 @@ class FeedViewModel @Inject constructor(
 		}
 	}
 
+	fun removeItem(item: FeedItem) {
+		launchJob(Dispatchers.Default) {
+			val removed = repository.removeLog(item.id) ?: return@launchJob
+			onActionDone.call(
+				ReversibleAction(R.string.update_removed) {
+					repository.restoreLog(removed)
+				},
+			)
+		}
+	}
+
 	private suspend fun List<TrackingLogItem>.mapListTo(destination: MutableList<ListModel>) {
 		val feedItems = mangaListMapper.toFeedItemList(this)
 		var prevDate: DateTimeAgo? = null
