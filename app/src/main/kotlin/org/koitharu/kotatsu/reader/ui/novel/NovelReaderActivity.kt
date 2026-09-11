@@ -36,6 +36,7 @@ import org.koitharu.kotatsu.reader.ui.tapgrid.TapAction
 import org.koitharu.kotatsu.reader.ui.tapgrid.TapGridDispatcher
 import javax.inject.Inject
 import androidx.lifecycle.lifecycleScope
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 
 @AndroidEntryPoint
 class NovelReaderActivity :
@@ -55,6 +56,7 @@ class NovelReaderActivity :
 
 	private lateinit var controlDelegate: ReaderControlDelegate
 	private var isUiVisible = true
+	private var systemBarsBottomInset: Int = 0
 	private var isScrollMode = false
 	private var chapterLoadJob: kotlinx.coroutines.Job? = null
 	private var preloadJob: kotlinx.coroutines.Job? = null
@@ -292,10 +294,10 @@ class NovelReaderActivity :
 	}
 
 	override fun onSettingsChanged(newSettings: NovelReaderSettings) {
-		viewBinding.readerView.updateSettings(newSettings)
-		viewBinding.readerView.setDualPageMode(newSettings.enableDualPage && !isScrollMode)
-		continuousAdapter?.updateSettings(newSettings)
-		applyReaderPalette()
+		// The sheet persists the prefs; apply them live (same path as the flow observer) and
+		// update the VM flow so visibility/palette logic sees the new values without re-entering.
+		viewModel.readerSettings.value = newSettings
+		applySettings(newSettings)
 	}
 
 	override fun onBookmarkClick() {
@@ -339,6 +341,9 @@ class NovelReaderActivity :
 		viewBinding.appbarTop.isVisible = visible
 		viewBinding.toolbarDocked.isVisible = visible
 		viewBinding.infoBar.isVisible = visible && viewModel.readerSettings.value.showReadingStatus
+		systemUiController.setSystemUiVisible(visible || !viewModel.readerSettings.value.enableFullscreen)
+		// Hidden system bars change the insets; re-apply so content re-paginates for the new area.
+		viewBinding.root.requestApplyInsets()
 	}
 
 	override fun openMenu() {
@@ -375,6 +380,7 @@ class NovelReaderActivity :
 
 	override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
 		val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+		systemBarsBottomInset = bars.bottom
 		// Keep the reading content between the status bar and the navigation bar, like the
 		// manga reader: text never renders under system UI regardless of toolbar visibility.
 		viewBinding.readerView.applyContentInsets(
@@ -403,6 +409,11 @@ class NovelReaderActivity :
 			bottom = bars.bottom,
 		)
 		viewBinding.infoBar.updatePadding(bottom = bars.bottom)
+		// The floating bottom toolbar sits above the navigation bar, like the manga reader's.
+		(viewBinding.toolbarDocked.layoutParams as? CoordinatorLayout.LayoutParams)?.let { lp ->
+			lp.bottomMargin = bars.bottom + resources.getDimensionPixelSize(R.dimen.reader_toolbar_float_gap)
+			viewBinding.toolbarDocked.layoutParams = lp
+		}
 		return WindowInsetsCompat.Builder(insets)
 			.setInsets(WindowInsetsCompat.Type.systemBars(), Insets.NONE)
 			.build()
