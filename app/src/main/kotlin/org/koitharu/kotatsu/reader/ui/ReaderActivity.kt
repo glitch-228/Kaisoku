@@ -665,6 +665,14 @@ class ReaderActivity :
         viewModel.toggleBookmark()
     }
 
+    override fun showChaptersSheet(defaultTab: Int?) {
+        if (defaultTab != null) {
+            router.showChapterPagesSheet(defaultTab)
+        } else {
+            router.showChapterPagesSheet()
+        }
+    }
+
     override fun onSavePageClick() {
         viewModel.saveCurrentPage(pageSaveHelper)
     }

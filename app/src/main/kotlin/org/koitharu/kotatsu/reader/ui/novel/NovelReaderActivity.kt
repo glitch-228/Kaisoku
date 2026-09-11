@@ -302,6 +302,10 @@ class NovelReaderActivity :
 		// Bookmarks for novels are not supported in v1
 	}
 
+	override fun showChaptersSheet(defaultTab: Int?) {
+		showChaptersSheet()
+	}
+
 	override fun onGridTouch(area: TapGridArea): Boolean {
 		return handleGridAction(tapGridSettings.getTapAction(area, isLongTap = false))
 	}
