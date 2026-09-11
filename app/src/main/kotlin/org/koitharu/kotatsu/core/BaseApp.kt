@@ -30,6 +30,7 @@ import org.koitharu.kotatsu.core.os.AppValidator
 import org.koitharu.kotatsu.core.os.RomCompat
 import org.koitharu.kotatsu.core.parser.DynamicParserManager
 import org.koitharu.kotatsu.core.parser.PluginFileLoader
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderSourceManager
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.work.AppWorkerFactory
 import org.koitharu.kotatsu.core.util.ext.processLifecycleScope
@@ -76,6 +77,9 @@ open class BaseApp : Application(), Configuration.Provider {
 	@LocalStorageChanges
 	lateinit var localStorageChanges: MutableSharedFlow<LocalManga?>
 
+	@Inject
+	lateinit var lnReaderSourceManager: Provider<LnReaderSourceManager>
+
 	override val workManagerConfiguration: Configuration
 		get() = Configuration.Builder()
 			.setWorkerFactory(workerFactory)
@@ -110,6 +114,11 @@ open class BaseApp : Application(), Configuration.Provider {
 		}
 		processLifecycleScope.launch(Dispatchers.IO) {
 			DynamicParserManager.loadParsersFromDirectory(this@BaseApp, PluginFileLoader.pluginsDir(this@BaseApp))
+		}
+		// Populate the LNReader source registry eagerly so novels resolve from history/
+		// shortcuts/DB on a cold start, before any Explore-side assimilation ran.
+		processLifecycleScope.launch(Dispatchers.IO) {
+			runCatching { lnReaderSourceManager.get().reload() }
 		}
 		workScheduleManager.init()
 	}

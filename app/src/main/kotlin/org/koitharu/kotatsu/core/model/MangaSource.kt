@@ -14,6 +14,9 @@ import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.customsource.data.CustomSourcesRepository
 import org.koitharu.kotatsu.customsource.domain.CustomMangaSource
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaSource
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderSourceRegistry
+import org.koitharu.kotatsu.core.parser.lnreader.UnresolvedLnReaderSource
 import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
 import org.koitharu.kotatsu.core.util.ext.getDisplayName
 import org.koitharu.kotatsu.core.util.ext.toLocale
@@ -52,6 +55,11 @@ fun MangaSource(name: String?): MangaSource {
 			packageName = parts.first,
 			sourceId = parts.second.toLongOrNull() ?: return UnknownMangaSource,
 		)
+	}
+	if (name.startsWith(LnReaderMangaSource.NAME_PREFIX)) {
+		val pluginId = LnReaderMangaSource.extractPluginId(name) ?: return UnknownMangaSource
+		LnReaderSourceRegistry.peek(pluginId)?.let { return it }
+		return UnresolvedLnReaderSource(pluginId)
 	}
 	if (name.startsWith(MihonMangaSource.TACHI_IDENTIFIER_PREFIX)) {
 		val packageName = name.substringAfter('_')
@@ -136,6 +144,7 @@ fun MangaSource.getLocale(): Locale? = when (val source = unwrap()) {
 	is MangaParserSource -> source.locale.toLocaleOrNull()
 	is PluginMangaSource -> source.locale.toLocaleOrNull()
 	is MihonMangaSource -> source.resolved().locale?.toLocaleOrNull()
+	is LnReaderMangaSource -> source.lang?.toLocaleOrNull()
 	else -> null
 }
 
@@ -161,6 +170,8 @@ fun MangaSource.identityName(): String = when (val name = unwrap().name) {
 }
 
 fun MangaSource.getSummary(context: Context): String? = when (val source = unwrap()) {
+	is LnReaderMangaSource -> source.site?.toUri()?.host
+
 	is MangaParserSource -> {
 		val type = context.getString(source.contentType.titleResId)
 		val locale = source.locale.toLocale().getDisplayName(context)
@@ -195,6 +206,8 @@ fun MangaSource.getSummary(context: Context): String? = when (val source = unwra
 
 fun MangaSource.getTitle(context: Context): String = when (val source = unwrap()) {
 	is MangaParserSource -> source.title
+	is LnReaderMangaSource -> source.displayName
+	is UnresolvedLnReaderSource -> source.pluginId
 	is CustomMangaSource -> source.displayTitle
 	is PluginMangaSource -> source.title
 	is MihonMangaSource -> source.resolveName(context)

@@ -44,6 +44,9 @@ import org.koitharu.kotatsu.core.model.isLocal
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableMangaListFilter
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableMangaPage
+import org.koitharu.kotatsu.core.model.unwrap
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaSource
+import org.koitharu.kotatsu.reader.ui.novel.NovelReaderActivity
 import org.koitharu.kotatsu.core.network.CommonHeaders
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
 import org.koitharu.kotatsu.core.prefs.AppSettings
@@ -55,6 +58,7 @@ import org.koitharu.kotatsu.core.ui.dialog.buildAlertDialog
 import org.koitharu.kotatsu.core.util.ext.connectivityManager
 import org.koitharu.kotatsu.core.util.ext.findActivity
 import org.koitharu.kotatsu.core.util.ext.getThemeDrawable
+import org.koitharu.kotatsu.core.util.ext.getParcelableExtraCompat
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toFileOrNull
 import org.koitharu.kotatsu.core.util.ext.toUriOrNull
@@ -105,6 +109,8 @@ import org.koitharu.kotatsu.settings.sources.auth.SourceAuthActivity
 import org.koitharu.kotatsu.settings.sources.catalog.SourcesCatalogActivity
 import org.koitharu.kotatsu.settings.sources.repo.MihonExtensionReposActivity
 import org.koitharu.kotatsu.settings.sources.repo.MihonRepoExtensionsActivity
+import org.koitharu.kotatsu.settings.sources.lnreader.LnReaderReposActivity
+import org.koitharu.kotatsu.settings.sources.lnreader.LnReaderPluginsActivity
 import org.koitharu.kotatsu.settings.storage.MangaDirectorySelectDialog
 import org.koitharu.kotatsu.settings.storage.directories.MangaDirectoriesActivity
 import org.koitharu.kotatsu.settings.tracker.categories.TrackerCategoriesConfigSheet
@@ -162,6 +168,14 @@ class AppRouter private constructor(
     }
 
     fun openReader(manga: Manga, anchor: View? = null) {
+        if (manga.source.unwrap() is LnReaderMangaSource) {
+            startActivity(
+                Intent(contextOrNull() ?: return, NovelReaderActivity::class.java)
+                    .putExtra(KEY_MANGA, ParcelableManga(manga)),
+                anchor?.let { view -> scaleUpActivityOptionsOf(view) },
+            )
+            return
+        }
         openReader(
             ReaderIntent.Builder(contextOrNull() ?: return)
                 .manga(manga)
@@ -172,6 +186,15 @@ class AppRouter private constructor(
 
     fun openReader(intent: ReaderIntent, anchor: View? = null) {
         val activityIntent = intent.intent
+        // Novels cannot be displayed by the standard reader; divert like openReader(manga),
+        // carrying over the requested state/incognito/branch extras.
+        val manga = activityIntent.getParcelableExtraCompat<ParcelableManga>(KEY_MANGA)?.manga
+        if (manga?.source?.unwrap() is LnReaderMangaSource) {
+            val novelIntent = Intent(activityIntent)
+                .setClass(contextOrNull() ?: return, NovelReaderActivity::class.java)
+            startActivity(novelIntent, anchor?.let { view -> scaleUpActivityOptionsOf(view) })
+            return
+        }
         if (settings.isReaderMultiTaskEnabled && activityIntent.data != null) {
             activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT)
         }
@@ -230,6 +253,16 @@ class AppRouter private constructor(
     fun openMihonRepoExtensions(baseUrl: String, title: String? = null) {
         startActivity(
             Intent(contextOrNull() ?: return, MihonRepoExtensionsActivity::class.java)
+                .putExtra(KEY_URL, baseUrl)
+                .putExtra(KEY_TITLE, title),
+        )
+    }
+
+    fun openLnReaderRepos() = startActivity(LnReaderReposActivity::class.java)
+
+    fun openLnReaderPlugins(baseUrl: String, title: String? = null) {
+        startActivity(
+            Intent(contextOrNull() ?: return, LnReaderPluginsActivity::class.java)
                 .putExtra(KEY_URL, baseUrl)
                 .putExtra(KEY_TITLE, title),
         )
