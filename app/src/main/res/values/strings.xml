@@ -305,6 +305,7 @@
     <string name="no_extensions">No extensions</string>
     <string name="plugins">Plugins</string>
     <string name="no_plugins">No plugins</string>
+    <string name="no_novels">No novels</string>
     <string name="reset_filter">Reset filter</string>
     <string name="enter_name">Enter name</string>
     <string name="pinned_sources_only">Pinned sources only</string>

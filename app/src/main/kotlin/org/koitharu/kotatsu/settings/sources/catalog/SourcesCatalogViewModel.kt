@@ -199,6 +199,11 @@ class SourcesCatalogViewModel @Inject constructor(
 		appliedFilter.value = filter.copy(pluginMode = filter.pluginMode.next())
 	}
 
+	fun cycleNovelMode() {
+		val filter = appliedFilter.value
+		appliedFilter.value = filter.copy(novelMode = filter.novelMode.next())
+	}
+
 	fun refreshSources() {
 		launchJob(Dispatchers.IO) {
 			repository.refreshInstalledMihonSources()
@@ -223,6 +228,8 @@ class SourcesCatalogViewModel @Inject constructor(
 			excludeMihon = filter.mihonMode == SourceCatalogFilterMode.EXCLUDE,
 			includePlugins = filter.pluginMode == SourceCatalogFilterMode.INCLUDE,
 			excludePlugins = filter.pluginMode == SourceCatalogFilterMode.EXCLUDE,
+			includeNovel = filter.novelMode == SourceCatalogFilterMode.INCLUDE,
+			excludeNovel = filter.novelMode == SourceCatalogFilterMode.EXCLUDE,
 			sortOrder = SourcesSortOrder.ALPHABETIC,
 			snapshot = snapshot,
 		)

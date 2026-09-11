@@ -80,6 +80,7 @@ class MangaSourcesRepository @Inject constructor(
 		val isNsfw: Boolean,
 		val isMihon: Boolean,
 		val isPlugin: Boolean,
+		val isNovel: Boolean = false,
 	)
 
 	private val isNewSourcesAssimilated = AtomicBoolean(false)
@@ -183,6 +184,8 @@ class MangaSourcesRepository @Inject constructor(
 		excludeMihon: Boolean,
 		includePlugins: Boolean,
 		excludePlugins: Boolean,
+		includeNovel: Boolean = false,
+		excludeNovel: Boolean = false,
 		sortOrder: SourcesSortOrder?,
 		snapshot: List<ParserSourceSnapshot>? = null,
 	): List<MangaSource> {
@@ -198,7 +201,7 @@ class MangaSourcesRepository @Inject constructor(
 			emptySet()
 		}
 		val effectiveQuery = query?.takeIf { it.isNotBlank() }
-		val hasSourceKindIncludes = includeMihon || includePlugins
+		val hasSourceKindIncludes = includeMihon || includePlugins || includeNovel
 		val sources = ArrayList<MangaSource>(entries.size)
 		for ((index, entry) in entries.withIndex()) {
 			if (index % 32 == 0) {
@@ -225,7 +228,12 @@ class MangaSourcesRepository @Inject constructor(
 			if (excludePlugins && entry.isPlugin) {
 				continue
 			}
-			if (hasSourceKindIncludes && !((includeMihon && entry.isMihon) || (includePlugins && entry.isPlugin))) {
+			if (excludeNovel && entry.isNovel) {
+				continue
+			}
+			if (hasSourceKindIncludes &&
+				!((includeMihon && entry.isMihon) || (includePlugins && entry.isPlugin) || (includeNovel && entry.isNovel))
+			) {
 				continue
 			}
 			if (excludeBroken && !hideBrokenSources && entry.isBroken) {
@@ -285,8 +293,9 @@ class MangaSourcesRepository @Inject constructor(
 				addedIn = entity.addedIn,
 				isBroken = source.isBrokenSource(),
 				isNsfw = source.isNsfw(),
-				isMihon = source is MihonMangaSource,
-				isPlugin = source is PluginMangaSource,
+			isMihon = source is MihonMangaSource,
+			isPlugin = source is PluginMangaSource,
+			isNovel = source is LnReaderMangaSource,
 			)
 		}.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
 	}
