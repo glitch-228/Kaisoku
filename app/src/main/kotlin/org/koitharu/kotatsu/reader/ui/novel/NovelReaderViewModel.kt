@@ -11,6 +11,7 @@ package org.koitharu.kotatsu.reader.ui.novel
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -23,10 +24,12 @@ import org.koitharu.kotatsu.core.nav.ReaderIntent
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.ui.BaseViewModel
+import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.history.data.HistoryRepository
 import org.koitharu.kotatsu.history.domain.HistoryUpdateUseCase
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaChapter
+import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import org.koitharu.kotatsu.reader.ui.ReaderState
 import android.content.Context
 import javax.inject.Inject
@@ -64,11 +67,27 @@ class NovelReaderViewModel @Inject constructor(
 				?: error("Cannot resolve novel ${intent.mangaId}")
 			manga.value = target
 			chapters.value = target.chapters.orEmpty()
+			// The intent/DB snapshot may carry no chapters (cold open from history with a
+			// stale row, or a first open straight from search). Refresh details from the
+			// plugin so the chapter list is real before we try to render anything.
+			if (target.chapters.isNullOrEmpty()) {
+				runCatchingCancellable {
+					val repository = repositoryFactory.create(target.source)
+					val refreshed = repository.getDetails(target)
+					manga.value = refreshed
+					chapters.value = refreshed.chapters.orEmpty()
+					dataRepository.storeManga(refreshed, replaceExisting = false)
+				}.onFailure { e ->
+					if (e !is CancellationException) {
+						errorEvent.call(e)
+					}
+				}
+			}
 			val history = historyRepository.getOne(target)
 			val requested: ReaderState? = this@NovelReaderViewModel.requestedState?.takeIf { s ->
-				target.chapters.orEmpty().any { it.id == s.chapterId }
+				chapters.value.any { it.id == s.chapterId }
 			}
-			currentChapterIndex.value = resolveInitialChapterIndex(target, requested, history)
+			currentChapterIndex.value = resolveInitialChapterIndex(manga.value ?: target, requested, history)
 			initialRatio.value = resolveInitialRatio(requested, history)
 		}
 	}
