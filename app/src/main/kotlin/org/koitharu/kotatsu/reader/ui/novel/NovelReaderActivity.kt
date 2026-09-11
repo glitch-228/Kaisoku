@@ -375,14 +375,21 @@ class NovelReaderActivity :
 
 	override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
 		val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-		viewBinding.readerView.updatePadding(
+		// Keep the reading content between the status bar and the navigation bar, like the
+		// manga reader: text never renders under system UI regardless of toolbar visibility.
+		viewBinding.readerView.applyContentInsets(
 			left = bars.left,
 			right = bars.right,
+			top = bars.top,
 			bottom = bars.bottom,
 		)
+		// Scroll mode: pad the edges so text clears the system bars; clipToPadding lets the
+		// content scroll from under the status bar as the list moves.
+		viewBinding.continuousScrollView.clipToPadding = false
 		viewBinding.continuousScrollView.updatePadding(
 			left = bars.left,
 			right = bars.right,
+			top = bars.top,
 			bottom = bars.bottom,
 		)
 		viewBinding.appbarTop.updatePadding(
@@ -395,6 +402,7 @@ class NovelReaderActivity :
 			right = bars.right,
 			bottom = bars.bottom,
 		)
+		viewBinding.infoBar.updatePadding(bottom = bars.bottom)
 		return WindowInsetsCompat.Builder(insets)
 			.setInsets(WindowInsetsCompat.Type.systemBars(), Insets.NONE)
 			.build()

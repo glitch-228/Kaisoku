@@ -994,6 +994,21 @@ class NovelReaderView @JvmOverloads constructor(
 		}
 	}
 
+	/**
+	 * Applies system-bar insets as view padding and repaginates: page layout is derived from
+	 * the padded area, so inset changes must re-flow the text.
+	 */
+	fun applyContentInsets(left: Int, top: Int, right: Int, bottom: Int) {
+		if (paddingLeft == left && paddingTop == top && paddingRight == right && paddingBottom == bottom) {
+			return
+		}
+		setPadding(left, top, right, bottom)
+		if (width > 0 && height > 0) {
+			repaginate()
+			repaginateBoundaryPreviews()
+		}
+	}
+
 	fun setChapterBoundaryPreview(chapterDelta: Int, content: String?) {
 		when {
 			chapterDelta > 0 -> nextChapterPreviewText = content?.takeIf { it.isNotBlank() }
