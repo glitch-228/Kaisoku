@@ -3,6 +3,7 @@ package org.koitharu.kotatsu.settings.sources.catalog
 import androidx.annotation.WorkerThread
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,10 +91,13 @@ class SourcesCatalogViewModel @Inject constructor(
 				repository.observeInstalledMihonSources().onStart { emit(emptyList()) },
 				repository.observeInstalledPluginSources().onStart { emit(emptyList()) },
 				refreshTrigger,
-			) { _, _, _, _ -> Unit }.mapLatest {
+			) { _, _, _, _ -> Unit 			}.mapLatest {
 				runCatching {
 					repository.getParserSourcesSnapshot()
 				}.onFailure { error ->
+					if (error is CancellationException) {
+						throw error
+					}
 					error.printStackTraceDebug()
 					errorEvent.call(error)
 					if (sourcesSnapshot.value == null) {
@@ -121,6 +125,11 @@ class SourcesCatalogViewModel @Inject constructor(
 						snapshot = snapshot,
 					)
 				}.onFailure { error ->
+					// Cancellation here only means a newer query superseded this one; surfacing it
+					// as an error dialog would show "An error occurred" with no details.
+					if (error is CancellationException) {
+						throw error
+					}
 					error.printStackTraceDebug()
 					errorEvent.call(error)
 				}.getOrElse {

@@ -36,6 +36,10 @@ class LnReaderSourceManager @Inject constructor(
 	@Volatile
 	private var entitiesById: Map<String, LnReaderSourceEntity> = emptyMap()
 
+	/** Fingerprint of the last reload's registry content; `null` until the first reload ran. */
+	@Volatile
+	private var lastRegistryFingerprint: String? = null
+
 	/** Synchronous entity lookup for already-loaded plugin sources (registry-backed). */
 	fun peekEntity(pluginId: String): LnReaderSourceEntity? = entitiesById[pluginId]
 
@@ -67,14 +71,22 @@ class LnReaderSourceManager @Inject constructor(
 		}
 
 	/**
-	 * Reloads all installed plugin sources into the registry and refreshes
-	 * the MangaSourceRegistry update signal.
+	 * Reloads all installed plugin sources into the registry.
+	 *
+	 * The global [MangaSourceRegistry] update signal is re-emitted only when the installed set
+	 * actually changed. Observers like `observeEnabledSources()` re-run assimilation on every
+	 * registry update, and assimilation calls this method — an unconditional emit here would put
+	 * those two into an endless ping-pong that starves Explore and the sources catalog.
 	 */
 	suspend fun reload() = withContext(Dispatchers.IO) {
 		val entities = dao.findAll()
 		entitiesById = entities.associateBy { it.pluginId }
 		LnReaderSourceRegistry.replaceAll(entities.map { it.toMangaSource() })
-		MangaSourceRegistry.updates.tryEmit(Unit)
+		val fingerprint = registryFingerprint(entities)
+		if (fingerprint != lastRegistryFingerprint) {
+			lastRegistryFingerprint = fingerprint
+			MangaSourceRegistry.updates.tryEmit(Unit)
+		}
 	}
 
 	suspend fun getInstalledSources(): List<LnReaderMangaSource> = withContext(Dispatchers.IO) {
@@ -119,6 +131,15 @@ class LnReaderSourceManager @Inject constructor(
 		removed
 	}
 }
+
+/**
+ * Content fingerprint of an installed-plugin set: identity + everything the registry exposes to
+ * observers. Order-insensitive; `js_code` deliberately excluded (it is not part of the source
+ * identity and comparing megabyte strings would be wasteful).
+ */
+internal fun registryFingerprint(entities: List<LnReaderSourceEntity>): String =
+	entities.sortedBy(LnReaderSourceEntity::pluginId)
+		.joinToString("|") { "${it.pluginId}:${it.name}:${it.lang}:${it.site}:${it.version}" }
 
 fun LnReaderSourceEntity.toMangaSource(): LnReaderMangaSource = LnReaderMangaSource(
 	pluginId = pluginId,
