@@ -19,6 +19,7 @@ import okhttp3.Headers
 import okhttp3.Request
 import org.koitharu.kotatsu.core.model.MangaHistory
 import org.koitharu.kotatsu.core.nav.MangaIntent
+import org.koitharu.kotatsu.core.nav.ReaderIntent
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.ui.BaseViewModel
@@ -42,6 +43,11 @@ class NovelReaderViewModel @Inject constructor(
 
 	private val intent = MangaIntent(savedStateHandle)
 
+	/** Explicitly requested position (e.g. a chapter-row tap), wins over history. */
+	private val requestedState: ReaderState? = savedStateHandle[EXTRA_STATE]
+
+	val isIncognitoMode: Boolean = savedStateHandle[EXTRA_INCOGNITO] ?: false
+
 	val manga = MutableStateFlow<Manga?>(null)
 	val chapters = MutableStateFlow<List<MangaChapter>>(emptyList())
 	val currentChapterIndex = MutableStateFlow(-1)
@@ -59,13 +65,13 @@ class NovelReaderViewModel @Inject constructor(
 			manga.value = target
 			chapters.value = target.chapters.orEmpty()
 			val history = historyRepository.getOne(target)
-			val requestedState = savedState2State()
-			currentChapterIndex.value = resolveInitialChapterIndex(target, requestedState, history)
-			initialRatio.value = resolveInitialRatio(requestedState, history)
+			val requested: ReaderState? = this@NovelReaderViewModel.requestedState?.takeIf { s ->
+				target.chapters.orEmpty().any { it.id == s.chapterId }
+			}
+			currentChapterIndex.value = resolveInitialChapterIndex(target, requested, history)
+			initialRatio.value = resolveInitialRatio(requested, history)
 		}
 	}
-
-	private fun savedState2State(): ReaderState? = null
 
 	private fun resolveInitialChapterIndex(
 		target: Manga,
@@ -85,10 +91,22 @@ class NovelReaderViewModel @Inject constructor(
 		return (scroll / SCROLL_RATIO_SCALE).coerceIn(0f, 1f)
 	}
 
+	companion object {
+
+		/** Extras shared with [ReaderIntent] (same key strings). */
+		const val EXTRA_STATE = ReaderIntent.EXTRA_STATE
+		const val EXTRA_INCOGNITO = ReaderIntent.EXTRA_INCOGNITO
+
+		private const val SCROLL_RATIO_SCALE = 10_000f
+	}
+
 	/** Persist the current reading position. Ratio: 0..1 within the chapter. */
 	fun saveProgress(chapterIndex: Int, ratio: Float) {
 		val target = manga.value ?: return
 		val chapter = chapters.value.getOrNull(chapterIndex) ?: return
+		if (isIncognitoMode) {
+			return
+		}
 		val total = chapters.value.size
 		val percent = if (total > 0) (chapterIndex + ratio) / total else 0f
 		val state = ReaderState(
@@ -153,10 +171,5 @@ class NovelReaderViewModel @Inject constructor(
 		for (name in headers.names()) {
 			put(name, headers[name] ?: continue)
 		}
-	}
-
-	private companion object {
-
-		const val SCROLL_RATIO_SCALE = 10_000f
 	}
 }

@@ -49,6 +49,7 @@ import org.koitharu.kotatsu.core.ui.image.TrimTransformation
 import org.koitharu.kotatsu.core.util.FileSize
 import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.URI_SCHEME_ZIP
+import org.koitharu.kotatsu.core.util.ext.dataDecodedBytes
 import org.koitharu.kotatsu.core.util.ext.cancelChildrenAndJoin
 import org.koitharu.kotatsu.core.util.ext.compressToPNG
 import org.koitharu.kotatsu.core.util.ext.ensureRamAtLeast
@@ -309,6 +310,13 @@ class PageLoader @Inject constructor(
 		}
 		val uri = pageUrl.toUri()
 		return when {
+			uri.scheme == "data" -> {
+				// Novel chapters: the "page" is a data: URL with the chapter HTML payload.
+				// Never hand it to OkHttp; decode and cache it like a downloaded page.
+				val bytes = uri.dataDecodedBytes() ?: error("Cannot decode data URL for $page")
+				cache.set(pageUrl, bytes.inputStream().source(), null).toUri()
+			}
+
 			uri.isZipUri() -> if (uri.scheme == URI_SCHEME_ZIP) {
 				uri
 			} else { // legacy uri

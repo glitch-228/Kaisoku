@@ -58,6 +58,7 @@ import org.koitharu.kotatsu.core.ui.dialog.buildAlertDialog
 import org.koitharu.kotatsu.core.util.ext.connectivityManager
 import org.koitharu.kotatsu.core.util.ext.findActivity
 import org.koitharu.kotatsu.core.util.ext.getThemeDrawable
+import org.koitharu.kotatsu.core.util.ext.getParcelableExtraCompat
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toFileOrNull
 import org.koitharu.kotatsu.core.util.ext.toUriOrNull
@@ -185,6 +186,15 @@ class AppRouter private constructor(
 
     fun openReader(intent: ReaderIntent, anchor: View? = null) {
         val activityIntent = intent.intent
+        // Novels cannot be displayed by the standard reader; divert like openReader(manga),
+        // carrying over the requested state/incognito/branch extras.
+        val manga = activityIntent.getParcelableExtraCompat<ParcelableManga>(KEY_MANGA)?.manga
+        if (manga?.source?.unwrap() is LnReaderMangaSource) {
+            val novelIntent = Intent(activityIntent)
+                .setClass(contextOrNull() ?: return, NovelReaderActivity::class.java)
+            startActivity(novelIntent, anchor?.let { view -> scaleUpActivityOptionsOf(view) })
+            return
+        }
         if (settings.isReaderMultiTaskEnabled && activityIntent.data != null) {
             activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT)
         }

@@ -477,6 +477,7 @@ class NovelReaderActivity :
 
 	companion object {
 
-		const val EXTRA_INCOGNITO = "incognito"
+		const val EXTRA_INCOGNITO = NovelReaderViewModel.EXTRA_INCOGNITO
+		const val EXTRA_STATE = NovelReaderViewModel.EXTRA_STATE
 	}
 }
