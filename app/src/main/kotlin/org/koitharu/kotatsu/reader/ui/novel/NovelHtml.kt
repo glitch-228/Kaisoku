@@ -27,7 +27,8 @@ object NovelHtml {
 				}
 			}
 		}
-		return ""
+		// Plain HTML straight from the plugin (the novel reader path): pass through.
+		return url
 	}
 
 	fun toPlainText(html: String): String = html

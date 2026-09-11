@@ -3,8 +3,10 @@ package org.koitharu.kotatsu.details.domain
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.model.getPreferredBranch
 import org.koitharu.kotatsu.core.model.isLocal
+import org.koitharu.kotatsu.core.model.unwrap
 import org.koitharu.kotatsu.core.os.NetworkState
 import org.koitharu.kotatsu.core.parser.MangaRepository
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaSource
 import org.koitharu.kotatsu.history.data.HistoryEntity
 import org.koitharu.kotatsu.list.domain.ReadingProgress
 import org.koitharu.kotatsu.list.domain.ReadingProgress.Companion.PROGRESS_NONE
@@ -48,7 +50,13 @@ class ProgressUpdateUseCase @Inject constructor(
 			return PROGRESS_NONE
 		}
 		val chapterIndex = chapters.indexOfFirst { x -> x.id == history.chapterId }
-		val pagesCount = chapterRepo.getPages(chapter).size
+		// Novels have a single pseudo-page whose content is a full chapter fetch; fetching it
+		// here would run the whole plugin just to compute a percent. The count is always 1.
+		val pagesCount = if (seed.source.unwrap() is LnReaderMangaSource) {
+			1
+		} else {
+			chapterRepo.getPages(chapter).size
+		}
 		if (pagesCount == 0) {
 			return PROGRESS_NONE
 		}
