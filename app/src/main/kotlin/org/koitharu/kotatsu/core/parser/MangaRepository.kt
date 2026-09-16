@@ -185,6 +185,9 @@ interface MangaRepository {
 						httpClient = lnReaderSourceManager.httpClient,
 						cache = contentCache,
 						diskCacheDir = java.io.File(context.cacheDir, "lnreader_chapters"),
+						storage = org.koitharu.kotatsu.core.parser.lnreader.LNReaderStorage(
+							context.getSharedPreferences("lnreader_" + android.net.Uri.encode(entity.pluginId), Context.MODE_PRIVATE),
+						),
 					)
 				}
 			}.getOrNull() ?: EmptyMangaRepository(source)

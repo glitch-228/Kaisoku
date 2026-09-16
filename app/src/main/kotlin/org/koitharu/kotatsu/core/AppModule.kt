@@ -113,6 +113,7 @@ interface AppModule {
 			imageProxyInterceptor: ImageProxyInterceptor,
 			pageFetcherFactory: MangaPageFetcher.Factory,
 			coverRestoreInterceptor: CoverRestoreInterceptor,
+			mangaSourceHeaderInterceptor: MangaSourceHeaderInterceptor,
 			networkStateProvider: Provider<NetworkState>,
 			captchaHandler: CaptchaHandler,
 		): ImageLoader {
@@ -152,7 +153,7 @@ interface AppModule {
 					add(pageFetcherFactory)
 					add(imageProxyInterceptor)
 					add(coverRestoreInterceptor)
-					add(MangaSourceHeaderInterceptor())
+					add(mangaSourceHeaderInterceptor)
 				}.build()
 		}
 

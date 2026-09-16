@@ -53,6 +53,7 @@ class LnReaderPluginsActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 		viewBinding.scrollViewChips.isVisible = false
 		FadingAppbarMediator(viewBinding.appbar, viewBinding.toolbar).bind()
 		viewModel.content.observe(this, adapter)
+		viewModel.availableLanguages.observe(this) { invalidateOptionsMenu() }
 		viewModel.screenTitle.observe(this) {
 			supportActionBar?.title = it
 		}
@@ -61,6 +62,7 @@ class LnReaderPluginsActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 		addMenuProvider(object : MenuProvider {
 			override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
 				menuInflater.inflate(R.menu.opt_sources_catalog, menu)
+				menu.add(Menu.NONE, R.id.action_languages, Menu.NONE, R.string.languages)
 				val searchMenuItem = menu.findItem(R.id.action_search)
 				searchMenuItem.setOnActionExpandListener(this@LnReaderPluginsActivity)
 				val searchView = searchMenuItem.actionView as SearchView
@@ -71,6 +73,11 @@ class LnReaderPluginsActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 
 			override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
 				return when (menuItem.itemId) {
+					R.id.action_languages -> {
+						viewModel.languageFilter.showDialog(this@LnReaderPluginsActivity, viewModel.availableLanguages.value)
+						true
+					}
+
 					R.id.action_refresh -> {
 						viewModel.refresh()
 						true

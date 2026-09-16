@@ -8,6 +8,8 @@ import dagger.hilt.android.testing.HiltTestApplication
 class HiltTestRunner : AndroidJUnitRunner() {
 
     override fun newApplication(cl: ClassLoader?, name: String?, context: Context?): Application {
-        return super.newApplication(cl, HiltTestApplication::class.java.name, context)
+        // The test application lives in the instrumentation APK. On Android 16 the
+        // supplied loader may contain only the target APK's classes.
+        return super.newApplication(HiltTestApplication::class.java.classLoader, HiltTestApplication::class.java.name, context)
     }
 }

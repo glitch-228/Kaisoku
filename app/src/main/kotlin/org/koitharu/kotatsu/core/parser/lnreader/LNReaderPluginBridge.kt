@@ -7,7 +7,9 @@ package org.koitharu.kotatsu.core.parser.lnreader
 
 import com.dokar.quickjs.QuickJs
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -32,12 +34,14 @@ import kotlinx.serialization.json.jsonPrimitive
 class LNReaderPluginBridge(
 	private val qjs: QuickJs,
 	private val pluginId: String,
+	private val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
 ) {
 	companion object {
 		private const val TAG = "LNReaderPluginBridge"
 		private const val DEFAULT_TIMEOUT_MS = 30_000L
-		private const val MAX_POLL_ATTEMPTS = 150
 	}
+
+	private var nextCall = 0L
 
 	private val sanitizedId = pluginId.replace(Regex("[^a-zA-Z0-9_]"), "_")
 	private val json = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
@@ -113,7 +117,7 @@ class LNReaderPluginBridge(
 			})();
 		""".trimIndent()
 
-		val resultJson = runCatching { qjs.evaluate<String>(script, "<getFilters>") }.getOrNull() ?: return emptyList()
+		val resultJson = qjs.evaluate<String>(script, "<getFilters>")
 		return try {
 			val obj = json.parseToJsonElement(resultJson).jsonObject
 			if (obj["success"]?.jsonPrimitive?.booleanOrNull == true) {
@@ -131,10 +135,9 @@ class LNReaderPluginBridge(
 					} ?: emptyList()
 					LNReaderFilter(key, label, type, opts)
 				}
-			} else emptyList()
+			} else throw LNReaderJSException("getFilters failed: ${obj["error"]?.jsonPrimitive?.contentOrNull}")
 		} catch (e: Exception) {
-			LnLog.e(TAG, "Failed to parse filters from JS: ${e.message}")
-			emptyList()
+			throw LNReaderJSException("Invalid plugin filters: ${e.message}", e)
 		}
 	}
 
@@ -144,8 +147,8 @@ class LNReaderPluginBridge(
 	 * Call plugin.popularNovels(page, {filters}).
 	 * Returns list of novel items.
 	 */
-	suspend fun popularNovels(page: Int, selectedFilters: Map<String, String>? = null): List<LNReaderNovelItem> {
-		val resultVar = "__popularResult_${sanitizedId}"
+	suspend fun popularNovels(page: Int, selectedFilters: Map<String, String>? = null, latest: Boolean = false): List<LNReaderNovelItem> {
+		val resultVar = "__popularResult_${sanitizedId}_${nextCall++}"
 		val filterOverrides = if (selectedFilters.isNullOrEmpty()) "" else {
 			selectedFilters.entries.joinToString("\n") { (k, v) ->
 				"if(defaultFilters['${escapeForJS(k)}']) defaultFilters['${escapeForJS(k)}'].value = '${escapeForJS(v)}';"
@@ -170,11 +173,11 @@ class LNReaderPluginBridge(
 					}
 				}
 				$filterOverrides
-				var result = await plugin.popularNovels($page, { showLatestNovels: false, filters: defaultFilters });
-					globalThis.$resultVar = { success: true, data: JSON.stringify(result || []) };
+				var result = await plugin.popularNovels($page, { showLatestNovels: $latest, filters: defaultFilters });
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = { success: true, data: JSON.stringify(result) };
 				} catch (error) {
 					console.error("PLUGIN EVAL ERROR: " + String(error) + "\nSTACK: " + (error ? error.stack : "null"));
-					globalThis.$resultVar = {
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = {
 						success: false,
 						error: (error && error.message) ? error.message : String(error)
 					};
@@ -190,7 +193,7 @@ class LNReaderPluginBridge(
 	 * Call plugin.searchNovels(query, page).
 	 */
 	suspend fun searchNovels(query: String, page: Int): List<LNReaderNovelItem> {
-		val resultVar = "__searchResult_${sanitizedId}"
+		val resultVar = "__searchResult_${sanitizedId}_${nextCall++}"
 		val escapedQuery = escapeForJS(query)
 		val script = """
 			(async function() {
@@ -199,9 +202,9 @@ class LNReaderPluginBridge(
 					if (!plugin) throw new Error('Plugin not found');
 					if (typeof plugin.searchNovels !== 'function') throw new Error('searchNovels not found');
 					var result = await plugin.searchNovels('$escapedQuery', $page);
-					globalThis.$resultVar = { success: true, data: JSON.stringify(result || []) };
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = { success: true, data: JSON.stringify(result) };
 				} catch (error) {
-					globalThis.$resultVar = {
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = {
 						success: false,
 						error: (error && error.message) ? error.message : String(error)
 					};
@@ -218,7 +221,7 @@ class LNReaderPluginBridge(
 	 * Returns novel details with chapter list.
 	 */
 	suspend fun parseNovel(novelPath: String): LNReaderNovelDetails {
-		val resultVar = "__parseNovelResult_${sanitizedId}"
+		val resultVar = "__parseNovelResult_${sanitizedId}_${nextCall++}"
 		val escapedPath = escapeForJS(novelPath)
 		val script = """
 			(async function() {
@@ -227,9 +230,9 @@ class LNReaderPluginBridge(
 					if (!plugin) throw new Error('Plugin not found');
 					if (typeof plugin.parseNovel !== 'function') throw new Error('parseNovel not found');
 					var result = await plugin.parseNovel('$escapedPath');
-					globalThis.$resultVar = { success: true, data: JSON.stringify(result || {}) };
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = { success: true, data: JSON.stringify(result) };
 				} catch (error) {
-					globalThis.$resultVar = {
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = {
 						success: false,
 						error: (error && error.message) ? error.message : String(error)
 					};
@@ -246,7 +249,7 @@ class LNReaderPluginBridge(
 	 * Many LNReader plugins paginate their chapter lists and return them via this method.
 	 */
 	suspend fun parsePage(novelPath: String, page: Int): List<LNReaderChapter> {
-		val resultVar = "__parsePageResult_${sanitizedId}_$page"
+		val resultVar = "__parsePageResult_${sanitizedId}_${page}_${nextCall++}"
 		val escapedPath = escapeForJS(novelPath)
 		val script = """
 			(async function() {
@@ -254,13 +257,12 @@ class LNReaderPluginBridge(
 					var plugin = globalThis.__plugin_${sanitizedId};
 					if (!plugin) throw new Error('Plugin not found');
 					if (typeof plugin.parsePage !== 'function') {
-						globalThis.$resultVar = { success: true, data: '[]' };
-						return;
+						throw new Error('parsePage required for paginated chapters');
 					}
 					var res = await plugin.parsePage('$escapedPath', $page);
-					globalThis.$resultVar = { success: true, data: JSON.stringify(res || []) };
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = { success: true, data: JSON.stringify(res) };
 				} catch (error) {
-					globalThis.$resultVar = {
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = {
 						success: false,
 						error: (error && error.message) ? error.message : String(error)
 					};
@@ -272,24 +274,23 @@ class LNReaderPluginBridge(
 		return try {
 			val element = json.parseToJsonElement(resultJson)
 			val array = if (element is JsonObject) {
-				element["chapters"]?.jsonArray ?: JsonArray(emptyList())
+				element["chapters"]?.jsonArray ?: error("Chapter page has no chapters array")
 			} else {
 				element.jsonArray
 			}
 
-			array.mapNotNull { chElement ->
+			array.map { chElement ->
 				val chObj = chElement.jsonObject
-				val chName = chObj["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+				val chName = chObj["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
 				val chPath = chObj["path"]?.jsonPrimitive?.contentOrNull
-					?: chObj["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+					?: chObj["url"]?.jsonPrimitive?.contentOrNull ?: error("Chapter is missing its path")
 				val releaseTime = chObj["releaseTime"]?.jsonPrimitive?.contentOrNull
 				val chapterNumber = chObj["chapterNumber"]?.jsonPrimitive?.contentOrNull
 					?: chObj["chapterNumber"]?.jsonPrimitive?.intOrNull?.toString()
 				LNReaderChapter(name = chName, path = chPath, releaseTime = releaseTime, chapterNumber = chapterNumber)
 			}
 		} catch (e: Exception) {
-			LnLog.e(TAG, "Failed to parse parsePage[$page] json: ${e.message}\nRaw: ${resultJson.take(500)}")
-			emptyList()
+			throw LNReaderJSException("Invalid chapter page $page: ${e.message}", e)
 		}
 	}
 
@@ -298,7 +299,7 @@ class LNReaderPluginBridge(
 	 * Returns chapter HTML text content.
 	 */
 	suspend fun parseChapter(chapterPath: String): String {
-		val resultVar = "__parseChapterResult_${sanitizedId}"
+		val resultVar = "__parseChapterResult_${sanitizedId}_${nextCall++}"
 		val escapedChapterPath = escapeForJS(chapterPath)
 		val script = """
 			(async function() {
@@ -315,11 +316,11 @@ class LNReaderPluginBridge(
 					} else if (result && result.text) {
 						text = result.text;
 					} else {
-						text = JSON.stringify(result || '');
+						throw new Error('parseChapter returned unsupported content');
 					}
-					globalThis.$resultVar = { success: true, data: text };
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = { success: true, data: text };
 				} catch (error) {
-					globalThis.$resultVar = {
+					if (Object.prototype.hasOwnProperty.call(globalThis, '$resultVar')) globalThis.$resultVar = {
 						success: false,
 						error: (error && error.message) ? error.message : String(error)
 					};
@@ -327,7 +328,8 @@ class LNReaderPluginBridge(
 			})();
 		""".trimIndent()
 
-		return executeAsyncAndPoll(script, resultVar, "parseChapter")
+		return executeAsyncAndPoll(script, resultVar, "parseChapter").takeIf(String::isNotBlank)
+			?: throw LNReaderJSException("parseChapter returned empty text for $chapterPath")
 	}
 
 	// ==================== Internal Helpers ====================
@@ -339,44 +341,48 @@ class LNReaderPluginBridge(
 		script: String,
 		resultVar: String,
 		methodName: String,
-	): String {
-		return withTimeout(DEFAULT_TIMEOUT_MS) {
-			qjs.evaluate<Any?>(script, "<$methodName>")
-
-			var attempts = 0
-			var waitTime = 10L
-
-			while (attempts < MAX_POLL_ATTEMPTS) {
-				delay(waitTime)
-
-				// Check every 5 attempts or first 10 to reduce engine calls
-				if (attempts % 5 == 0 || attempts < 10) {
-					val checkResult = qjs.evaluate<String?>(
-						"(function() { var r = globalThis.$resultVar; if (!r) return null; return JSON.stringify(r); })()",
-						"<check>"
-					)
-
-					if (checkResult != null) {
-						val obj = json.parseToJsonElement(checkResult).jsonObject
-						val success = (obj["success"] as? JsonPrimitive)?.content?.toBoolean() ?: false
-						if (success) {
-							val data = obj["data"]?.jsonPrimitive?.contentOrNull ?: "[]"
-							runCatching { qjs.evaluate<Any?>("delete globalThis.$resultVar;", "<cleanup>") }
-							return@withTimeout data
-						} else {
-							val error = obj["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
-							LnLog.e(TAG, "$methodName failed for $pluginId: $error")
-							throw LNReaderJSException("$methodName failed: $error")
-						}
+	): String = try {
+		withTimeoutOrNull(timeoutMs) {
+			qjs.evaluate<Any?>("globalThis.$resultVar = undefined;\n" + script, "<$methodName>")
+			while (true) {
+				val result = qjs.evaluate<String?>(
+					"JSON.stringify(globalThis.$resultVar) || null", "<result>",
+				)
+				if (result != null) {
+					val obj = json.parseToJsonElement(result).jsonObject
+					if (obj["success"]?.jsonPrimitive?.booleanOrNull != true) {
+						val reason = obj["error"]?.jsonPrimitive?.contentOrNull
+							?.takeUnless { it.isBlank() || it == "null" || it == "undefined" }
+							?: "Plugin rejected the request without error details. Retry the chapter or open it on the source website."
+						throw LNReaderJSException("$methodName failed: $reason")
 					}
+					return@withTimeoutOrNull obj["data"]?.jsonPrimitive?.contentOrNull
+						?: throw LNReaderJSException("$methodName returned no data")
 				}
-
-				attempts++
-				if (waitTime < 200) waitTime = (waitTime * 1.2).toLong().coerceAtMost(200)
+				delay(20)
 			}
-
-			throw LNReaderJSException("$methodName timeout after ${MAX_POLL_ATTEMPTS} attempts")
+			error("Unreachable")
+		} ?: throw LNReaderJSException("$methodName timed out after ${timeoutMs / 1000} seconds. Please retry.")
+	} finally {
+		withContext(NonCancellable) {
+			runCatching { qjs.evaluate<Any?>("delete globalThis.$resultVar;", "<cleanup>") }
 		}
+	}
+
+	suspend fun resolveUrl(path: String, isNovel: Boolean = true): String? = qjs.evaluate<String?>(
+		"""
+		(function() {
+			var plugin = globalThis.__plugin_${sanitizedId};
+			return typeof plugin.resolveUrl === 'function' ? plugin.resolveUrl('${escapeForJS(path)}', $isNovel) : null;
+		})();
+		""".trimIndent(), "<resolveUrl>",
+	)
+
+	suspend fun imageHeaders(): Map<String, String> {
+		val result = qjs.evaluate<String>(
+			"JSON.stringify(globalThis.__plugin_${sanitizedId}.imageRequestInit?.headers || {})", "<imageHeaders>",
+		)
+		return json.parseToJsonElement(result).jsonObject.mapValues { it.value.jsonPrimitive.content }
 	}
 
 	/**
@@ -386,17 +392,17 @@ class LNReaderPluginBridge(
 	private fun parseNovelList(jsonStr: String): List<LNReaderNovelItem> {
 		return try {
 			val array = json.parseToJsonElement(jsonStr).jsonArray
-			array.mapNotNull { element ->
+			array.map { element ->
 				val obj = element.jsonObject
-				val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+				val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: error("Novel is missing its name")
 				val path = obj["path"]?.jsonPrimitive?.contentOrNull
-					?: obj["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+					?: obj["url"]?.jsonPrimitive?.contentOrNull ?: error("Novel is missing its path")
 				val cover = obj["cover"]?.jsonPrimitive?.contentOrNull ?: ""
+				require(name.isNotBlank() && path.isNotBlank()) { "Novel has an empty name or path" }
 				LNReaderNovelItem(name = name, path = path, cover = cover)
 			}
 		} catch (e: Exception) {
-			LnLog.e(TAG, "Failed to parse novel list: ${e.message}")
-			emptyList()
+			throw LNReaderJSException("Invalid novel list: ${e.message}", e)
 		}
 	}
 
@@ -409,13 +415,13 @@ class LNReaderPluginBridge(
 			json.parseToJsonElement(jsonStr).jsonObject
 		} catch (e: Exception) {
 			LnLog.e(TAG, "Failed to parse novel details JSON: ${e.message}\nRaw JSON: ${jsonStr.take(1000)}")
-			return LNReaderNovelDetails(name = "Error", path = "")
+			throw LNReaderJSException("Invalid novel details: ${e.message}", e)
 		}
 
-		val chaptersArray = obj["chapters"] as? JsonArray
+		require(obj.isNotEmpty()) { "Empty novel details" }
 
 		val totalPages = obj["totalPages"]?.jsonPrimitive?.intOrNull ?: 0
-		val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: "Unknown"
+		val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: ""
 		val path = obj["path"]?.jsonPrimitive?.contentOrNull
 			?: obj["url"]?.jsonPrimitive?.contentOrNull ?: ""
 		val cover = obj["cover"]?.jsonPrimitive?.contentOrNull ?: ""
@@ -426,25 +432,29 @@ class LNReaderPluginBridge(
 
 		val genres = try {
 			when (val g = obj["genres"]) {
-				is JsonArray -> g.mapNotNull { it.jsonPrimitive.contentOrNull }
+				is JsonArray -> g.map { item ->
+                    if (item is JsonObject) item["name"]?.jsonPrimitive?.contentOrNull
+                        ?: item["title"]?.jsonPrimitive?.contentOrNull ?: error("Genre is missing its name")
+                    else item.jsonPrimitive.contentOrNull ?: error("Invalid genre")
+                }
+				is JsonPrimitive -> g.contentOrNull.orEmpty().split(',').map(String::trim).filter(String::isNotEmpty)
 				else -> emptyList()
 			}
-		} catch (e: Exception) { emptyList() }
+		} catch (e: Exception) { throw LNReaderJSException("Invalid genres: ${e.message}", e) }
 
 		val chapters = try {
-			(obj["chapters"] as? JsonArray)?.mapNotNull { element ->
+			obj["chapters"]?.takeUnless { it is kotlinx.serialization.json.JsonNull }?.jsonArray?.map { element ->
 				val chObj = element.jsonObject
-				val chName = chObj["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+				val chName = chObj["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
 				val chPath = chObj["path"]?.jsonPrimitive?.contentOrNull
-					?: chObj["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+					?: chObj["url"]?.jsonPrimitive?.contentOrNull ?: error("Chapter is missing its path")
 				val releaseTime = chObj["releaseTime"]?.jsonPrimitive?.contentOrNull
 				val chapterNumber = chObj["chapterNumber"]?.jsonPrimitive?.contentOrNull
 					?: chObj["chapterNumber"]?.jsonPrimitive?.intOrNull?.toString()
 				LNReaderChapter(name = chName, path = chPath, releaseTime = releaseTime, chapterNumber = chapterNumber)
 			} ?: emptyList()
 		} catch (e: Exception) {
-			LnLog.e(TAG, "Failed to parse chapters: ${e.message}")
-			emptyList()
+			throw LNReaderJSException("Invalid chapters: ${e.message}", e)
 		}
 
 		return LNReaderNovelDetails(

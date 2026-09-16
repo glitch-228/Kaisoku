@@ -19,6 +19,70 @@ import java.net.Socket
  */
 @RunWith(AndroidJUnit4::class)
 class LNReaderEngineInstrumentedTest {
+	@Test fun coverHeadersLoadOnColdOpenWithoutFetchingDetailsOrChapters() = runBlocking {
+		val application = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+		val entity = org.koitharu.kotatsu.core.db.entity.LnReaderSourceEntity(
+			pluginId = "cover-test", name = "Cover Test", site = "https://example.test",
+			jsCode = """
+				exports.default = {
+					imageRequestInit: {headers: {Referer: 'https://reader.example/', 'Site-Id': '3'}},
+					parseNovel: function() { throw new Error('Must not load details for covers'); },
+					parseChapter: function() { throw new Error('Must not load chapters for covers'); }
+				};
+			""".trimIndent(), createdAt = 0, updatedAt = 0,
+		)
+		val cache = org.koitharu.kotatsu.core.cache.MemoryContentCache(application)
+		try {
+			val repository = LnReaderMangaRepository(entity, OkHttpClient(), cache)
+			val headers = repository.getImageHeaders()
+			assertEquals("https://reader.example/", headers["Referer"])
+			assertEquals("3", headers["Site-Id"])
+			assertEquals(headers, repository.getImageHeaders())
+		} finally {
+			application.unregisterComponentCallbacks(cache)
+		}
+	}
+
+	@Test fun chapterErrorsAreActionableAndCleanUpResults() = runBlocking {
+		val engine = LNReaderEngine(LNReaderFetchBridge(OkHttpClient(), "errors"))
+		engine.createPluginContext("""
+			exports.default = {parseChapter: function(path) {
+				if (path === 'null') return Promise.reject(null);
+				if (path === 'empty') return Promise.resolve('');
+				return new Promise(function(resolve) { globalThis.finishRequest = resolve; });
+			}};
+		""".trimIndent(), "errors").use { qjs ->
+			val bridge = LNReaderPluginBridge(qjs, "errors", timeoutMs = 250)
+			for ((path, message) in listOf("null" to "without error details", "empty" to "empty text", "timeout" to "timed out")) {
+				try {
+					bridge.parseChapter(path)
+					org.junit.Assert.fail("Expected chapter failure for $path")
+				} catch (e: LNReaderJSException) {
+					assertTrue(e.message.orEmpty(), e.message.orEmpty().contains(message))
+				}
+				assertEquals(0L, qjs.evaluate<Long>("Object.keys(globalThis).filter(k => k.startsWith('__parseChapterResult_')).length"))
+			}
+			qjs.evaluate<Any?>("if (globalThis.finishRequest) finishRequest('late text');", "<finish>")
+			assertEquals(0L, qjs.evaluate<Long>("Object.keys(globalThis).filter(k => k.startsWith('__parseChapterResult_')).length"))
+		}
+	}
+
+	@Test fun cancellationAndLateCompletionDoNotLeaveResultGlobals() = runBlocking {
+		val engine = LNReaderEngine(LNReaderFetchBridge(OkHttpClient(), "cancel"))
+		engine.createPluginContext("""
+			exports.default = {popularNovels: function() {
+				return new Promise(function(resolve) { globalThis.finishRequest = resolve; });
+			}};
+		""".trimIndent(), "cancel").use { qjs ->
+			val bridge = LNReaderPluginBridge(qjs, "cancel")
+			try {
+				kotlinx.coroutines.withTimeout(250) { bridge.popularNovels(1) }
+				org.junit.Assert.fail("The unresolved plugin promise should time out")
+			} catch (_: kotlinx.coroutines.TimeoutCancellationException) { }
+			qjs.evaluate<Any?>("if (globalThis.finishRequest) finishRequest([]);", "<finish>")
+			assertEquals(0L, qjs.evaluate<Long>("Object.keys(globalThis).filter(k => k.startsWith('__popularResult_')).length"))
+		}
+	}
 
 	private lateinit var server: LoopbackHttpServer
 

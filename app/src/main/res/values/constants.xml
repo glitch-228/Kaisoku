@@ -6,9 +6,10 @@
 	<string name="url_telegram" translatable="false">tg://resolve?domain=KaisokuApp</string>
 	<string name="url_weblate" translatable="false">https://hosted.weblate.org/projects/kaisoku/</string>
 	<string name="url_user_manual" translatable="false">https://github.com/glitch-228/Kaisoku/blob/devel/README.md</string>
-	<string name="wallet_ton" translatable="false">UQAOpnu8wzOgARXNfdcNPY4tH74RO3AcAVzBSJZhh-VwYJqb</string>
-	<string name="wallet_eth" translatable="false">0xd450f41448ad17951c5b825620dd3206697a7d81</string>
-	<string name="wallet_xmr" translatable="false">4HR2jnRAwm3SFP4r8KzxBxEKsVHKLvZ29Pxz8Qm3uqHY5aD9Kj1De2Y1W8S18fYjh9acS9NkK4VNje5pC2gVq3aYVSJPcmhCuaUD9eNXsW</string>
+	<string name="wallet_ton" translatable="false">UQCL8-vU8VMwMUfEFYj_fUIqNSXBIynPqeoPuB6e8_QOk7H6</string>
+	<string name="wallet_eth" translatable="false">0x661Aa39F61155CfEDd54D73FB93571B111fA8a8b</string>
+	<string name="wallet_sol" translatable="false">2voftu9V6jFN3v1WTEG8q18nFUM6yjeUepaMdiVZ1pYB</string>
+	<string name="wallet_btc" translatable="false">bc1qnjk6n8jcgmpwdzgtwk3q0k08mysr503fsx8m32</string>
 	<string name="url_error_report" translatable="false">https://github.com/glitch-228/Kaisoku/issues/new/choose</string>
 	<string name="acra_report_url" translatable="false"></string>
 	<string name="account_type_sync" translatable="false">io.github.glitch228.kaisoku.sync</string>

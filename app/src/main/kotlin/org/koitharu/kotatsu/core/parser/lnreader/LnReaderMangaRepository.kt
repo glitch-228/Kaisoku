@@ -1,5 +1,8 @@
 package org.koitharu.kotatsu.core.parser.lnreader
 
+import kotlinx.coroutines.sync.withLock
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -34,6 +37,7 @@ class LnReaderMangaRepository(
 	private val httpClient: OkHttpClient,
 	cache: MemoryContentCache,
 	private val diskCacheDir: File? = null,
+	private val storage: LNReaderStorage = LNReaderStorage(),
 ) : CachingMangaRepository(cache) {
 
 	override val source: LnReaderMangaSource = entity.toMangaSource()
@@ -46,6 +50,20 @@ class LnReaderMangaRepository(
 		isSearchSupported = true,
 	)
 
+	private val listMutex = kotlinx.coroutines.sync.Mutex()
+	private val pagination = LNReaderPagination()
+	@Volatile var imageHeaders: Map<String, String> = entity.site?.let { mapOf("Referer" to it) }.orEmpty()
+		private set
+	@Volatile private var imageHeadersLoaded = false
+	private val imageHeadersMutex = kotlinx.coroutines.sync.Mutex()
+
+	suspend fun getImageHeaders(): Map<String, String> {
+		if (!imageHeadersLoaded) imageHeadersMutex.withLock {
+			if (!imageHeadersLoaded) executeInPluginContext { }
+		}
+		return imageHeaders
+	}
+
 	private val chapterHtmlMutex = MultiMutex<String>()
 	private val chapterHtmlCache = object : LinkedHashMap<String, String>(16, 0.75f, true) {
 		override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean {
@@ -55,43 +73,42 @@ class LnReaderMangaRepository(
 
 	// ==================== Listing / details ====================
 
-	override suspend fun getList(offset: Int, order: SortOrder?, filter: MangaListFilter?): List<Manga> {
-		val page = offset + 1 // LNReader uses 1-based pages
-		val query = filter?.query?.trim().orEmpty()
-		return executeInPluginContext { bridge ->
-			if (query.isNotEmpty()) {
-				bridge.searchNovels(query, page)
-			} else {
-				bridge.popularNovels(page)
-			}.map { it.toManga() }
+	override suspend fun getList(offset: Int, order: SortOrder?, filter: MangaListFilter?): List<Manga> =
+		listMutex.withLock {
+			val query = filter?.query?.trim().orEmpty()
+			val key = query to (order ?: defaultSortOrder)
+			val page = pagination.pageFor(key.toString(), offset)
+			val result = executeInPluginContext { bridge ->
+				val novels = if (query.isNotEmpty()) bridge.searchNovels(query, page)
+				else bridge.popularNovels(page, latest = key.second == SortOrder.UPDATED)
+				novels.map { novel ->
+					novel.toManga().let { it.copy(publicUrl = absoluteUrl(bridge.resolveUrl(novel.path) ?: it.publicUrl)) }
+				}
+			}
+			pagination.accept(key.toString(), offset, page, result.size)
+			result
 		}
-	}
 
 	override suspend fun getDetailsImpl(manga: Manga): Manga {
 		val novelPath = manga.url.substringBefore(CHAPTER_SEPARATOR)
 		if (novelPath.isBlank()) return manga
 		return executeInPluginContext { bridge ->
 			val details = bridge.parseNovel(novelPath)
-			var chapters = details.chapters
-			if (chapters.isEmpty() && details.totalPages > 0) {
-				val allChapters = mutableListOf<LNReaderChapter>()
-				for (page in 1..details.totalPages) {
-					val pageChapters = runCatching { bridge.parsePage(novelPath, page) }.getOrDefault(emptyList())
-					allChapters.addAll(pageChapters)
-					if (pageChapters.isEmpty()) break
-				}
-				chapters = allChapters
-			}
+			val chapters = normalizeNovelChapterOrder(
+				entity.pluginId, loadAllNovelChapters(details) { page -> bridge.parsePage(novelPath, page) },
+			) { it.name }
+			val existingChapters = manga.chapters.orEmpty().associateBy { it.url.substringAfter(CHAPTER_SEPARATOR) }
+
 			Manga(
 				id = manga.id,
 				title = details.name.ifBlank { manga.title },
 				altTitles = emptySet(),
 				url = details.path.ifBlank { novelPath },
-				publicUrl = details.path.ifBlank { manga.publicUrl.ifBlank { novelPath } },
+				publicUrl = absoluteUrl(bridge.resolveUrl(novelPath) ?: manga.publicUrl.ifBlank { novelPath }),
 				rating = manga.rating,
 				contentRating = manga.contentRating,
-				coverUrl = details.cover.ifBlank { manga.coverUrl },
-				largeCoverUrl = details.cover.ifBlank { manga.largeCoverUrl },
+				coverUrl = details.cover.takeIf(String::isNotBlank)?.let(::absoluteUrl) ?: manga.coverUrl,
+				largeCoverUrl = details.cover.takeIf(String::isNotBlank)?.let(::absoluteUrl) ?: manga.largeCoverUrl,
 				tags = details.genres.mapTo(LinkedHashSet()) {
 					MangaTag(title = it, key = it.lowercase(Locale.ROOT), source = source)
 				},
@@ -106,7 +123,7 @@ class LnReaderMangaRepository(
 				description = details.summary.ifBlank { manga.description },
 				chapters = chapters.mapIndexed { index, ch ->
 					MangaChapter(
-						id = stableId("${details.path}|${ch.path}"),
+						id = existingChapters[ch.path]?.id ?: stableId("${details.path}|${ch.path}"),
 						title = ch.name.ifBlank { ch.chapterNumber?.let { "Chapter $it" } ?: "Chapter ${index + 1}" },
 						number = ch.chapterNumber?.toFloatOrNull() ?: (index + 1).toFloat(),
 						volume = 0,
@@ -154,15 +171,25 @@ class LnReaderMangaRepository(
 
 	override fun getImageClient(): OkHttpClient? = httpClient
 
+	override fun createPageRequest(pageUrl: String, page: MangaPage): okhttp3.Request =
+		super.createPageRequest(pageUrl, page).newBuilder().apply {
+			imageHeaders.forEach { (name, value) -> header(name, value) }
+		}.build()
+
 	// ==================== Internal ====================
+
+	private fun absoluteUrl(path: String): String =
+		entity.site?.toHttpUrlOrNull()?.resolve(path)?.toString() ?: path
 
 	private suspend fun <T> executeInPluginContext(block: suspend (LNReaderPluginBridge) -> T): T {
 		return withContext(Dispatchers.IO) {
 			val fetchBridge = LNReaderFetchBridge(httpClient, entity.pluginId)
-			val engine = LNReaderEngine(fetchBridge)
+			val engine = LNReaderEngine(fetchBridge, storage)
 			val qjs = engine.createPluginContext(entity.jsCode, entity.pluginId)
 			try {
 				val bridge = LNReaderPluginBridge(qjs, entity.pluginId)
+				imageHeaders = imageHeaders + bridge.imageHeaders()
+				imageHeadersLoaded = true
 				block(bridge).also {
 					// Re-throw any fatal interactive exceptions that were tunneled out of the fetch
 					// bridge even if JS swallowed the error and resolved the promise.
@@ -173,7 +200,8 @@ class LnReaderMangaRepository(
 			} catch (e: Exception) {
 				fetchBridge.pendingFatalException?.let { throw it }
 				LnLog.e(TAG, "executeInPluginContext failed for ${source.name}", e)
-				throw LNReaderJSException("LNReader JS Error in ${source.name}: ${e.message}", e)
+				val context = fetchBridge.lastRequestDescription?.let { "\n$it" }.orEmpty()
+				throw LNReaderJSException("LNReader JS Error in ${source.name}: ${e.message ?: e.javaClass.simpleName}$context", e)
 			} finally {
 				qjs.close()
 			}
@@ -201,7 +229,14 @@ class LnReaderMangaRepository(
 			}
 			val chapterPath = chapter.url.split(CHAPTER_SEPARATOR, limit = 2).getOrNull(1) ?: chapter.url
 			val html = executeInPluginContext { bridge ->
-				bridge.parseChapter(chapterPath)
+				val raw = bridge.parseChapter(chapterPath)
+				val baseUrl = absoluteUrl(bridge.resolveUrl(chapterPath, isNovel = false) ?: chapterPath)
+				org.jsoup.Jsoup.parseBodyFragment(raw, baseUrl).apply {
+					outputSettings().prettyPrint(false)
+					select("img[src]").forEach { image ->
+						image.absUrl("src").takeIf(String::isNotBlank)?.let { image.attr("src", it) }
+					}
+				}.body().html()
 			}
 			if (html.isNotBlank()) {
 				synchronized(chapterHtmlCache) {
@@ -240,7 +275,7 @@ class LnReaderMangaRepository(
 		publicUrl = path,
 		rating = 0f,
 		contentRating = null,
-		coverUrl = cover.ifBlank { null },
+		coverUrl = cover.takeIf(String::isNotBlank)?.let(::absoluteUrl),
 		tags = emptySet(),
 		state = null,
 		authors = emptySet(),

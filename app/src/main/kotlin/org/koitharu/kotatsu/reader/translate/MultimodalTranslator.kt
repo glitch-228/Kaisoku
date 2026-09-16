@@ -6,6 +6,7 @@ import android.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,6 +32,7 @@ import kotlin.math.ceil
 class MultimodalTranslator @Inject constructor(
 	@MangaHttpClient private val okHttpClient: OkHttpClient,
 	private val settings: AppSettings,
+	private val googleTranslate: GoogleLensTranslator,
 ) : PageTranslator {
 
 	private val rateMutex = Mutex()
@@ -41,6 +43,60 @@ class MultimodalTranslator @Inject constructor(
 		okHttpClient.newBuilder()
 			.callTimeout(REQUEST_TIMEOUT_SEC, TimeUnit.SECONDS)
 			.build()
+	}
+
+	/** Reuse provider configuration, headers, retry policy and rate gate for text. */
+	suspend fun translateText(text: String, onProgress: (Int, Int) -> Unit = { _, _ -> }): String = withContext(Dispatchers.IO) {
+		val provider = settings.translateProvider
+		if (provider == TranslateProvider.GOOGLE_LENS) {
+			val source = settings.translateSourceLanguage.ifBlank { "auto" }
+			val target = settings.translateTargetLanguage.ifBlank { "en" }
+			val parts = NovelTextTranslation.parts(text)
+			val total = parts.count { it.translate }
+			var done = 0
+			onProgress(0, total)
+			return@withContext buildString {
+				for (part in parts) {
+					kotlinx.coroutines.currentCoroutineContext().ensureActive()
+					if (part.translate) {
+						rateGate()
+						append(googleTranslate.translateText(part.text, source, target))
+						onProgress(++done, total)
+					} else append(part.text)
+				}
+			}
+		}
+		val endpoint = settings.translateEndpoint.trim().ifEmpty { throw TranslateException.NoEndpoint() }
+		val apiKey = settings.translateApiKey.trim().ifEmpty { throw TranslateException.NoKey() }
+		val model = settings.translateModel.trim().ifBlank {
+			if (provider == TranslateProvider.GEMINI) "gemini-2.5-flash" else "gpt-4o-mini"
+		}
+		val source = settings.translateSourceLanguage
+		val target = settings.translateTargetLanguage
+		val gemini = provider == TranslateProvider.GEMINI || endpoint.contains("generateContent") ||
+			endpoint.contains("googleapis.com/v1beta/models/")
+		val parts = NovelTextTranslation.parts(text)
+		val total = parts.count { it.translate }
+		var done = 0
+		onProgress(done, total)
+		buildString {
+			for (part in parts) {
+				kotlinx.coroutines.currentCoroutineContext().ensureActive()
+				if (!part.translate) { append(part.text); continue }
+				val payload = NovelTextTranslation.payload(part.text, source, target, model, gemini)
+				val request = Request.Builder().url(resolveUrl(endpoint, apiKey, model, gemini))
+					.post(payload.toString().toRequestBody(JSON_MEDIA_TYPE)).apply {
+						if (!gemini) header("Authorization", "Bearer $apiKey")
+						applyCustomHeaders(this)
+					}.build()
+				append(executeWithRetry(request).use { response ->
+					val body = response.body.string()
+					if (!response.isSuccessful) throw TranslateException.Http(response.code, body)
+					NovelTextTranslation.response(body)
+				})
+				onProgress(++done, total)
+			}
+		}
 	}
 
 	/**

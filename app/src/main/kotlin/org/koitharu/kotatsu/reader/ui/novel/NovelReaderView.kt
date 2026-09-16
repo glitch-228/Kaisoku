@@ -883,8 +883,8 @@ class NovelReaderView @JvmOverloads constructor(
 		if (resetPage) {
 			pendingPageIndex = initialPageIndex
 			pendingProgressRatio = initialProgressRatio
-			val total = if (paginatedTotalLength > 0) paginatedTotalLength else chapterContent.length
-			pendingTargetOffset = initialProgressRatio?.let { (total * it).toInt() }
+			// Resolve the ratio after paginating the new chapter, using its own length.
+			pendingTargetOffset = null
 			pendingBiasToEnd = false
 			currentPageIndex = 0
 		} else {
@@ -932,9 +932,7 @@ class NovelReaderView @JvmOverloads constructor(
 		val adoptedPageIndex = when {
 			initialProgressRatio != null -> {
 				val targetOffset = (content.length * initialProgressRatio).roundToInt()
-				adoptedPages.indexOfFirst { targetOffset in it.startOffset until it.endOffset }
-					.takeIf { it >= 0 }
-					?: 0
+				novelRestoredPage(targetOffset, content.length, adoptedPages.map { it.startOffset })
 			}
 
 			initialPageIndex == -1 -> getLastBoundaryPreviewStartIndex(adoptedPages.size)
@@ -1114,9 +1112,10 @@ class NovelReaderView @JvmOverloads constructor(
 	fun isDualPage(): Boolean = isDualPage
 
 	fun getProgressRatio(): Float {
+		pendingProgressRatio?.let { return it.coerceIn(0f, 1f) }
 		val total = paginatedTotalLength
 		if (total == 0) return 0f
-		return (getCurrentCharOffset().toFloat() / total).coerceIn(0f, 1f)
+		return novelPagedProgress(getCurrentCharOffset(), total, currentPageIndex, pages.size, isDualPage)
 	}
 
 	fun getDisplayPageIndex(): Int {
@@ -1155,6 +1154,9 @@ class NovelReaderView @JvmOverloads constructor(
 
 	private fun findClosestPageForOffset(offset: Int, biasToEnd: Boolean): Int {
 		if (pages.isEmpty()) return 0
+		if (pendingProgressRatio != null) {
+			return novelRestoredPage(offset, paginatedTotalLength, pages.map { it.startOffset })
+		}
 		val clamped = offset.coerceIn(0, paginatedTotalLength)
 		val exact = pages.indexOfFirst { clamped in it.startOffset until it.endOffset }
 		if (exact != -1) {
@@ -1233,6 +1235,7 @@ class NovelReaderView @JvmOverloads constructor(
 
 			pendingTargetOffset != null || pendingProgressRatio != null -> {
 				currentPageIndex = findClosestPageForOffset(targetCharOffset, pendingBiasToEnd)
+				pendingPageIndex = -2
 				pendingTargetOffset = null
 				pendingProgressRatio = null
 				pendingBiasToEnd = false
@@ -1676,7 +1679,7 @@ class NovelReaderView @JvmOverloads constructor(
 		scope.launch {
 			try {
 				val bitmap = if (imagePath.startsWith("http", ignoreCase = true) ||
-					imagePath.startsWith("file", ignoreCase = true)
+					imagePath.startsWith("file", ignoreCase = true) || imagePath.startsWith("zip:")
 				) {
 					loadCoilImage(imagePath)
 				} else {

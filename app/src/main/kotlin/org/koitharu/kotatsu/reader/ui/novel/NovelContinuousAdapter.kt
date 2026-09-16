@@ -18,10 +18,18 @@ class NovelContinuousAdapter(
 	private var settings: NovelReaderSettings,
 	private val onImageClick: (NovelInlineImageRequest) -> Unit,
 	private val onTap: (chapterIndex: Int, viewTop: Float, eventTime: Long) -> Unit,
+	private val imageHeadersProvider: (String) -> Map<String, String> = { emptyMap() },
+	private val onBeforeGeometryChange: () -> Unit = {},
 ) : RecyclerView.Adapter<NovelContinuousAdapter.ChapterViewHolder>() {
 
 	private val chapters = mutableListOf<NovelChapterData>()
 	private var palette: NovelReaderPalette? = null
+
+	init {
+		setHasStableIds(true)
+	}
+
+	override fun getItemId(position: Int): Long = chapters[position].chapterIndex.toLong()
 
 	class ChapterViewHolder(val view: NovelChapterView) : RecyclerView.ViewHolder(view) {
 
@@ -53,17 +61,21 @@ class NovelContinuousAdapter(
 	}
 
 	override fun onBindViewHolder(holder: ChapterViewHolder, position: Int) {
+		holder.view.onBeforeGeometryChange = onBeforeGeometryChange
+		holder.view.imageHeadersProvider = imageHeadersProvider
 		holder.bind(chapters[position], settings, palette, onImageClick, onTap)
 	}
 
 	override fun getItemCount(): Int = chapters.size
 
 	fun updateSettings(newSettings: NovelReaderSettings) {
+		if (settings == newSettings) return
 		settings = newSettings
 		notifyDataSetChanged()
 	}
 
 	fun updatePalette(newPalette: NovelReaderPalette) {
+		if (palette == newPalette) return
 		palette = newPalette
 		notifyDataSetChanged()
 	}
@@ -77,13 +89,13 @@ class NovelContinuousAdapter(
 	}
 
 	fun prependChapter(data: NovelChapterData) {
-		if (chapters.isNotEmpty() && chapters.first().chapterIndex == data.chapterIndex) return
+		if (chapters.any { it.chapterIndex == data.chapterIndex }) return
 		chapters.add(0, data)
 		notifyItemInserted(0)
 	}
 
 	fun appendChapter(data: NovelChapterData) {
-		if (chapters.isNotEmpty() && chapters.last().chapterIndex == data.chapterIndex) return
+		if (chapters.any { it.chapterIndex == data.chapterIndex }) return
 		chapters.add(data)
 		notifyItemInserted(chapters.size - 1)
 	}

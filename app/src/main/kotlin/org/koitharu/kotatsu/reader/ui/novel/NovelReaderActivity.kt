@@ -20,6 +20,10 @@ import androidx.transition.Fade
 import androidx.transition.TransitionManager
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
+import org.koitharu.kotatsu.core.nav.router
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,7 +64,10 @@ class NovelReaderActivity :
 	private var isScrollMode = false
 	private var chapterLoadJob: kotlinx.coroutines.Job? = null
 	private var preloadJob: kotlinx.coroutines.Job? = null
+	private var translationJob: kotlinx.coroutines.Job? = null
 	private var lastLoadedChapterIndex = -1
+	private var chapterLoadGeneration = 0L
+	private lateinit var scrollLayoutManager: NovelScrollLayoutManager
 
 	private var continuousAdapter: NovelContinuousAdapter? = null
 
@@ -73,15 +80,19 @@ class NovelReaderActivity :
 		WindowCompat.setDecorFitsSystemWindows(window, false)
 		setDisplayHomeAsUp(isEnabled = true, showUpAsClose = false)
 		supportActionBar?.title = null
+		supportActionBar?.subtitle = getString(R.string.novel_reader_beta)
 
 		controlDelegate = ReaderControlDelegate(resources, settings, tapGridSettings, this)
 
 		viewBinding.actionsView.listener = this
-		viewBinding.actionsView.isSliderEnabled = false
+		viewBinding.actionsView.isSliderEnabled = true
 		addMenu()
 
 		setupReaderView()
 		setupContinuousScroll()
+		isScrollMode = viewModel.readerSettings.value.readingMode == NovelReadingMode.SCROLL
+		viewBinding.readerView.isVisible = !isScrollMode
+		viewBinding.continuousScrollView.isVisible = isScrollMode
 
 		viewModel.manga.observe(this) { manga ->
 			if (manga != null) {
@@ -89,9 +100,9 @@ class NovelReaderActivity :
 			}
 		}
 		viewModel.isUiLoading.observe(this) { showLoading(it) }
-		viewModel.currentChapterIndex.observe(this) { index ->
-			if (index >= 0) {
-				loadChapter(index)
+		viewModel.chapterRequest.observe(this) { request ->
+			if (request != null && request.first >= 0) {
+				loadChapter(request.first, force = true)
 			}
 		}
 		viewModel.readerSettings.observe(this) { applySettings(it) }
@@ -108,49 +119,62 @@ class NovelReaderActivity :
 
 	private fun setupReaderView() {
 		with(viewBinding.readerView) {
+			imageHeadersProvider = { viewModel.imageHeaders }
 			onTapAreaListener = { area -> onGridTouch(area) }
 			onChapterChangeRequestListener = { delta -> switchChapterBy(delta) }
-			onPageChangeListener = { _, _ -> updateProgressUi() }
+			onPageChangeListener = { _, _ -> if (!isScrollMode) updateProgressUi() }
+			onImageClickListener = { request -> openInlineImage(request.imagePath) }
 		}
 	}
 
 	private fun setupContinuousScroll() {
 		continuousAdapter = NovelContinuousAdapter(
 			settings = viewModel.readerSettings.value,
+			imageHeadersProvider = { viewModel.imageHeaders },
 			onImageClick = { request -> openInlineImage(request.imagePath) },
 			onTap = { _, _, _ -> toggleUiVisibility() },
+			onBeforeGeometryChange = {
+				continuousAnchor()?.let { restoreContinuousAnchor(it.first, it.second) }
+			},
 		)
 		viewBinding.continuousScrollView.adapter = continuousAdapter
+		scrollLayoutManager = NovelScrollLayoutManager(this) { continuousAdapter?.getItems().orEmpty() }
+		viewBinding.continuousScrollView.layoutManager = scrollLayoutManager
+		viewBinding.continuousScrollView.itemAnimator = null
 		viewBinding.continuousScrollView.addOnScrollListener(
 			object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
 
-				private var lastVisibleChapter = -1
-
 				override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
 					super.onScrolled(recyclerView, dx, dy)
-					val manager = recyclerView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
-						?: return
-					val lastVisible = manager.findLastVisibleItemPosition()
-					if (lastVisible >= 0 && lastVisible != lastVisibleChapter) {
-						lastVisibleChapter = lastVisible
-						val chapterIndex = continuousAdapter?.getItems()?.getOrNull(lastVisible)?.chapterIndex ?: return
-						if (chapterIndex != viewModel.currentChapterIndex.value) {
-							viewModel.switchChapter(chapterIndex)
+					if (dx != 0 || dy != 0) {
+						continuousAnchor()?.let { anchor ->
+							if (anchor.first != viewModel.currentChapterIndex.value) {
+								viewModel.switchChapter(anchor.first)
+								preloadBoundary(anchor.first)
+							}
 						}
-						saveCurrentProgress()
 					}
+					if (isScrollMode) updateProgressUi()
 				}
+
 			},
 		)
 	}
 
 	private fun applySettings(newSettings: NovelReaderSettings) {
+		saveCurrentProgress()
+		val anchor = continuousAnchor()
 		val modeChanged = isScrollMode != (newSettings.readingMode == NovelReadingMode.SCROLL)
 		isScrollMode = newSettings.readingMode == NovelReadingMode.SCROLL
+		if (modeChanged) {
+			lastLoadedChapterIndex = -1
+			continuousAdapter?.clear()
+		}
 
 		viewBinding.readerView.updateSettings(newSettings)
 		viewBinding.readerView.setDualPageMode(newSettings.enableDualPage && !isScrollMode)
 		continuousAdapter?.updateSettings(newSettings)
+		if (!modeChanged && isScrollMode && anchor != null) restoreContinuousAnchor(anchor.first, anchor.second)
 
 		if (modeChanged) {
 			val index = viewModel.currentChapterIndex.value
@@ -174,16 +198,24 @@ class NovelReaderActivity :
 	}
 
 	private fun loadChapter(index: Int, force: Boolean = false) {
+		if (!force && isScrollMode && continuousAdapter?.getItems()?.any { it.chapterIndex == index } == true) {
+			preloadBoundary(index)
+			return
+		}
 		if (!force && lastLoadedChapterIndex == index) return
-		lastLoadedChapterIndex = index
+		translationJob?.cancel()
+		val generation = ++chapterLoadGeneration
 		chapterLoadJob?.cancel()
+		preloadJob?.cancel()
 		chapterLoadJob = lifecycleScope.launch {
 			showLoading(true)
 			try {
-				val html = withContext(Dispatchers.IO) { viewModel.loadChapterHtml(index) }
-				if (html != null) {
-					val text = NovelHtml.decodeChapterHtml(html).let(NovelHtml::toPlainText)
+				val text = withContext(Dispatchers.IO) { viewModel.loadChapterText(index) }
+				ensureActive()
+				if (generation != chapterLoadGeneration) return@launch
+				if (text != null) {
 					if (text.isNotBlank()) {
+						lastLoadedChapterIndex = index
 						renderChapter(index, text)
 					} else {
 						showEmptyChapter()
@@ -191,18 +223,22 @@ class NovelReaderActivity :
 				} else {
 					showEmptyChapter()
 				}
+			} catch (e: CancellationException) {
+				throw e
 			} catch (e: Exception) {
-				showError(e)
+				if (generation == chapterLoadGeneration) showError(e)
 			} finally {
-				showLoading(false)
+				if (generation == chapterLoadGeneration) showLoading(false)
 			}
 		}
 	}
 
 	private fun renderChapter(index: Int, text: String) {
+		viewModel.switchChapter(index)
 		val initialRatio = viewModel.restoreRatioFor(index)
 		if (isScrollMode) {
 			continuousAdapter?.setInitialChapter(NovelChapterData(chapterIndex = index, content = text))
+			restoreContinuousAnchor(index, initialRatio ?: 0f)
 		} else {
 			viewBinding.readerView.setContent(
 				content = text,
@@ -210,46 +246,49 @@ class NovelReaderActivity :
 				initialProgressRatio = initialRatio,
 			)
 		}
-		updateProgressUi()
 		preloadBoundary(index)
+		updateProgressUi()
+		invalidateOptionsMenu()
 	}
 
 	private fun preloadBoundary(centerIndex: Int) {
 		preloadJob?.cancel()
+		val generation = chapterLoadGeneration
 		preloadJob = lifecycleScope.launch {
 			for (delta in intArrayOf(1, -1)) {
 				val previewIndex = centerIndex + delta
-				if (previewIndex !in viewModel.chapters.value.indices) return@launch
-				val html = runCatching {
-					withContext(Dispatchers.IO) { viewModel.loadChapterHtml(previewIndex) }
+				if (previewIndex !in viewModel.chapters.value.indices) continue
+				if (isScrollMode && continuousAdapter?.getItems()?.any { it.chapterIndex == previewIndex } == true) continue
+				val text = runCatchingCancellable {
+					withContext(Dispatchers.IO) { viewModel.loadChapterText(previewIndex) }
 				}.getOrNull() ?: continue
-				val text = NovelHtml.decodeChapterHtml(html).let(NovelHtml::toPlainText)
+				ensureActive()
+				if (generation != chapterLoadGeneration) return@launch
 				if (text.isNotBlank()) {
-					viewBinding.readerView.setChapterBoundaryPreview(delta, text)
+					if (isScrollMode) {
+						val data = NovelChapterData(previewIndex, text)
+						if (delta > 0) continuousAdapter?.appendChapter(data) else continuousAdapter?.prependChapter(data)
+						// LinearLayoutManager preserves the attached item's pixel offset on insertion.
+						// Re-scrolling to a character here used to interrupt flings and reset progress.
+					} else {
+						viewBinding.readerView.setChapterBoundaryPreview(delta, text)
+					}
 				}
 			}
 		}
 	}
 
 	private fun showEmptyChapter() {
-		if (isScrollMode) {
-			continuousAdapter?.setInitialChapter(
-				NovelChapterData(
-					chapterIndex = viewModel.currentChapterIndex.value,
-					content = getString(R.string.no_chapters_in_manga),
-				),
-			)
-		} else {
-			viewBinding.readerView.setContent(getString(R.string.no_chapters_in_manga))
-		}
-	}
+        showError(IllegalStateException(getString(R.string.error_no_data_received)))
+    }
 
 	private fun showError(e: Exception) {
+		viewBinding.readerView.cancelPendingChapterTransition()
 		Snackbar.make(
 			viewBinding.root,
 			e.message ?: getString(R.string.error_occurred),
 			Snackbar.LENGTH_SHORT,
-		).show()
+		).setAction(R.string.try_again) { loadChapter(viewModel.currentChapterIndex.value, force = true) }.show()
 	}
 
 	private fun showLoading(isLoading: Boolean) {
@@ -257,31 +296,69 @@ class NovelReaderActivity :
 	}
 
 	private fun updateProgressUi() {
-		val chapter = viewModel.chapters.value.getOrNull(viewModel.currentChapterIndex.value)
-		viewBinding.actionsView.setSliderValue(
-			viewBinding.readerView.getDisplayPageIndex(),
-			viewBinding.readerView.getDisplayPageCount().coerceAtLeast(1),
-		)
-		viewBinding.infoBar.isVisible = chapter != null && viewModel.readerSettings.value.showReadingStatus
+		val anchor = continuousAnchor()
+		val index = anchor?.first ?: lastLoadedChapterIndex
+		val chapter = viewModel.chapters.value.getOrNull(index) ?: return
+		val view = continuousChapterView()
+		val count = if (isScrollMode) view?.pageCount(scrollViewportHeight()) ?: 1
+			else viewBinding.readerView.getDisplayPageCount().coerceAtLeast(1)
+		val page = if (isScrollMode) view?.pageAtProgress(anchor?.second ?: 0f, scrollViewportHeight()) ?: 0
+			else viewBinding.readerView.getDisplayPageIndex()
+		val ratio = anchor?.second ?: viewBinding.readerView.getProgressRatio()
+		viewBinding.actionsView.setSliderValue(page, count)
+		viewBinding.actionsView.isSliderEnabled = count > 1
+		viewBinding.infoBar.update(org.koitharu.kotatsu.reader.ui.pager.ReaderUiState(
+			mangaName = viewModel.manga.value?.title,
+			chapter = chapter, chapterIndex = index, chaptersTotal = viewModel.chapters.value.size,
+			currentPage = page, totalPages = count,
+			percent = (index + ratio) / viewModel.chapters.value.size.coerceAtLeast(1),
+			incognito = viewModel.isIncognitoMode, scrollProgress = if (isScrollMode) ratio else -1f,
+		))
+		viewBinding.infoBar.isVisible = isUiVisible && viewModel.readerSettings.value.showReadingStatus
 		saveCurrentProgress()
 	}
 
+	private fun scrollViewportHeight(): Int = with(viewBinding.continuousScrollView) {
+		(height - paddingTop - paddingBottom).coerceAtLeast(1)
+	}
+
+	private fun continuousChapterView(): NovelChapterView? {
+		val manager = viewBinding.continuousScrollView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+			?: return null
+		return manager.findViewByPosition(manager.findFirstVisibleItemPosition()) as? NovelChapterView
+	}
+
+	private fun continuousAnchor(): Pair<Int, Float>? {
+		if (!isScrollMode) return null
+		scrollLayoutManager.pendingAnchor?.let { return it }
+		val recycler = viewBinding.continuousScrollView
+		val manager = recycler.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager ?: return null
+		val position = manager.findFirstVisibleItemPosition()
+		val chapter = continuousAdapter?.getItems()?.getOrNull(position) ?: return null
+		val view = manager.findViewByPosition(position) as? NovelChapterView ?: return null
+		val atEnd = chapter.chapterIndex == viewModel.chapters.value.lastIndex && !recycler.canScrollVertically(1)
+		return chapter.chapterIndex to if (atEnd) 1f else view.progressAt(recycler.paddingTop - view.top)
+	}
+
+	private fun restoreContinuousAnchor(index: Int, ratio: Float) {
+		scrollLayoutManager.restoreChapter(index, ratio)
+	}
+
 	private fun saveCurrentProgress() {
-		val index = viewModel.currentChapterIndex.value
-		if (index < 0) return
-		val ratio = if (isScrollMode) 0f else viewBinding.readerView.getProgressRatio()
-		viewModel.saveProgress(index, ratio)
+		if (isScrollMode) {
+			val anchor = continuousAnchor() ?: return
+			viewModel.saveProgress(anchor.first, anchor.second)
+		} else if (lastLoadedChapterIndex >= 0 && viewBinding.readerView.isLaidOut) {
+			viewModel.saveProgress(lastLoadedChapterIndex, viewBinding.readerView.getProgressRatio())
+		}
 	}
 
 	private fun openInlineImage(imagePath: String) {
-		Snackbar.make(viewBinding.root, imagePath, Snackbar.LENGTH_SHORT).show()
+		router.openImage(imagePath, viewModel.manga.value?.source)
 	}
 
 	private fun showChaptersSheet() {
-		val sheet = NovelChaptersSheet.newInstance(
-			viewModel.chapters.value,
-			viewModel.currentChapterIndex.value,
-		)
+		val sheet = NovelChaptersSheet()
 		sheet.show(supportFragmentManager, NovelChaptersSheet::class.java.name)
 	}
 
@@ -290,14 +367,79 @@ class NovelReaderActivity :
 	}
 
 	override fun onChapterSelected(index: Int) {
-		viewModel.switchChapter(index)
+		saveCurrentProgress()
+		viewModel.navigateTo(index, 0f)
+	}
+
+	private fun onReverseReadingChanged(reversed: Boolean) {
+		if (reversed == viewModel.isReadingReversed.value) return
+		val anchor = continuousAnchor() ?: if (lastLoadedChapterIndex >= 0) {
+			lastLoadedChapterIndex to viewBinding.readerView.getProgressRatio()
+		} else null
+		saveCurrentProgress()
+		// Old indices and preloads belong to the old sequence. Retire them before publishing the new one.
+		++chapterLoadGeneration
+		chapterLoadJob?.cancel()
+		preloadJob?.cancel()
+		translationJob?.cancel()
+		lastLoadedChapterIndex = -1
+		scrollLayoutManager.clearPendingAnchor()
+		continuousAdapter?.clear()
+		viewBinding.readerView.cancelPendingChapterTransition()
+		viewBinding.readerView.clearChapterBoundaryPreviews()
+		viewModel.setReadingReversed(reversed, anchor?.first, anchor?.second)
+	}
+
+	private fun visibleAnchor(): Pair<Int, Float>? = continuousAnchor() ?: if (lastLoadedChapterIndex >= 0) {
+		lastLoadedChapterIndex to viewBinding.readerView.getProgressRatio()
+	} else null
+
+	private fun toggleChapterTranslation() {
+		if (translationJob?.isActive == true) { translationJob?.cancel(); return }
+		val anchor = visibleAnchor() ?: return
+		if (viewModel.isChapterTranslated(anchor.first)) {
+			saveCurrentProgress()
+			viewModel.showOriginalChapter(anchor.first)
+			viewBinding.readerView.clearChapterBoundaryPreviews()
+			viewModel.navigateTo(anchor.first, anchor.second)
+			return
+		}
+		val chapterId = viewModel.chapters.value.getOrNull(anchor.first)?.id ?: return
+		val generation = chapterLoadGeneration
+		translationJob = lifecycleScope.launch {
+			val message = Snackbar.make(viewBinding.root, R.string.novel_translating, Snackbar.LENGTH_INDEFINITE)
+				.setAction(R.string.cancel) { translationJob?.cancel() }
+			message.show()
+			try {
+				viewModel.translateChapter(anchor.first) { done, total ->
+					runOnUiThread { message.setText(getString(R.string.novel_translation_progress, done, total)) }
+				}
+				ensureActive()
+				val current = visibleAnchor()
+				if (generation == chapterLoadGeneration && current != null &&
+					viewModel.chapters.value.getOrNull(current.first)?.id == chapterId) {
+					saveCurrentProgress()
+					viewBinding.readerView.clearChapterBoundaryPreviews()
+					viewModel.navigateTo(current.first, current.second)
+				}
+			} catch (e: CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Snackbar.make(viewBinding.root, e.message ?: getString(R.string.error_occurred), Snackbar.LENGTH_LONG)
+					.setAction(R.string.settings) { router.openReaderSettings() }.show()
+			} finally {
+				message.dismiss()
+				invalidateOptionsMenu()
+			}
+		}
+		invalidateOptionsMenu()
 	}
 
 	override fun onSettingsChanged(newSettings: NovelReaderSettings) {
 		// The sheet persists the prefs; apply them live (same path as the flow observer) and
 		// update the VM flow so visibility/palette logic sees the new values without re-entering.
+		saveCurrentProgress()
 		viewModel.readerSettings.value = newSettings
-		applySettings(newSettings)
 	}
 
 	override fun onBookmarkClick() {
@@ -360,8 +502,26 @@ class NovelReaderActivity :
 				menuInflater.inflate(R.menu.opt_novel_reader, menu)
 			}
 
+			override fun onPrepareMenu(menu: android.view.Menu) {
+				menu.findItem(R.id.action_novel_source_settings)?.isEnabled = viewModel.readingSource.value != null
+				menu.findItem(R.id.action_novel_translate)?.apply {
+					isEnabled = visibleAnchor() != null
+					setTitle(when {
+						translationJob?.isActive == true -> R.string.cancel
+						viewModel.isChapterTranslated(visibleAnchor()?.first ?: -1) -> R.string.novel_show_original
+						else -> R.string.novel_translate_chapter
+					})
+				}
+			}
+
 			override fun onMenuItemSelected(menuItem: android.view.MenuItem): Boolean {
 				return when (menuItem.itemId) {
+					R.id.action_novel_translate -> { toggleChapterTranslation(); true }
+					R.id.action_novel_translation_settings -> { router.openReaderSettings(); true }
+					R.id.action_novel_source_settings -> {
+						viewModel.readingSource.value?.let { router.openSourceSettings(it) }
+						true
+					}
 					R.id.action_chapters -> {
 						showChaptersSheet()
 						true
@@ -380,23 +540,27 @@ class NovelReaderActivity :
 
 	override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
 		val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+		// Keep the camera/status area reserved even when fullscreen hides the status bar.
+		val safe = insets.getInsetsIgnoringVisibility(
+			WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout(),
+		)
+		val contentInsets = Insets.max(bars, safe)
 		systemBarsBottomInset = bars.bottom
 		// Keep the reading content between the status bar and the navigation bar, like the
 		// manga reader: text never renders under system UI regardless of toolbar visibility.
 		viewBinding.readerView.applyContentInsets(
-			left = bars.left,
-			right = bars.right,
-			top = bars.top,
-			bottom = bars.bottom,
+			left = contentInsets.left,
+			right = contentInsets.right,
+			top = contentInsets.top,
+			bottom = contentInsets.bottom,
 		)
-		// Scroll mode: pad the edges so text clears the system bars; clipToPadding lets the
-		// content scroll from under the status bar as the list moves.
-		viewBinding.continuousScrollView.clipToPadding = false
+		// Padding alone does not prevent scrolled children drawing under the camera.
+		viewBinding.continuousScrollView.clipToPadding = true
 		viewBinding.continuousScrollView.updatePadding(
-			left = bars.left,
-			right = bars.right,
-			top = bars.top,
-			bottom = bars.bottom,
+			left = contentInsets.left,
+			right = contentInsets.right,
+			top = contentInsets.top,
+			bottom = contentInsets.bottom,
 		)
 		viewBinding.appbarTop.updatePadding(
 			left = bars.left,
@@ -437,7 +601,11 @@ class NovelReaderActivity :
 	}
 
 	override fun switchPageTo(index: Int) {
-		if (!isScrollMode) {
+		if (isScrollMode) {
+			val anchor = continuousAnchor() ?: return
+			val view = continuousChapterView() ?: return
+			restoreContinuousAnchor(anchor.first, view.progressAt(index * scrollViewportHeight()))
+		} else {
 			viewBinding.readerView.goToPage(index)
 		}
 	}
@@ -445,8 +613,8 @@ class NovelReaderActivity :
 	override fun switchChapterBy(delta: Int) {
 		val next = viewModel.currentChapterIndex.value + delta
 		if (next in viewModel.chapters.value.indices) {
-			viewModel.initialRatio.value = if (delta > 0) 0f else 1f
-			viewModel.switchChapter(next)
+			saveCurrentProgress()
+			viewModel.navigateTo(next, if (delta > 0) 0f else 1f)
 		} else {
 			viewBinding.readerView.cancelPendingChapterTransition()
 			Snackbar.make(viewBinding.root, R.string.no_more_chapters, Snackbar.LENGTH_SHORT).show()
@@ -491,6 +659,11 @@ class NovelReaderActivity :
 	override fun onPause() {
 		super.onPause()
 		saveCurrentProgress()
+	}
+
+	override fun onResume() {
+		super.onResume()
+		viewModel.configuredReadingReversed()?.let(::onReverseReadingChanged)
 	}
 
 	override fun onStop() {

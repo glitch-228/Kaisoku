@@ -35,6 +35,7 @@ data class ReaderSettings(
 	val colorFilter: ReaderColorFilter?,
 	val isReaderOptimizationEnabled: Boolean,
 	val isUpscaleEnabled: Boolean,
+	val upscaleConfig: org.koitharu.kotatsu.reader.domain.UpscaleConfig,
 	val bitmapConfig: Bitmap.Config,
 	val isPagesNumbersEnabled: Boolean,
 	val isPagesCropEnabledStandard: Boolean,
@@ -47,6 +48,7 @@ data class ReaderSettings(
 		colorFilter = colorFilterOverride?.takeUnless { it.isEmpty } ?: settings.readerColorFilter,
 		isReaderOptimizationEnabled = settings.isReaderOptimizationEnabled,
 		isUpscaleEnabled = settings.isReaderUpscaleEnabled,
+		upscaleConfig = settings.readerUpscaleConfig,
 		bitmapConfig = if (settings.is32BitColorsEnabled) {
 			Bitmap.Config.ARGB_8888
 		} else {
@@ -101,6 +103,9 @@ data class ReaderSettings(
 			AppSettings.KEY_32BIT_COLOR,
 			AppSettings.KEY_READER_OPTIMIZE,
 			AppSettings.KEY_READER_UPSCALE,
+			AppSettings.KEY_UPSCALE_STRENGTH,
+			AppSettings.KEY_UPSCALE_PASSES,
+			AppSettings.KEY_UPSCALE_THRESHOLD,
 			AppSettings.KEY_CF_CONTRAST,
 			AppSettings.KEY_CF_BRIGHTNESS,
 			AppSettings.KEY_CF_INVERTED,

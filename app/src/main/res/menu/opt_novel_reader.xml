@@ -14,6 +14,13 @@
 		android:title="@string/novel_reader_settings"
 		app:showAsAction="never" />
 
+	<item android:id="@+id/action_novel_translate"
+		android:title="@string/novel_translate_chapter" app:showAsAction="never" />
+	<item android:id="@+id/action_novel_translation_settings"
+		android:title="@string/novel_translation_settings" app:showAsAction="never" />
+	<item android:id="@+id/action_novel_source_settings"
+		android:title="@string/novel_source_settings" app:showAsAction="never" />
+
 	<item
 		android:id="@+id/action_bookmark"
 		android:title="@string/bookmark_add"

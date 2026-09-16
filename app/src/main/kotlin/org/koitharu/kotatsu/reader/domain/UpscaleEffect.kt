@@ -35,20 +35,21 @@ object UpscaleEffect {
 	}
 
 	/** What the reader is showing right now, in source-image coordinates */
-	class Viewport(val scale: Float, val centerX: Float, val centerY: Float)
+	class Viewport(val scale: Float, val centerX: Float, val centerY: Float, val fitScale: Float)
 
 	private data class RegisteredView(
 		val view: WeakReference<SubsamplingScaleImageView>,
 		val isEnabled: Boolean,
+		val config: UpscaleConfig,
 	)
 
 	private val views = HashMap<Long, RegisteredView>()
 
-	fun registerView(pageId: Long, ssiv: SubsamplingScaleImageView, isEnabled: Boolean) {
+	fun registerView(pageId: Long, ssiv: SubsamplingScaleImageView, isEnabled: Boolean, config: UpscaleConfig = UpscaleConfig()) {
 		views.entries.removeAll { (id, registration) ->
 			registration.view.get() == null || id != pageId && registration.view.get() === ssiv
 		}
-		views[pageId] = RegisteredView(WeakReference(ssiv), isEnabled)
+		views[pageId] = RegisteredView(WeakReference(ssiv), isEnabled, config)
 	}
 
 	fun unregisterView(pageId: Long, ssiv: SubsamplingScaleImageView) {
@@ -63,7 +64,8 @@ object UpscaleEffect {
 		isEnabled: Boolean,
 		isPowerSaveMode: Boolean,
 		fitScale: Float,
-	): Boolean = isSupported && isEnabled && !isPowerSaveMode && fitScale > MIN_SCALE
+		config: UpscaleConfig = UpscaleConfig(),
+	): Boolean = isSupported && isEnabled && !isPowerSaveMode && config.strength > 0 && fitScale > config.threshold
 
 	fun passCount(scale: Float): Int = when {
 		scale >= 3f -> 4
@@ -90,7 +92,7 @@ object UpscaleEffect {
 			visible.exactCenterX() - location[0],
 			visible.exactCenterY() - location[1],
 		) ?: return null
-		return Viewport(ssiv.scale, center.x, center.y)
+		return Viewport(ssiv.scale, center.x, center.y, ssiv.width / ssiv.sWidth.toFloat())
 	}
 
 	fun refreshPowerSaveState(isPowerSaveMode: Boolean) {
@@ -102,8 +104,8 @@ object UpscaleEffect {
 				true
 			} else {
 				val fitScale = if (view.isReady && view.sWidth > 0) view.width / view.sWidth.toFloat() else 0f
-				val effect = if (shouldApply(true, registration.isEnabled, isPowerSaveMode, fitScale)) {
-					create(fitScale)
+				val effect = if (shouldApply(true, registration.isEnabled, isPowerSaveMode, fitScale, registration.config)) {
+					create(fitScale, registration.config)
 				} else {
 					null
 				}
@@ -115,14 +117,14 @@ object UpscaleEffect {
 	}
 
 	@RequiresApi(Build.VERSION_CODES.TIRAMISU)
-	fun create(scale: Float): RenderEffect? = runCatching {
+	fun create(scale: Float, config: UpscaleConfig = UpscaleConfig()): RenderEffect? = runCatching {
 		// Anime4K is iterative: chain more push passes the more the page is stretched
-		val passes = passCount(scale)
+		val passes = config.passes.takeIf { it > 0 } ?: passCount(scale)
 		val px = (scale / 2f).coerceIn(1f, 2.5f)
 		var effect: RenderEffect? = null
 		repeat(passes) {
 			val shader = RuntimeShader(AGSL)
-			shader.setFloatUniform("strength", 0.75f)
+			shader.setFloatUniform("strength", config.strength / 100f)
 			shader.setFloatUniform("px", px)
 			val pass = RenderEffect.createRuntimeShaderEffect(shader, "src")
 			effect = effect?.let { RenderEffect.createChainEffect(pass, it) } ?: pass

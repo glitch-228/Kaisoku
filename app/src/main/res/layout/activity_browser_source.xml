@@ -35,7 +35,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/close"
                     android:src="@drawable/ic_close"
-                    android:tint="?attr/colorOnSurface" />
+                    app:tint="?attr/colorOnSurface" />
 
                 <!-- Back button -->
                 <ImageButton
@@ -47,7 +47,7 @@
                     android:contentDescription="@string/browser_source_back"
                     android:enabled="false"
                     android:src="@drawable/ic_arrow_back"
-                    android:tint="?attr/colorOnSurface" />
+                    app:tint="?attr/colorOnSurface" />
 
                 <!-- Forward button -->
                 <ImageButton
@@ -59,7 +59,7 @@
                     android:contentDescription="@string/browser_source_forward"
                     android:enabled="false"
                     android:src="@drawable/ic_arrow_forward"
-                    android:tint="?attr/colorOnSurface" />
+                    app:tint="?attr/colorOnSurface" />
 
                 <!-- URL bar -->
                 <com.google.android.material.textfield.TextInputEditText
@@ -85,7 +85,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/browser_source_refresh"
                     android:src="@drawable/ic_refresh"
-                    android:tint="?attr/colorOnSurface" />
+                    app:tint="?attr/colorOnSurface" />
 
                 <!-- Ad blocker toggle -->
                 <ImageButton
@@ -95,7 +95,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/browser_source_adblock_toggle"
                     android:src="@drawable/ic_shield"
-                    android:tint="?attr/colorPrimary" />
+                    app:tint="?attr/colorPrimary" />
 
             </LinearLayout>
         </androidx.appcompat.widget.Toolbar>

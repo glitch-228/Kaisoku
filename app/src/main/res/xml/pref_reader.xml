@@ -106,8 +106,8 @@
 		android:summary="@string/reader_optimize_summary"
 		android:title="@string/reader_optimize" />
 
-	<SwitchPreferenceCompat
-		android:defaultValue="false"
+	<Preference
+		android:persistent="false"
 		android:key="reader_upscale"
 		android:summary="@string/reader_upscale_summary"
 		android:title="@string/reader_upscale" />

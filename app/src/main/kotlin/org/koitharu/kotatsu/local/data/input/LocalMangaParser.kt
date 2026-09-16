@@ -14,6 +14,8 @@ import okio.Path
 import okio.Path.Companion.toOkioPath
 import okio.Path.Companion.toPath
 import okio.openZip
+import okio.buffer
+import org.koitharu.kotatsu.local.data.NovelChapterArchive
 import org.jetbrains.annotations.Blocking
 import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.isSameEntryAs
@@ -60,7 +62,11 @@ class LocalMangaParser(private val uri: Uri) {
 	suspend fun getManga(withDetails: Boolean): LocalManga = runInterruptible(Dispatchers.IO) {
 		(uri.resolveFsAndPath()).use { (fileSystem, rootPath) ->
 			val index = MangaIndex.read(fileSystem, rootPath / ENTRY_NAME_INDEX)
-			val mangaInfo = index?.getMangaInfo()
+			val mangaInfo = index?.getMangaInfo()?.let { info ->
+				info.copy(chapters = info.chapters?.let { chapters ->
+					org.koitharu.kotatsu.core.parser.lnreader.normalizeNovelChapterOrder(info.source.name, chapters) { it.title }
+				})
+			}
 			if (mangaInfo != null) {
 				val coverEntry: Path? = index.getCoverEntry()?.let { rootPath / it }?.takeIf {
 					fileSystem.exists(it)
@@ -147,6 +153,26 @@ class LocalMangaParser(private val uri: Uri) {
 		uri.resolveFsAndPath().use { (fileSystem, rootPath) ->
 			val index = MangaIndex.read(fileSystem, rootPath / ENTRY_NAME_INDEX)
 			index?.getMangaInfo()
+		}
+	}
+
+	suspend fun isNovel(): Boolean = getMangaInfo()?.source?.name?.startsWith("lnreader:") == true
+
+	suspend fun getChapterHtml(chapter: MangaChapter): String = runInterruptible(Dispatchers.IO) {
+		val chapterUri = chapter.url.toUri().resolve()
+		chapterUri.resolveFsAndPath().use { (fileSystem, rootPath) ->
+			val index = MangaIndex.read(fileSystem, rootPath / ENTRY_NAME_INDEX)
+			val pattern = index?.getChapterNamesPattern(chapter)
+			val entries = fileSystem.listRecursively(rootPath).filter { path ->
+				fileSystem.isRegularFile(path) && if (pattern == null) path.parent == rootPath
+				else path.name.substringBefore('.').matches(pattern)
+			}.toListSorted(compareBy(AlphanumComparator()) { it.toString() })
+			val html = entries.singleOrNull { it.name.endsWith(".html") || it.name.endsWith(".htm") }
+				?: throw java.io.IOException("Downloaded chapter text is missing: ${chapter.title}")
+			val text = fileSystem.source(html).buffer().use { it.readUtf8() }
+			NovelChapterArchive.resolve(text, entries.filter { it.isImage() }.map {
+				chapterUri.child(it, resolve = true).toString()
+			})
 		}
 	}
 

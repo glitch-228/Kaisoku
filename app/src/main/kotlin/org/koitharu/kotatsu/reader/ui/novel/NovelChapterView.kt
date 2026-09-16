@@ -33,6 +33,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koitharu.kotatsu.core.util.ext.resolveSp
@@ -58,7 +60,7 @@ class NovelChapterView @JvmOverloads constructor(
 
 	private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
 		color = palette.textColor
-		textSize = resources.resolveSp(17f)
+		textSize = resources.resolveSp(settings.fontSizeSp)
 		isSubpixelText = true
 		letterSpacing = 0.01f
 	}
@@ -81,6 +83,7 @@ class NovelChapterView @JvmOverloads constructor(
 	var onImageClickListener: ((NovelInlineImageRequest) -> Unit)? = null
 	var onTapListener: ((rawX: Float, rawY: Float, eventTime: Long) -> Unit)? = null
 	var onTapAreaListener: ((area: TapGridArea) -> Unit)? = null
+	var onBeforeGeometryChange: (() -> Unit)? = null
 
 	@Inject
 	lateinit var imageLoader: ImageLoader
@@ -114,6 +117,8 @@ class NovelChapterView @JvmOverloads constructor(
 		android.content.res.Configuration.UI_MODE_NIGHT_YES
 
 	fun setContent(content: String) {
+		if (chapterContent == content) return
+		scope.coroutineContext.cancelChildren()
 		chapterContent = content
 		displayLayout = null
 		loadingImages.clear()
@@ -123,6 +128,7 @@ class NovelChapterView @JvmOverloads constructor(
 	}
 
 	fun updateSettings(newSettings: NovelReaderSettings) {
+		if (settings == newSettings) return
 		settings = newSettings
 		textPaint.textSize = resources.resolveSp(settings.fontSizeSp)
 		updatePalette()
@@ -158,7 +164,7 @@ class NovelChapterView @JvmOverloads constructor(
 	fun getOffsetForVertical(y: Float): Int {
 		val layout = displayLayout ?: return 0
 		return try {
-			val adjustedY = y - paddingTop
+			val adjustedY = y - paddingTop - settings.marginVertical
 			val clampedY = adjustedY.coerceIn(0f, layout.height.toFloat())
 			val line = layout.getLineForVertical(clampedY.toInt())
 			layout.getOffsetForHorizontal(line, 0f)
@@ -178,12 +184,12 @@ class NovelChapterView @JvmOverloads constructor(
 
 		val availableWidth = widthSize - paddingLeft - paddingRight - (settings.marginHorizontal * 2)
 
-		if (displayLayout == null && chapterContent.isNotEmpty() && availableWidth > 0) {
+		if (displayLayout?.width != availableWidth && chapterContent.isNotEmpty() && availableWidth > 0) {
 			buildLayout(availableWidth)
 		}
 
 		val contentHeight = displayLayout?.height ?: 0
-		val desiredHeight = paddingTop + paddingBottom + contentHeight
+		val desiredHeight = paddingTop + paddingBottom + contentHeight + settings.marginVertical * 2
 
 		val heightMode = MeasureSpec.getMode(heightMeasureSpec)
 		val heightSize = MeasureSpec.getSize(heightMeasureSpec)
@@ -299,7 +305,7 @@ class NovelChapterView @JvmOverloads constructor(
 
 		canvas.save()
 		val x = paddingLeft + settings.marginHorizontal.toFloat()
-		canvas.translate(x, paddingTop.toFloat())
+		canvas.translate(x, (paddingTop + settings.marginVertical).toFloat())
 
 		highlightRange?.let { range ->
 			val intersectStart = max(0, range.first)
@@ -334,13 +340,40 @@ class NovelChapterView @JvmOverloads constructor(
 			}
 		}
 		canvas.restore()
+		imagePaint.color = palette.secondaryTextColor
+		imagePaint.strokeWidth = resources.displayMetrics.density
+		val separatorY = (height - paddingBottom - settings.marginVertical / 2f)
+		canvas.drawLine(
+			(paddingLeft + settings.marginHorizontal).toFloat(), separatorY,
+			(width - paddingRight - settings.marginHorizontal).toFloat(), separatorY, imagePaint,
+		)
 	}
+
+	/** Character-based anchor shared with the paged reader's history ratio. */
+	fun progressAt(y: Int): Float {
+		val layout = displayLayout ?: return 0f
+		if (layout.text.isEmpty()) return 0f
+		val line = layout.getLineForVertical((y - paddingTop - settings.marginVertical).coerceAtLeast(0))
+		return layout.getLineStart(line).toFloat() / layout.text.length
+	}
+
+	fun offsetForProgress(ratio: Float): Int {
+		val layout = displayLayout ?: return 0
+		val offset = (layout.text.length * ratio.coerceIn(0f, 1f)).toInt()
+		return if (ratio <= 0f) 0 else paddingTop + settings.marginVertical + layout.getLineTop(layout.getLineForOffset(offset))
+	}
+
+	fun pageCount(viewportHeight: Int): Int = novelScrollPageCount(height, viewportHeight)
+
+	fun pageAtProgress(ratio: Float, viewportHeight: Int): Int =
+		if (ratio >= 1f) pageCount(viewportHeight) - 1
+		else novelScrollPageIndex(offsetForProgress(ratio), height, viewportHeight)
 
 	private fun processedTextLength(): Int = displayLayout?.text?.length ?: 0
 
 	private fun findInlineImageAt(x: Float, y: Float): NovelInlineImageRequest? {
 		val localX = x - paddingLeft - settings.marginHorizontal
-		val localY = y - paddingTop
+		val localY = y - paddingTop - settings.marginVertical
 		if (localX < 0f || localY < 0f) {
 			return null
 		}
@@ -401,7 +434,7 @@ class NovelChapterView @JvmOverloads constructor(
 			scope.launch {
 				try {
 					val bitmap = if (imagePath.startsWith("http", ignoreCase = true) ||
-						imagePath.startsWith("file", ignoreCase = true)
+						imagePath.startsWith("file", ignoreCase = true) || imagePath.startsWith("zip:")
 					) {
 						loadCoilImage(imagePath)
 					} else {
@@ -414,6 +447,7 @@ class NovelChapterView @JvmOverloads constructor(
 						val previousMetrics = NovelImageMetricsCache.get(imagePath)
 						NovelImageMetricsCache.put(imagePath, metrics)
 						if (previousMetrics != metrics) {
+							onBeforeGeometryChange?.invoke()
 							displayLayout = null
 							requestLayout()
 						} else {
@@ -423,6 +457,8 @@ class NovelChapterView @JvmOverloads constructor(
 						loadingImages.remove(cacheKey)
 						failedImages.add(cacheKey)
 					}
+				} catch (e: CancellationException) {
+					throw e
 				} catch (e: Exception) {
 					loadingImages.remove(cacheKey)
 					failedImages.add(cacheKey)
@@ -450,7 +486,8 @@ class NovelChapterView @JvmOverloads constructor(
 
 	override fun onDetachedFromWindow() {
 		super.onDetachedFromWindow()
-		scope.cancel()
+		scope.coroutineContext.cancelChildren()
+		loadingImages.clear()
 	}
 }
 

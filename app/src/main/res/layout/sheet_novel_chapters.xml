@@ -40,7 +40,7 @@
 			style="?attr/materialIconButtonStyle"
 			android:layout_width="48dp"
 			android:layout_height="48dp"
-			android:contentDescription="@string/reverse"
+			android:contentDescription="@string/novel_reverse_list_display"
 			app:icon="@drawable/ic_sort_desc" />
 
 	</LinearLayout>

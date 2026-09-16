@@ -57,6 +57,10 @@ class SourceSettings(context: Context, source: MangaSource) : MangaSourceConfig 
 	val isSlowdownEnabled: Boolean
 		get() = prefs.getBoolean(KEY_SLOWDOWN, false)
 
+	var isNovelReadingReversed: Boolean
+		get() = prefs.getBoolean(KEY_NOVEL_REVERSE_READING, false)
+		set(value) = prefs.edit { putBoolean(KEY_NOVEL_REVERSE_READING, value) }
+
 	val isCaptchaNotificationsDisabled: Boolean
 		get() = prefs.getBoolean(KEY_NO_CAPTCHA, false)
 
@@ -112,6 +116,7 @@ class SourceSettings(context: Context, source: MangaSource) : MangaSourceConfig 
 		const val KEY_NO_AUTO_CAPTCHA = "no_auto_captcha"
 		const val KEY_SLOWDOWN = "slowdown"
 		const val KEY_SORT_ORDER = "sort_order"
+		const val KEY_NOVEL_REVERSE_READING = "novel_reverse_reading"
 
         fun prefsName(source: MangaSource): String {
             return source.name.substringAfter(':').replace(File.separatorChar, '$')

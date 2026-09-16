@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="novel_reader_settings">Настройки чтения новелл (Бета)</string>
+    <string name="novel_reader_beta">Чтение новелл · Бета</string>
+    <string name="lnreader_repositories_summary">Поиск и установка источников новелл. Чтение новелл — бета-функция.</string>
+    <string name="translate_provider_google_lens">Google Объектив / Google Переводчик (без ключа)</string>
+    <string name="novel_translation_settings">Настройки перевода</string>
     <string name="local_storage">Локальное хранилище</string>
     <string name="favourites">Избранное</string>
     <string name="history">История</string>
@@ -162,6 +167,14 @@
     <string name="text_clear_updates_feed_prompt">Удалить всю историю обновлений навсегда\?</string>
     <string name="check_for_new_chapters">Проверка новых глав</string>
     <string name="reverse">В обратном порядке</string>
+    <string name="novel_translate_chapter">Перевести главу</string>
+    <string name="novel_show_original">Показать оригинал главы</string>
+    <string name="novel_translating">Перевод главы…</string>
+    <string name="novel_translation_progress">Перевод главы: %1$d/%2$d</string>
+    <string name="novel_source_settings">Настройки источника</string>
+    <string name="novel_reverse_reading_order">Обратный порядок чтения</string>
+    <string name="novel_reverse_reading_order_summary">Обратный порядок глав при переходах и непрерывном чтении всех новелл этого источника. Текущая позиция сохранится.</string>
+    <string name="novel_reverse_list_display">Обратный порядок списка</string>
     <string name="sign_in">Войти</string>
     <string name="auth_required">Авторизуйтесь, чтобы просмотреть этот контент</string>
     <string name="default_s">По умолчанию: %s</string>
@@ -883,4 +896,12 @@
     <string name="translate_page">Перевести страницу</string>
     <string name="added_to_favourites">В избранном с</string>
     <string name="added_to_category_at">Добавлено в категорию «%1$s»: %2$s</string>
+	<string name="upscale_strength">Сила обработки</string>
+	<string name="upscale_strength_value">Сила обработки: %1$d%%</string>
+	<string name="upscale_passes">Количество проходов</string>
+	<string name="upscale_passes_value">Количество проходов: %1$s</string>
+	<string name="upscale_threshold">Порог включения</string>
+	<string name="upscale_threshold_value">Применять при увеличении более %1$s×</string>
+	<string name="upscale_power_save">Обработка приостановлена в режиме энергосбережжения.</string>
+	<string name="upscale_activation_help">Применяется при увеличении страницы выше выбранного порога. Сила 0 отключает обработку.</string>
 </resources>

@@ -19,6 +19,7 @@ import org.jsoup.Jsoup
  */
 class LNReaderEngine(
 	private val fetchBridge: LNReaderFetchBridge,
+	private val storage: LNReaderStorage = LNReaderStorage(),
 ) {
 	companion object {
 		private const val TAG = "LNReaderEngine"
@@ -42,7 +43,7 @@ class LNReaderEngine(
 			registerFetchBridge(qjs)
 			registerConsole(qjs)
 			registerGlobalPolyfills(qjs)
-			registerCheerioBridge(qjs)
+			registerDomBridge(qjs)
 			setupModuleSystem(qjs)
 			qjs.evaluate<Any?>(jsCode, "<lnreader-plugin>")
 
@@ -72,6 +73,7 @@ class LNReaderEngine(
 			return qjs
 		} catch (e: Exception) {
 			qjs.close()
+			if (e is kotlinx.coroutines.CancellationException) throw e
 			LnLog.e(TAG, "Failed to load plugin $pluginId", e)
 			throw LNReaderJSException("Failed to load plugin $pluginId: ${e.message}", e)
 		}
@@ -133,8 +135,10 @@ class LNReaderEngine(
 	}
 
 	private suspend fun registerGlobalPolyfills(qjs: QuickJs) {
-		qjs.evaluate<Any?>(
-			"""
+		qjs.evaluate<Any?>(globalPolyfillsScript(), "<polyfills>")
+	}
+
+	internal fun globalPolyfillsScript(): String = """
 			// Setup URL API polyfill with comprehensive error handling
 			globalThis.URL = function(url, base) {
 				if (url === null || url === undefined) throw new Error('Invalid URL');
@@ -454,19 +458,60 @@ class LNReaderEngine(
 				location: globalThis.location, URL: 'about:blank', domain: 'blank', referrer: '',
 				title: '', cookie: '', documentURI: 'about:blank', baseURI: 'about:blank'
 			};
-			""".trimIndent(),
-			"<polyfills>"
-		)
-	}
+			""".trimIndent()
 
 	private suspend fun setupModuleSystem(qjs: QuickJs) {
-		qjs.evaluate<Any?>(
-			"""
+		qjs.evaluate<Any?>(resource("cheerio.js"), "<cheerio>")
+		qjs.evaluate<Any?>(resource("dayjs.min.js"), "<dayjs>")
+		qjs.evaluate<Any?>(resource("localizedFormat.js"), "<dayjs-localized-format>")
+		qjs.evaluate<Any?>("dayjs.extend(dayjs_plugin_localizedFormat);", "<dayjs-setup>")
+		qjs.defineBinding("__nativeStorage", FunctionBinding<String?> { args ->
+			val key = args.getOrNull(1) as? String ?: return@FunctionBinding null
+			when (args.firstOrNull()) {
+				"keys" -> org.json.JSONArray(storage.keys().toList()).toString()
+				"get" -> storage.get(key)
+				"set" -> { storage.set(key, args.getOrNull(2) as? String); null }
+				else -> { storage.set(key, null); null }
+			}
+		})
+		qjs.evaluate<Any?>(storageScript(), "<plugin-runtime>")
+		qjs.evaluate<Any?>(moduleScript(), "<module-stubs>")
+	}
+
+	internal fun storageScript(): String = """
+			function persistentStorage(prefix) {
+				return {
+					get: function(key, raw) {
+						var value = __nativeStorage('get', prefix + String(key));
+						if (value == null) return undefined;
+						var item = JSON.parse(value);
+						if (item.expires && Date.now() > item.expires) { this.delete(key); return undefined; }
+						item.created = new Date(item.created);
+						return raw ? item : item.value;
+					},
+					set: function(key, value, expires) {
+						__nativeStorage('set', prefix + String(key), JSON.stringify({created: Date.now(), value: value,
+							expires: expires instanceof Date ? expires.getTime() : expires}));
+					},
+					delete: function(key) { __nativeStorage('delete', prefix + String(key)); },
+					getAllKeys: function() { return JSON.parse(__nativeStorage('keys', '')).filter(k => k.startsWith(prefix)).map(k => k.slice(prefix.length)); },
+					clearAll: function() { this.getAllKeys().forEach(key => this.delete(key)); }
+				};
+			}
+			globalThis.__pluginStorage = persistentStorage('plugin:');
+			globalThis.__webStorage = {get: function() { return JSON.parse(__nativeStorage('get', 'web:local') || '{}'); }};
+			globalThis.__sessionStorage = {get: function() { return {}; }};
+			globalThis.Intl = {DateTimeFormat: function() {
+				return {resolvedOptions: function() { return {timeZone: ${json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(java.util.TimeZone.getDefault().id))}}; }};
+			}};
+		""".trimIndent()
+
+	internal fun moduleScript(): String = """
 			globalThis.__cheerioIdCounter = 0;
 			globalThis.__cheerioQueue = [];
 			globalThis.__cheerioResults = {};
 
-			globalThis.cheerio = ${getNativeCheerioBridge()};
+
 			globalThis.htmlparser2 = ${getHtmlParser2Library()};
 
 			globalThis.__libs_novelStatus = ${getNovelStatusLibrary()};
@@ -484,12 +529,10 @@ class LNReaderEngine(
 					if (name === '@libs/novelStatus') return globalThis.__libs_novelStatus;
 					if (name === '@libs/filterInputs') return globalThis.__libs_filterInputs;
 
-					if (name === '@libs/storage') return {
-						storage: { get: function(key) { return null; }, set: function(key, value) {}, delete: function(key) {} },
-						get: function(key) { return null; },
-						set: function(key, value) {},
-						delete: function(key) {}
+					if (name === '@libs/storage' || name === '@lib/storage') return {
+						storage: __pluginStorage, localStorage: __webStorage, sessionStorage: __sessionStorage
 					};
+					if (name === 'dayjs') return globalThis.dayjs;
 					if (name === '@libs/defaultCover') return { defaultCover: '' };
 					if (name === '@libs/isAbsoluteUrl') return {
 						isUrlAbsolute: function(url) {
@@ -507,24 +550,7 @@ class LNReaderEngine(
 					if (name === 'htmlparser2') return globalThis.htmlparser2;
 					if (name === 'cheerio') return globalThis.cheerio;
 
-					// Return a dummy proxy that absorbs any property access without throwing
-					return new Proxy(function() {}, {
-						get: function(target, prop) {
-							if (prop === Symbol.toPrimitive) return () => '';
-							if (prop === 'then') return undefined; // Prevent infinite promise resolving loops
-							if (prop === 'toJSON') return undefined; // Prevent infinite recursion during JSON.stringify
-							console.log('PROXY GET:', name, prop ? String(prop) : 'unknown');
-							return new Proxy(function() {}, this);
-						},
-						apply: function(target, thisArg, argumentsList) {
-							console.log('PROXY CALL:', name);
-							return new Proxy(function() {}, this);
-						},
-						construct: function(target, args) {
-							console.log('PROXY CONSTRUCT:', name);
-							return new Proxy(function() {}, this);
-						}
-					});
+					throw new Error('Unsupported LNReader module: ' + name);
 				};
 			}
 			// CommonJS module support
@@ -541,254 +567,17 @@ class LNReaderEngine(
 				globalThis.setInterval = function(fn) { fn(); return 1; };
 				globalThis.clearInterval = function() {};
 			}
-			""".trimIndent(),
-			"<module-stubs>"
-		)
-	}
-
-	private fun registerCheerioBridge(qjs: QuickJs) {
-		val parsedElements = mutableMapOf<Int, org.jsoup.nodes.Element>()
-		var cheerioIdCounter = 0
-
-		qjs.defineBinding("__nativeCheerio", FunctionBinding<String> { args ->
-			val type = args.getOrNull(0) as? String ?: return@FunctionBinding "{}"
-
-			if (type == "parse") {
-				val html = args.getOrNull(1) as? String ?: ""
-				val docId = cheerioIdCounter++
-				try {
-					parsedElements[docId] = Jsoup.parse(html)
-					return@FunctionBinding docId.toString()
-				} catch (e: Exception) {
-					LnLog.e(TAG, "Cheerio parse error: ${e.message}")
-					return@FunctionBinding "-1"
-				}
-			} else if (type == "query") {
-				val parentIdStr = args.getOrNull(1)?.toString() ?: "-1"
-				val parentId = parentIdStr.toIntOrNull() ?: -1
-				val selector = args.getOrNull(2) as? String ?: ""
-
-				val parent = parsedElements[parentId] ?: return@FunctionBinding "{}"
-
-				try {
-					if (selector.startsWith("__is__:")) {
-						val sel = selector.substringAfter("__is__:")
-						return@FunctionBinding if (parent.`is`(sel)) "true" else "false"
-					}
-					if (selector == "__remove__") {
-						parent.remove()
-						return@FunctionBinding "true"
-					}
-
-					val selection = when {
-						selector == "__parent__" -> org.jsoup.select.Elements(parent.parent() ?: parent)
-						selector == "__children__" -> parent.children()
-						selector.isNotEmpty() -> parent.select(selector)
-						else -> org.jsoup.select.Elements()
-					}
-					val resultItems = mutableListOf<String>()
-					for (element in selection) {
-						val elId = cheerioIdCounter++
-						parsedElements[elId] = element
-
-						val itemData = mapOf(
-							"id" to elId.toString(),
-							"text" to element.text(),
-							"html" to element.html(),
-							"attrs" to mapOf(
-								"href" to element.attr("href"),
-								"src" to element.attr("src"),
-								"class" to element.className(),
-								"id" to element.id()
-							)
-						)
-						// Convert map to Json string manually
-						resultItems.add(json.encodeToString(
-							JsonObject.serializer(),
-							JsonObject(itemData.mapValues { (_, v) ->
-								if (v is String) JsonPrimitive(v)
-								else JsonObject((v as Map<String, String>).mapValues { JsonPrimitive(it.value) })
-							})
-						))
-					}
-
-					val resultJson = """
-						{
-							"text": ${json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(selection.text()))},
-							"html": ${json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(selection.html()))},
-							"attrs": {
-								"href": ${json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(selection.attr("href")))},
-								"src": ${json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(selection.attr("src")))},
-								"class": ${json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(selection.attr("class")))},
-								"id": ${json.encodeToString(JsonPrimitive.serializer(), JsonPrimitive(selection.attr("id")))}
-							},
-							"items": [${resultItems.joinToString(",")}]
-						}
-					""".trimIndent()
-
-					return@FunctionBinding resultJson
-				} catch (e: Exception) {
-					LnLog.e(TAG, "Cheerio query error: ${e.message}")
-				}
-			}
-			"{}"
+			""".trimIndent()
+	private fun registerDomBridge(qjs: QuickJs) {
+		val dom = LNReaderDomBridge()
+		qjs.defineBinding("__nativeDom", FunctionBinding<String> { args ->
+			dom.call(args[0] as String, args[1] as String)
 		})
 	}
 
-	private fun getNativeCheerioBridge(): String {
-		return """
-			{
-				load: function(html) {
-					const docIdStr = globalThis.__nativeCheerio('parse', html);
-					const docId = parseInt(docIdStr);
-
-					function createSelection(parentId, result) {
-						return {
-							_parentId: parentId,
-							text: function() { return result.text || ''; },
-							attr: function(name) { return (result.attrs && result.attrs[name]) || ''; },
-							html: function() { return result.html || ''; },
-							find: function(subSelector) {
-								const resultStr = globalThis.__nativeCheerio('query', parentId, subSelector || '');
-								let r = {items:[]};
-								try { r = JSON.parse(resultStr); } catch (e) {}
-								return createSelection(parentId, r);
-							},
-							is: function(sel) {
-								if (!result.items || result.items.length === 0) return false;
-								for (let i = 0; i < result.items.length; i++) {
-									const flag = globalThis.__nativeCheerio('query', result.items[i].id, '__is__:' + sel);
-									if (flag === 'true') return true;
-								}
-								return false;
-							},
-							parent: function() {
-								if (!result.items || result.items.length === 0) return createSelection(parentId, {items:[]});
-								const resultStr = globalThis.__nativeCheerio('query', result.items[0].id, '__parent__');
-								let r = {items:[]};
-								try { r = JSON.parse(resultStr); } catch (e) {}
-								return createSelection(docId, r);
-							},
-							children: function() {
-								if (!result.items || result.items.length === 0) return createSelection(parentId, {items:[]});
-								const resultStr = globalThis.__nativeCheerio('query', result.items[0].id, '__children__');
-								let r = {items:[]};
-								try { r = JSON.parse(resultStr); } catch (e) {}
-								return createSelection(docId, r);
-							},
-							contents: function() {
-								return this.children();
-							},
-							remove: function() {
-								if (result.items) {
-									result.items.forEach(function(item) {
-										globalThis.__nativeCheerio('query', item.id, '__remove__');
-									});
-								}
-								return this;
-							},
-							first: function() {
-								if (!result.items || result.items.length === 0) return this;
-								const cloned = Object.assign({}, this);
-								cloned.text = function() { return result.items[0].text || ''; };
-								cloned.html = function() { return result.items[0].html || ''; };
-								cloned.attr = function(name) { return (result.items[0].attrs && result.items[0].attrs[name]) || ''; };
-								cloned.get = function(i) { return i === undefined ? [result.items[0]] : result.items[0]; };
-								cloned.toArray = function() { return [result.items[0]]; };
-								cloned.length = 1;
-								return cloned;
-							},
-							last: function() {
-								if (!result.items || result.items.length === 0) return this;
-								const lastIdx = result.items.length - 1;
-								const cloned = Object.assign({}, this);
-								cloned.text = function() { return result.items[lastIdx].text || ''; };
-								cloned.html = function() { return result.items[lastIdx].html || ''; };
-								cloned.attr = function(name) { return (result.items[lastIdx].attrs && result.items[lastIdx].attrs[name]) || ''; };
-								cloned.get = function(i) { return i === undefined ? [result.items[lastIdx]] : result.items[lastIdx]; };
-								cloned.toArray = function() { return [result.items[lastIdx]]; };
-								cloned.length = 1;
-								return cloned;
-							},
-							eq: function(index) {
-								if (!result.items || !result.items[index]) return this;
-								const cloned = Object.assign({}, this);
-								cloned.text = function() { return result.items[index].text || ''; };
-								cloned.html = function() { return result.items[index].html || ''; };
-								cloned.attr = function(name) { return (result.items[index].attrs && result.items[index].attrs[name]) || ''; };
-								cloned.get = function(i) { return i === undefined ? [result.items[index]] : result.items[index]; };
-								cloned.toArray = function() { return [result.items[index]]; };
-								cloned.length = 1;
-								return cloned;
-							},
-							each: function(callback) {
-								if (result.items) {
-									result.items.forEach(function(item, index) {
-										const elId = parseInt(item.id);
-										const itemObj = createSelection(elId, item);
-										callback.call(itemObj, index, itemObj);
-									});
-								}
-								return this;
-							},
-							filter: function(callback) {
-								if (!result.items) return createSelection(parentId, {items:[]});
-								if (typeof callback === 'function') {
-									const results = [];
-									result.items.forEach(function(item, index) {
-										const elId = parseInt(item.id);
-										const itemObj = createSelection(elId, item);
-										if (callback.call(itemObj, index, itemObj)) {
-											results.push(item);
-										}
-									});
-									return createSelection(parentId, {items: results});
-								}
-								return this;
-							},
-							map: function(callback) {
-								const results = [];
-								if (result.items) {
-									result.items.forEach(function(item, index) {
-										const elId = parseInt(item.id);
-										const itemObj = createSelection(elId, item);
-										const value = callback.call(itemObj, index, itemObj);
-										if (value !== null && value !== undefined) {
-											results.push(value);
-										}
-									});
-								}
-								return { get: function() { return results; }, toArray: function() { return results; } };
-							},
-							get: function(index) {
-								if (!result.items) return null;
-								if (index === undefined) return result.items;
-								return result.items[index] || null;
-							},
-							toArray: function() {
-								return result.items || [];
-							},
-							length: (result.items ? result.items.length : 0)
-						};
-					}
-
-					var ${'$'} = function(selector) {
-						if (typeof selector === 'object' && selector._parentId !== undefined) {
-							return selector;
-						}
-						const resultStr = globalThis.__nativeCheerio('query', docId, selector || '');
-						let result = {items:[]};
-						try {
-							result = JSON.parse(resultStr);
-						} catch (e) {}
-
-						return createSelection(docId, result);
-					};
-					return ${'$'};
-				}
-			}
-		""".trimIndent()
-	}
+	internal fun resource(name: String): String = checkNotNull(javaClass.getResourceAsStream("/lnreader/$name")) {
+		"Missing LNReader runtime resource: $name"
+	}.bufferedReader().use { it.readText() }
 
 	private fun getHtmlParser2Library(): String {
 		return """

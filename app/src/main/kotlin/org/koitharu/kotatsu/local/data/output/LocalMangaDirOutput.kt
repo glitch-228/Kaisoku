@@ -31,6 +31,7 @@ class LocalMangaDirOutput(
 	private val mutex = Mutex()
 
 	init {
+		check(rootFile.isDirectory || rootFile.mkdirs()) { "Cannot create download directory: $rootFile" }
 		if (!manga.isLocal) {
 			index.setMangaInfo(manga)
 		}

@@ -37,9 +37,8 @@ class ReversedReaderFragment : BasePagerReaderFragment() {
 		super.switchPageTo(reversed(position), smooth)
 	}
 
-	override suspend fun onPagesChanged(pages: List<ReaderPage>, pendingState: ReaderState?) {
-		super.onPagesChanged(pages.reversed(), pendingState)
-	}
+	override fun adapterPages(pages: List<ReaderPage>): List<ReaderPage> =
+		super.adapterPages(pages.reversed())
 
 	override fun notifyPageChanged(page: Int) {
 		val pos = reversed(page)

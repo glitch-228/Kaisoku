@@ -11,7 +11,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.net.URI
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import java.util.Locale
 
 /**
  * Native fetch API bridge for LNReader JS plugins.
@@ -35,6 +36,8 @@ class LNReaderFetchBridge(
 	}
 
 	var pendingFatalException: Exception? = null
+	var lastRequestDescription: String? = null
+		private set
 
 	/**
 	 * Performs an HTTP request matching the Fetch API contract.
@@ -44,9 +47,11 @@ class LNReaderFetchBridge(
 		return try {
 			LnLog.d(TAG, "[$pluginId] Fetching: $url")
 
-			if (!isValidUrl(url)) {
+			val parsedUrl = url.toHttpUrlOrNull()
+			if (parsedUrl == null) {
 				return errorResponse(url, 0, "Security Error", "Invalid URL: $url")
 			}
+			lastRequestDescription = "Request ${parsedUrl.scheme}://${parsedUrl.host}${parsedUrl.encodedPath}"
 
 			val init = try {
 				if (!initStr.isNullOrEmpty()) org.json.JSONObject(initStr) else null
@@ -54,39 +59,33 @@ class LNReaderFetchBridge(
 				null
 			}
 
-			val method = (init?.optString("method"))?.ifEmpty { "GET" }?.uppercase() ?: "GET"
+			val method = (init?.optString("method"))?.ifEmpty { "GET" }?.uppercase(Locale.ROOT) ?: "GET"
 			val headersMap = extractHeaders(init)
 			val body = extractBody(init)
 
 			val requestBuilder = Request.Builder()
-				.url(url)
+				.url(parsedUrl)
 
 			val headerBuilder = Headers.Builder()
-			if (!headersMap.containsKey("User-Agent")) {
+			if (!headersMap.containsKey("user-agent")) {
 				headerBuilder.add("User-Agent", DEFAULT_USER_AGENT)
 			}
 			headersMap.forEach { (key, value) ->
-				headerBuilder.add(key, value)
+				// Fetch owns compression negotiation; explicit gzip disables OkHttp decompression.
+				if (!key.equals("accept-encoding", ignoreCase = true)) headerBuilder.add(key, value)
 			}
 			requestBuilder.headers(headerBuilder.build())
 
-			when (method) {
-				"GET" -> requestBuilder.get()
-				"POST" -> {
-					val contentType = headersMap["Content-Type"] ?: "application/x-www-form-urlencoded"
-					val requestBody = (body ?: "").toRequestBody(contentType.toMediaType())
-					requestBuilder.post(requestBody)
-				}
-				"PUT" -> {
-					val contentType = headersMap["Content-Type"] ?: "application/x-www-form-urlencoded"
-					val requestBody = (body ?: "").toRequestBody(contentType.toMediaType())
-					requestBuilder.put(requestBody)
-				}
-				"DELETE" -> requestBuilder.delete()
-				else -> requestBuilder.method(method, null)
-			}
+			val contentType = headersMap["content-type"] ?: "application/x-www-form-urlencoded"
+			val requestBody = body?.toRequestBody(contentType.toMediaType())
+			requestBuilder.method(method, when (method) {
+				"GET", "HEAD" -> null
+				"POST", "PUT", "PATCH" -> requestBody ?: "".toRequestBody(contentType.toMediaType())
+				else -> requestBody
+			})
 
 			httpClient.newCall(requestBuilder.build()).execute().use { response ->
+				lastRequestDescription = "HTTP ${response.code}: ${response.request.url.scheme}://${response.request.url.host}${response.request.url.encodedPath}"
 				val responseBody = response.body?.string() ?: ""
 				val responseHeaders = mutableMapOf<String, String>()
 				response.headers.forEach { (name, value) ->
@@ -99,7 +98,7 @@ class LNReaderFetchBridge(
 				responseJson.put("ok", response.isSuccessful)
 				responseJson.put("status", response.code)
 				responseJson.put("statusText", response.message.ifEmpty { "OK" })
-				responseJson.put("url", url)
+				responseJson.put("url", response.request.url.toString())
 				responseJson.put("text", responseBody)
 
 				val jsHeaders = org.json.JSONObject()
@@ -109,6 +108,7 @@ class LNReaderFetchBridge(
 				responseJson.toString()
 			}
 		} catch (e: Exception) {
+			lastRequestDescription = "${lastRequestDescription.orEmpty()}: ${e.message ?: e.javaClass.simpleName}"
 			val causeList = generateSequence(e as Throwable) { it.cause }.toList()
 			val interactiveEx = causeList.find {
 				it.javaClass.name.contains("CloudFlare") ||
@@ -138,7 +138,9 @@ class LNReaderFetchBridge(
 				constructor(init) {
 					this.map = {};
 					if (init) {
-						if (typeof init.forEach === 'function') {
+						if (Array.isArray(init)) {
+							init.forEach(pair => this.append(pair[0], pair[1]));
+						} else if (typeof init.forEach === 'function') {
 							init.forEach((value, key) => this.append(key, value));
 						} else {
 							for (const key in init) {
@@ -179,7 +181,10 @@ class LNReaderFetchBridge(
 			globalThis.Headers = Headers;
 
 			globalThis.fetchApi = function(url, init) {
-				var initStr = init ? JSON.stringify(init) : "{}";
+				url = String(url);
+				init = init || {};
+				if (init.headers) init = Object.assign({}, init, {headers: new Headers(init.headers)});
+				var initStr = JSON.stringify(init);
 				var responseStr = __nativeFetch(url, initStr);
 				var response = responseStr ? JSON.parse(responseStr) : {};
 
@@ -198,9 +203,9 @@ class LNReaderFetchBridge(
 				resObj.text = function() { return Promise.resolve(response.text || ''); };
 				resObj.json = function() {
 					try {
-						return Promise.resolve(JSON.parse(response.text || '{}'));
+						return Promise.resolve(JSON.parse(response.text || ''));
 					} catch(e) {
-						return Promise.reject(e);
+						return Promise.reject(new Error('Invalid JSON response (HTTP ' + response.status + ', ' + response.url + '): ' + e.message));
 					}
 				};
 				return Promise.resolve(resObj);
@@ -219,7 +224,7 @@ class LNReaderFetchBridge(
 		val keys = headersObj.keys()
 		while (keys.hasNext()) {
 			val key = keys.next()
-			result[key] = headersObj.optString(key)
+			result[key.lowercase(Locale.ROOT)] = headersObj.optString(key)
 		}
 		return result
 	}
@@ -239,16 +244,6 @@ class LNReaderFetchBridge(
 				parts.joinToString("&")
 			}
 			else -> body?.toString()
-		}
-	}
-
-	private fun isValidUrl(url: String): Boolean {
-		return try {
-			val uri = URI(url)
-			val scheme = uri.scheme?.lowercase()
-			scheme == "http" || scheme == "https"
-		} catch (e: Exception) {
-			false
 		}
 	}
 

@@ -263,6 +263,21 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getBoolean(KEY_READER_UPSCALE, false)
 		set(value) = prefs.edit { putBoolean(KEY_READER_UPSCALE, value) }
 
+	var readerUpscaleStrength: Int
+		get() = prefs.getInt(KEY_UPSCALE_STRENGTH, 75).coerceIn(0, 100)
+		set(value) = prefs.edit { putInt(KEY_UPSCALE_STRENGTH, value.coerceIn(0, 100)) }
+
+	var readerUpscalePasses: Int
+		get() = prefs.getInt(KEY_UPSCALE_PASSES, 0).coerceIn(0, 4)
+		set(value) = prefs.edit { putInt(KEY_UPSCALE_PASSES, value.coerceIn(0, 4)) }
+
+	var readerUpscaleThreshold: Float
+		get() = prefs.getFloat(KEY_UPSCALE_THRESHOLD, 1.5f).takeIf { it in setOf(1f, 1.5f, 2f, 3f) } ?: 1.5f
+		set(value) = prefs.edit { putFloat(KEY_UPSCALE_THRESHOLD, value) }
+
+	val readerUpscaleConfig: org.koitharu.kotatsu.reader.domain.UpscaleConfig
+		get() = org.koitharu.kotatsu.reader.domain.UpscaleConfig(readerUpscaleStrength, readerUpscalePasses, readerUpscaleThreshold)
+
 	val isEInkFlashEnabled: Boolean
 		get() = prefs.getBoolean(KEY_EINK_FLASH, false)
 
@@ -1016,6 +1031,9 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_SHORTCUTS = "dynamic_shortcuts"
 		const val KEY_READER_TAP_ACTIONS = "reader_tap_actions"
 		const val KEY_READER_OPTIMIZE = "reader_optimize"
+		const val KEY_UPSCALE_STRENGTH = "reader_upscale_strength"
+		const val KEY_UPSCALE_PASSES = "reader_upscale_passes"
+		const val KEY_UPSCALE_THRESHOLD = "reader_upscale_threshold"
 		const val KEY_READER_UPSCALE = "reader_upscale"
 		const val KEY_EINK_FLASH = "eink_flash"
 		const val KEY_EINK_FLASH_DURATION = "eink_flash_duration"
@@ -1124,7 +1142,8 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_LINK_MANUAL = "about_help"
 		const val KEY_DONATION_TON = "donation_ton"
 		const val KEY_DONATION_ETH = "donation_eth"
-		const val KEY_DONATION_XMR = "donation_xmr"
+		const val KEY_DONATION_SOL = "donation_sol"
+		const val KEY_DONATION_BTC = "donation_btc"
 		const val KEY_PROXY_TEST = "proxy_test"
 		const val KEY_OPEN_BROWSER = "open_browser"
 		const val KEY_HANDLE_LINKS = "handle_links"

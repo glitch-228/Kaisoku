@@ -156,9 +156,9 @@ class DetailsLoadUseCase @Inject constructor(
 		} else {
 			repository.getDetails(seed)
 		}
-		details.withSeedIdentityIfSameManga(seed)
+		details.withSeedIdentityIfSameManga(seed).withMissingDetailsFrom(seed)
 	}.recoverNotNull { e ->
-		if (e is NotFoundException) {
+		if (e is NotFoundException && isMangaDetailsUrl(e.url, seed.url, seed.publicUrl)) {
 			recoverUseCase(seed)
 		} else {
 			null

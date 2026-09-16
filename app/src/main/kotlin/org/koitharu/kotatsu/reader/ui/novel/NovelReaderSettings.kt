@@ -18,7 +18,7 @@ data class NovelReaderSettings(
 	val themePreset: NovelReaderThemePreset = NovelReaderThemePreset.PAPER,
 	val readingMode: NovelReadingMode = NovelReadingMode.PAGED,
 	val pageTurnAnimation: NovelPageTurnAnimation = NovelPageTurnAnimation.SLIDE,
-	val enableDualPage: Boolean = true,
+	val enableDualPage: Boolean = false,
 	val enableFullscreen: Boolean = false,
 	val showReadingStatus: Boolean = true,
 	val isReadingStatusTransparent: Boolean = true,
@@ -95,7 +95,7 @@ data class NovelReaderSettings(
 				readingMode = prefs.getString(KEY_READING_MODE, null).parseEnum(NovelReadingMode.PAGED),
 				pageTurnAnimation = prefs.getString(KEY_PAGE_TURN_ANIMATION, null)
 					.parseEnum(NovelPageTurnAnimation.SLIDE),
-				enableDualPage = prefs.getBoolean(KEY_DUAL_PAGE, true),
+				enableDualPage = prefs.getBoolean(KEY_DUAL_PAGE, false),
 				enableFullscreen = prefs.getBoolean(KEY_FULLSCREEN, false),
 				showReadingStatus = prefs.getBoolean(KEY_SHOW_READING_STATUS, true),
 				isReadingStatusTransparent = prefs.getBoolean(KEY_READING_STATUS_TRANSPARENT, true),

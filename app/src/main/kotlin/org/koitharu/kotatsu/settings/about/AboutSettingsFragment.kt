@@ -82,12 +82,14 @@ class AboutSettingsFragment : BasePreferenceFragment(R.string.about) {
 
 			AppSettings.KEY_DONATION_TON,
 			AppSettings.KEY_DONATION_ETH,
-			AppSettings.KEY_DONATION_XMR,
+			AppSettings.KEY_DONATION_SOL,
+			AppSettings.KEY_DONATION_BTC,
 			-> {
 				val address = when (preference.key) {
 					AppSettings.KEY_DONATION_TON -> getString(R.string.wallet_ton)
 					AppSettings.KEY_DONATION_ETH -> getString(R.string.wallet_eth)
-					else -> getString(R.string.wallet_xmr)
+					AppSettings.KEY_DONATION_SOL -> getString(R.string.wallet_sol)
+					else -> getString(R.string.wallet_btc)
 				}
 				requireContext().copyToClipboard(preference.title.toString(), address)
 				Snackbar.make(listView, R.string.donation_copied, Snackbar.LENGTH_SHORT).show()

@@ -48,7 +48,7 @@ class DetailsErrorObserver(
 	override suspend fun emit(value: Throwable) {
 		// A title that is gone from its source is a dead end, not something a one-line snackbar can
 		// help with, so ask up front whether to go looking for it on another source.
-		val missingManga = viewModel.getMangaOrNull()?.takeIf { !it.isLocal && value.isContentNotFound() }
+		val missingManga = viewModel.getMangaOrNull()?.takeIf { !it.isLocal && value.isContentNotFound(it) }
 		if (missingManga != null && showUnavailableDialog(missingManga)) {
 			return
 		}

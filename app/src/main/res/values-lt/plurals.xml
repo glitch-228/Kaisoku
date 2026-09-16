@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<!-- All callers use Android getQuantityString with integer counts; fractional CLDR many is unreachable. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingQuantity">
     <plurals name="new_chapters">
         <item quantity="one">%1$d naujas skyrius</item>
         <item quantity="few">%1$d nauji skyriai</item>

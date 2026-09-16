@@ -71,9 +71,12 @@ open class DoubleReaderFragment : BaseReaderFragment<FragmentReaderDoubleBinding
 		super.onDestroyView()
 	}
 
+	override fun adapterPages(pages: List<ReaderPage>): List<ReaderPage> =
+		pages.padForDoublePage(coverPage = settings.isReaderDoubleCoverPage)
+
 	override suspend fun onPagesChanged(pages: List<ReaderPage>, pendingState: ReaderState?) = coroutineScope {
 		originalPageCount = pages.size
-		val paddedPages = pages.padForDoublePage(coverPage = settings.isReaderDoubleCoverPage)
+		val paddedPages = adapterPages(pages)
 		positionMap = IntArray(paddedPages.size)
 		var originalIndex = 0
 		for (i in paddedPages.indices) {

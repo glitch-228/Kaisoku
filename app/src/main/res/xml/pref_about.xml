@@ -64,10 +64,16 @@
 			android:title="@string/donation_eth" />
 
 		<Preference
-			android:key="donation_xmr"
+			android:key="donation_sol"
 			android:persistent="false"
-			android:summary="@string/wallet_xmr"
-			android:title="@string/donation_xmr" />
+			android:summary="@string/wallet_sol"
+			android:title="@string/donation_sol" />
+
+		<Preference
+			android:key="donation_btc"
+			android:persistent="false"
+			android:summary="@string/wallet_btc"
+			android:title="@string/donation_btc" />
 
 	</PreferenceCategory>
 

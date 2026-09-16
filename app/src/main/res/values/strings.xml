@@ -32,7 +32,8 @@
     <string name="translate_clear_cache">Clear translation cache</string>
     <string name="translate_provider_openai">OpenAI-compatible</string>
     <string name="translate_provider_gemini">Native Gemini</string>
-    <string name="translate_provider_google_lens">Google Lens (keyless OCR + translate)</string>
+    <string name="translate_provider_google_lens">Google Lens / Google Translate (no key)</string>
+    <string name="novel_translation_settings">Translation settings</string>
     <string name="lang_auto">Auto-detect</string>
     <string name="local_storage">Local storage</string>
     <string name="favourites">Favorites</string>
@@ -128,7 +129,16 @@
     <string name="text_delete_local_manga">Permanently delete \"%s\" from device?</string>
     <string name="reader_settings">Reader settings</string>
     <string name="chapters_count">%1$d chapters</string>
-    <string name="novel_reader_settings">Novel reader settings</string>
+    <string name="novel_reader_settings">Novel reader settings (Beta)</string>
+    <string name="novel_reader_beta">Novel reader · Beta</string>
+    <string name="novel_translate_chapter">Translate chapter</string>
+    <string name="novel_show_original">Show original chapter</string>
+    <string name="novel_translating">Translating chapter…</string>
+    <string name="novel_translation_progress">Translating chapter: %1$d/%2$d</string>
+    <string name="novel_source_settings">Source settings</string>
+    <string name="novel_reverse_reading_order">Reverse reading order</string>
+    <string name="novel_reverse_reading_order_summary">Reverse chapter navigation and continuous reading for all novels from this source. Your current position is kept.</string>
+    <string name="novel_reverse_list_display">Reverse list display</string>
     <string name="novel_reading_mode">Reading mode</string>
     <string name="novel_mode_paged">Paged</string>
     <string name="novel_mode_scroll">Scroll</string>
@@ -219,9 +229,11 @@
     <string name="no_update_available">No updates available</string>
     <string name="donations">Donations</string>
     <string name="donations_summary">Support the developer</string>
-    <string name="donation_ton">TON</string>
+    <string name="donation_ton">TON / Gram</string>
     <string name="donation_eth">Ethereum</string>
     <string name="donation_xmr">Monero</string>
+    <string name="donation_sol" translatable="false">Solana</string>
+    <string name="donation_btc" translatable="false">Bitcoin</string>
     <string name="donation_copied">Wallet address copied to clipboard</string>
     <string name="right_to_left">Right-to-left</string>
     <string name="create_category">New category</string>
@@ -642,7 +654,7 @@
     <string name="extension_repositories_summary">Add and manage Mihon-compatible extension repositories</string>
     <string name="add_mihon_sources_from_link">Add Mihon sources from link</string>
     <string name="lnreader_repositories">LNReader plugin repositories</string>
-    <string name="lnreader_repositories_summary">Browse and install novel sources from LNReader plugin repositories</string>
+    <string name="lnreader_repositories_summary">Browse and install novel sources. Novel reader is in beta.</string>
     <string name="lnreader_plugins">LNReader plugins</string>
     <string name="add_lnreader_sources">Add novel sources (LNReader)</string>
     <string name="lnreader_repo_url_hint">Plugin index link (plugins.min.json)</string>
@@ -1289,4 +1301,12 @@
 	<string name="added_to_category_at">Added to category \"%1$s\": %2$s</string>
 	<string name="manga_preferences">Per-manga reader settings and overrides</string>
 	<string name="sync_content">Content to synchronize</string>
+	<string name="upscale_strength">Strength</string>
+	<string name="upscale_strength_value">Strength: %1$d%%</string>
+	<string name="upscale_passes">Processing passes</string>
+	<string name="upscale_passes_value">Processing passes: %1$s</string>
+	<string name="upscale_threshold">Activation threshold</string>
+	<string name="upscale_threshold_value">Apply above %1$s× enlargement</string>
+	<string name="upscale_power_save">Processing is paused while battery saver is active.</string>
+	<string name="upscale_activation_help">Applies when the page is enlarged above the selected threshold. Strength 0 disables processing.</string>
 </resources>

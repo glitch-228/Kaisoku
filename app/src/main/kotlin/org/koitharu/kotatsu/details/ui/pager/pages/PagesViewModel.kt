@@ -100,6 +100,10 @@ class PagesViewModel @Inject constructor(
 	}
 
 	private suspend fun doInit(state: State) {
+		if (!state.details.supportsPageThumbnails) {
+			thumbnails.value = emptyList()
+			return
+		}
 		chaptersLoader.init(state.details)
 		val initialChapterId = state.readerState?.chapterId?.takeIf {
 			chaptersLoader.peekChapter(it) != null

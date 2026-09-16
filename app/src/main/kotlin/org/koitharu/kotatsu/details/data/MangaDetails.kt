@@ -41,6 +41,10 @@ data class MangaDetails(
     val isLocal
         get() = manga.isLocal
 
+    // Novel chapter HTML is not an image page. Do not fetch it for the thumbnail tab.
+    val supportsPageThumbnails: Boolean
+        get() = !manga.source.name.startsWith("lnreader:")
+
     val local: LocalManga?
         get() = localManga ?: if (manga.isLocal) LocalManga(manga) else null
 

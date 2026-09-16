@@ -13,16 +13,17 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.Headers
-import okhttp3.Request
 import org.koitharu.kotatsu.core.model.MangaHistory
 import org.koitharu.kotatsu.core.nav.MangaIntent
 import org.koitharu.kotatsu.core.nav.ReaderIntent
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
+import org.koitharu.kotatsu.core.parser.lnreader.normalizeNovelChapterOrder
+import org.koitharu.kotatsu.core.prefs.AppSettings
+import org.koitharu.kotatsu.core.prefs.SourceSettings
+import org.koitharu.kotatsu.parsers.model.MangaSource
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.history.data.HistoryRepository
@@ -32,16 +33,23 @@ import org.koitharu.kotatsu.parsers.model.MangaChapter
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import org.koitharu.kotatsu.reader.ui.ReaderState
 import android.content.Context
+import androidx.core.net.toUri
+import org.koitharu.kotatsu.core.model.isLocal
+import org.koitharu.kotatsu.local.data.LocalMangaRepository
+import org.koitharu.kotatsu.local.data.input.LocalMangaParser
 import javax.inject.Inject
 
 @HiltViewModel
 class NovelReaderViewModel @Inject constructor(
-	@ApplicationContext appContext: Context,
+	@ApplicationContext private val appContext: Context,
 	savedStateHandle: SavedStateHandle,
 	private val dataRepository: MangaDataRepository,
 	private val repositoryFactory: MangaRepository.Factory,
 	private val historyRepository: HistoryRepository,
 	private val historyUpdateUseCase: HistoryUpdateUseCase,
+	private val localRepository: LocalMangaRepository,
+	private val appSettings: AppSettings,
+	private val translator: org.koitharu.kotatsu.reader.translate.MultimodalTranslator,
 ) : BaseViewModel() {
 
 	private val intent = MangaIntent(savedStateHandle)
@@ -54,17 +62,71 @@ class NovelReaderViewModel @Inject constructor(
 	val manga = MutableStateFlow<Manga?>(null)
 	val chapters = MutableStateFlow<List<MangaChapter>>(emptyList())
 	val currentChapterIndex = MutableStateFlow(-1)
+	val chapterRequest = MutableStateFlow<Pair<Int, Long>?>(null)
 	val isUiLoading = MutableStateFlow(false)
 	val readerSettings = MutableStateFlow(NovelReaderSettings.load(appContext))
 	val initialRatio = MutableStateFlow<Float?>(null)
+	val isReadingReversed = MutableStateFlow(false)
+	val readingSource = MutableStateFlow<MangaSource?>(null)
 
 	private var lastSavedState: ReaderState? = null
 	private var lastSavedRatio = 0f
+	private var lastSavedPercent = -1f
+	private val translations = object : LinkedHashMap<Long, Pair<String, String>>(8, .75f, true) {
+		override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Pair<String, String>>?) = size > 8
+	}
+
+	private fun translationConfig() = listOf(appSettings.translateProvider.name, appSettings.translateEndpoint,
+		appSettings.translateModel, appSettings.translateSourceLanguage, appSettings.translateTargetLanguage).joinToString("\n")
+
+	fun isChapterTranslated(index: Int): Boolean {
+		val id = chapters.value.getOrNull(index)?.id ?: return false
+		return synchronized(translations) { translations[id]?.first == translationConfig() }
+	}
+
+	fun showOriginalChapter(index: Int) {
+		val id = chapters.value.getOrNull(index)?.id ?: return
+		synchronized(translations) { translations.remove(id) }
+	}
+
+	suspend fun loadChapterText(index: Int): String? {
+		val id = chapters.value.getOrNull(index)?.id ?: return null
+		synchronized(translations) {
+			translations[id]?.takeIf { it.first == translationConfig() }?.let { return it.second }
+		}
+		return loadChapterHtml(index)?.let(NovelHtml::decodeChapterHtml)?.let(NovelHtml::toPlainText)
+	}
+
+	suspend fun translateChapter(index: Int, onProgress: (Int, Int) -> Unit) {
+		val chapter = chapters.value.getOrNull(index) ?: return
+		val config = translationConfig()
+		val original = loadChapterHtml(index)?.let(NovelHtml::decodeChapterHtml)?.let(NovelHtml::toPlainText)
+			?.takeIf(String::isNotBlank) ?: error("Chapter returned no text")
+		val translated = translator.translateText(original, onProgress)
+		kotlinx.coroutines.currentCoroutineContext().ensureActive()
+		if (config != translationConfig()) error("Translation settings changed. Please retry.")
+		synchronized(translations) { translations[chapter.id] = config to translated }
+	}
+	@Volatile var imageHeaders: Map<String, String> = emptyMap()
+		private set
 
 	init {
 		launchLoadingJob(Dispatchers.Default) {
-			val target = dataRepository.resolveIntent(intent, withChapters = true)
+			var target = dataRepository.resolveIntent(intent, withChapters = true)
 				?: error("Cannot resolve novel ${intent.mangaId}")
+			if (target.isLocal) target = localRepository.getDetails(target)
+			else {
+				val saved = localRepository.findSavedManga(target, withDetails = true)?.manga
+				val localChapters = saved?.chapters.orEmpty().associateBy { it.id }
+				target = target.copy(chapters = target.chapters?.takeIf { it.isNotEmpty() }?.map { localChapters[it.id] ?: it }
+					?: saved?.chapters)
+			}
+			readingSource.value = if (target.isLocal) LocalMangaParser(target.url.toUri()).getMangaInfo()?.source
+				else target.source
+			// History/favorites may still contain the old newest-first Jaomix snapshot.
+			target = target.copy(chapters = target.chapters?.let { list ->
+				normalizeNovelChapterOrder(target.source.name, list) { it.title }
+			})
 			manga.value = target
 			chapters.value = target.chapters.orEmpty()
 			// The intent/DB snapshot may carry no chapters (cold open from history with a
@@ -87,27 +149,23 @@ class NovelReaderViewModel @Inject constructor(
 			val requested: ReaderState? = this@NovelReaderViewModel.requestedState?.takeIf { s ->
 				chapters.value.any { it.id == s.chapterId }
 			}
-			currentChapterIndex.value = resolveInitialChapterIndex(manga.value ?: target, requested, history)
-			initialRatio.value = resolveInitialRatio(requested, history)
+			val reversed = readingSource.value?.let { SourceSettings(appContext, it).isNovelReadingReversed } ?: false
+			val sequence = novelReadingSequence(chapters.value, reversed, requested?.chapterId ?: history?.chapterId)
+			isReadingReversed.value = reversed
+			chapters.value = sequence.chapters
+			val initialChapter = sequence.currentIndex
+			initialRatio.value = resolveInitialRatio(requested, history?.takeIf { h ->
+				chapters.value.getOrNull(initialChapter)?.id == h.chapterId
+			})
+			currentChapterIndex.value = initialChapter
+			chapterRequest.value = initialChapter to 0L
 		}
-	}
-
-	private fun resolveInitialChapterIndex(
-		target: Manga,
-		requestedState: ReaderState?,
-		history: MangaHistory?,
-	): Int {
-		val chaptersList = target.chapters.orEmpty()
-		if (chaptersList.isEmpty()) return -1
-		val state = requestedState ?: history?.let { ReaderState(it) }
-		val index = state?.let { s -> chaptersList.indexOfFirst { it.id == s.chapterId } }
-		return if (index != null && index >= 0) index else 0
 	}
 
 	private fun resolveInitialRatio(requestedState: ReaderState?, history: MangaHistory?): Float? {
 		val scroll = requestedState?.scroll ?: history?.scroll ?: 0
 		if (scroll <= 0) return null
-		return (scroll / SCROLL_RATIO_SCALE).coerceIn(0f, 1f)
+		return novelProgressRatio(scroll)
 	}
 
 	companion object {
@@ -116,29 +174,20 @@ class NovelReaderViewModel @Inject constructor(
 		const val EXTRA_STATE = ReaderIntent.EXTRA_STATE
 		const val EXTRA_INCOGNITO = ReaderIntent.EXTRA_INCOGNITO
 
-		private const val SCROLL_RATIO_SCALE = 10_000f
 	}
 
 	/** Persist the current reading position. Ratio: 0..1 within the chapter. */
 	fun saveProgress(chapterIndex: Int, ratio: Float) {
 		val target = manga.value ?: return
 		val chapter = chapters.value.getOrNull(chapterIndex) ?: return
-		if (isIncognitoMode) {
-			return
-		}
 		val total = chapters.value.size
-		val percent = if (total > 0) (chapterIndex + ratio) / total else 0f
-		val state = ReaderState(
-			chapterId = chapter.id,
-			page = 0,
-			scroll = (ratio * SCROLL_RATIO_SCALE).toInt(),
-		)
-		lastSavedRatio = ratio
-		if (lastSavedState == state) return
+		val state = novelHistoryPosition(chapter.id, ratio)
+		lastSavedRatio = novelProgressRatio(state.scroll)
+		val percent = if (total > 0) (chapterIndex + lastSavedRatio) / total else 0f
+		if (lastSavedState == state && lastSavedPercent == percent) return
 		lastSavedState = state
-		launchJob(Dispatchers.Default) {
-			historyUpdateUseCase(target, state, percent.coerceIn(0f, 1f))
-		}
+		lastSavedPercent = percent
+		if (!isIncognitoMode) historyUpdateUseCase.invokeAsync(target, state, percent.coerceIn(0f, 1f))
 	}
 
 	/**
@@ -152,7 +201,7 @@ class NovelReaderViewModel @Inject constructor(
 			initialRatio.value = null
 			return explicit
 		}
-		if (chapterIndex == currentChapterIndex.value) {
+		if (chapters.value.getOrNull(chapterIndex)?.id == lastSavedState?.chapterId) {
 			return lastSavedRatio
 		}
 		return null
@@ -164,31 +213,38 @@ class NovelReaderViewModel @Inject constructor(
 		}
 	}
 
+	fun navigateTo(index: Int, ratio: Float) {
+		if (index !in chapters.value.indices) return
+		initialRatio.value = ratio
+		switchChapter(index)
+		chapterRequest.value = index to ((chapterRequest.value?.second ?: 0L) + 1L)
+	}
+
+	fun setReadingReversed(reversed: Boolean, visibleIndex: Int?, ratio: Float?) {
+		if (reversed == isReadingReversed.value) return
+		val index = visibleIndex ?: currentChapterIndex.value
+		val chapter = chapters.value.getOrNull(index) ?: return
+		val position = ratio ?: restoreRatioFor(index) ?: 0f
+		val sequence = novelReadingSequence(chapters.value, reversed = true, currentChapterId = chapter.id)
+		isReadingReversed.value = reversed
+		chapters.value = sequence.chapters
+		navigateTo(sequence.currentIndex, position)
+	}
+
+	fun configuredReadingReversed(): Boolean? {
+		// Initial loading applies the preference after it has resolved the complete sequence.
+		if (chapterRequest.value == null) return null
+		return readingSource.value?.let { SourceSettings(appContext, it).isNovelReadingReversed }
+	}
+
 	suspend fun loadChapterHtml(index: Int): String? {
 		val target = manga.value ?: return null
 		val chapter = chapters.value.getOrNull(index) ?: return null
+		if (chapter.source.name == "LOCAL") return LocalMangaParser(chapter.url.toUri()).getChapterHtml(chapter)
 		val repository = repositoryFactory.create(target.source)
 		val novelRepository = repository as? org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaRepository
 			?: return null
-		return novelRepository.getChapterHtml(chapter)
+		return novelRepository.getChapterHtml(chapter).also { imageHeaders = novelRepository.imageHeaders }
 	}
 
-	suspend fun getImageHeaders(url: String): Map<String, String> = runCatching {
-		if (!url.startsWith("http")) return@runCatching emptyMap()
-		val target = manga.value ?: return@runCatching emptyMap()
-		val repository = repositoryFactory.create(target.source)
-		val client = repository.getImageClient() ?: return@runCatching emptyMap()
-		val request = Request.Builder().url(url).build()
-		withContext(Dispatchers.IO) {
-			client.newCall(request).execute().use { response ->
-				HeadersToMap(response.request.headers)
-			}
-		}
-	}.getOrDefault(emptyMap())
-
-	private fun HeadersToMap(headers: Headers): Map<String, String> = buildMap {
-		for (name in headers.names()) {
-			put(name, headers[name] ?: continue)
-		}
-	}
 }

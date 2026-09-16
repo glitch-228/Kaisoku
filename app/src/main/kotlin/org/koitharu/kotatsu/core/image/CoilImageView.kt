@@ -27,7 +27,6 @@ import coil3.request.target
 import coil3.size.Scale
 import coil3.size.Size
 import coil3.size.SizeResolver
-import coil3.size.ViewSizeResolver
 import coil3.target.ViewTarget
 import coil3.transition.TransitionTarget
 import coil3.util.CoilUtils
@@ -213,7 +212,7 @@ open class CoilImageView @JvmOverloads constructor(
 		size(
 			exactImageSize?.let {
 				SizeResolver(it)
-			} ?: ViewSizeResolver(this@CoilImageView),
+			} ?: WeakViewSizeResolver(this@CoilImageView),
 		)
 		scale(scaleType.toCoilScale())
 		listener(weakRequestListener)

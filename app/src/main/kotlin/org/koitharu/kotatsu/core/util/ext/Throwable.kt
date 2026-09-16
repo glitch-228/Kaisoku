@@ -257,15 +257,13 @@ fun Throwable.isNetworkError(): Boolean {
  * Note this is deliberately narrower than [getDisplayMessage]'s 404 mapping: only errors that mean
  * *the manga itself* is missing qualify, so callers can offer to look for it on another source.
  */
-fun Throwable.isContentNotFound(): Boolean = generateSequence(this) { it.cause?.takeIf { c -> c !== it } }
-    .any { e ->
-        when (e) {
-            is NotFoundException,
-            is ContentUnavailableException,
-            -> true
-
-            is HttpException -> e.response.code == HttpURLConnection.HTTP_NOT_FOUND
-            is HttpStatusException -> e.statusCode == HttpURLConnection.HTTP_NOT_FOUND
+fun Throwable.isContentNotFound(manga: org.koitharu.kotatsu.parsers.model.Manga): Boolean =
+    generateSequence(this) { it.cause?.takeIf { cause -> cause !== it } }.any { error ->
+        when (error) {
+            is ContentUnavailableException -> true
+            // Image HTTP errors are not evidence that the manga was deleted.
+            is HttpStatusException -> error.statusCode == HttpURLConnection.HTTP_NOT_FOUND &&
+                org.koitharu.kotatsu.details.domain.isMangaDetailsUrl(error.url, manga.url, manga.publicUrl)
             else -> false
         }
     }

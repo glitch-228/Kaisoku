@@ -9,10 +9,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import kotlinx.coroutines.flow.combine
 import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.databinding.ItemNovelChapterBinding
 import org.koitharu.kotatsu.databinding.SheetNovelChaptersBinding
 import org.koitharu.kotatsu.parsers.model.MangaChapter
@@ -26,6 +29,7 @@ class NovelChaptersSheet : BottomSheetDialogFragment() {
 	private var currentIndex: Int = 0
 	private var isReversed: Boolean = false
 	private var callback: Callback? = null
+	private val viewModel by activityViewModels<NovelReaderViewModel>()
 
 	override fun onCreateView(
 		inflater: LayoutInflater,
@@ -40,24 +44,34 @@ class NovelChaptersSheet : BottomSheetDialogFragment() {
 		super.onViewCreated(view, savedInstanceState)
 		callback = activity as? Callback
 
-		binding.textChapterCount.text = getString(R.string.chapters_count, chapters.size)
-
+		isReversed = savedInstanceState?.getBoolean("reverseList") ?: false
 		binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
-		updateAdapter()
+		combine(viewModel.chapters, viewModel.currentChapterIndex, viewModel.isReadingReversed) { list, index, reversed ->
+			Triple(list, index, reversed)
+		}.observe(viewLifecycleOwner) { (list, index, reversed) ->
+			chapters = list
+			currentIndex = index
+			binding.textChapterCount.text = getString(R.string.chapters_count, list.size)
+			updateAdapter()
+			scrollToCurrentChapter()
+		}
 
 		binding.buttonReverse.setOnClickListener {
 			isReversed = !isReversed
 			updateAdapter()
 		}
 
-		binding.recyclerView.post {
-			scrollToCurrentChapter()
-		}
+	}
+
+	override fun onSaveInstanceState(outState: Bundle) {
+		outState.putBoolean("reverseList", isReversed)
+		super.onSaveInstanceState(outState)
 	}
 
 	override fun onDestroyView() {
 		super.onDestroyView()
 		_binding = null
+		callback = null
 	}
 
 	private fun updateAdapter() {
@@ -89,23 +103,9 @@ class NovelChaptersSheet : BottomSheetDialogFragment() {
 		}
 	}
 
-	fun setChapters(chapters: List<MangaChapter>, currentIndex: Int) {
-		this.chapters = chapters
-		this.currentIndex = currentIndex
-	}
-
 	interface Callback {
 
 		fun onChapterSelected(index: Int)
-	}
-
-	companion object {
-
-		fun newInstance(chapters: List<MangaChapter>, currentIndex: Int): NovelChaptersSheet {
-			return NovelChaptersSheet().apply {
-				setChapters(chapters, currentIndex)
-			}
-		}
 	}
 
 	private class ChaptersAdapter(
