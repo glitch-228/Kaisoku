@@ -99,27 +99,6 @@ internal fun calculateReaderPercent(
     return ((chapterIndex + pagePercent) / chaptersCount).coerceIn(0f, 1f)
 }
 
-/**
- * Converts a persisted reader position to a progress value.
- *
- * Webtoon readers persist an explicit 10000 scroll offset when the absolute bottom is reached.
- * Details refreshes can see a different page list (for example while an auxiliary page is being
- * advertised), so relying on the page index alone can turn a completed final chapter back into
- * 99%. The explicit bottom marker is authoritative, but only for the final chapter.
- */
-internal fun calculatePersistedReaderPercent(
-    chapterIndex: Int,
-    chaptersCount: Int,
-    pageIndex: Int,
-    pagesCount: Int,
-    scrollOffset: Int,
-): Float {
-    if (chapterIndex == chaptersCount - 1 && scrollOffset >= 10_000) {
-        return 1f
-    }
-    return calculateReaderPercent(chapterIndex, chaptersCount, pageIndex, pagesCount)
-}
-
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,

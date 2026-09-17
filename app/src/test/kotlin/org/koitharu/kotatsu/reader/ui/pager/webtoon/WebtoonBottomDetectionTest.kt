@@ -1,10 +1,42 @@
 package org.koitharu.kotatsu.reader.ui.pager.webtoon
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebtoonBottomDetectionTest {
+
+	@Test
+	fun shortFinalCreditImageDoesNotHaveAnUnreadRoundingPixel() {
+		// 1001 * 1080 / 1200 = 900.9; layout fits the entire image in a 900px item.
+		val height = calculateScaledPageHeight(1200, 1001, 1080, 2400)
+		assertEquals(900, height)
+		val range = calculateScaledPageScrollRange(1200, 1001, 1080, height)
+		assertEquals(0, range)
+		assertTrue(isPageScrolledToBottom(ready = true, scroll = 0, scrollRange = range))
+	}
+
+	@Test
+	fun fullyVisibleShortPagesHaveNoInternalScrollAcrossImageSizes() {
+		for (sourceHeight in 1..2600) {
+			val height = calculateScaledPageHeight(1200, sourceHeight, 1080, 2400)
+			assertEquals(
+				"Image height $sourceHeight",
+				0,
+				calculateScaledPageScrollRange(1200, sourceHeight, 1080, height),
+			)
+		}
+	}
+
+	@Test
+	fun tallFinalPageStillRequiresScrollingToItsRealBottom() {
+		val height = calculateScaledPageHeight(1200, 5001, 1080, 2400)
+		val range = calculateScaledPageScrollRange(1200, 5001, 1080, height)
+		assertEquals(2100, range)
+		assertFalse(isPageScrolledToBottom(ready = true, scroll = range - 1, scrollRange = range))
+		assertTrue(isPageScrolledToBottom(ready = true, scroll = range, scrollRange = range))
+	}
 
 	/**
 	 * Regression: when the last page's image is not ready yet, getScrollRange() is 0 and getScroll()

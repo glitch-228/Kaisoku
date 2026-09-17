@@ -72,8 +72,7 @@ class WebtoonImageView @JvmOverloads constructor(
 		if (!isReady) {
 			return 0
 		}
-		val totalHeight = (sHeight * width / sWidth.toFloat()).roundToInt()
-		return (totalHeight - height).coerceAtLeast(0)
+		return calculateScaledPageScrollRange(sWidth, sHeight, width, height)
 	}
 
 	override fun recycle() {
