@@ -37,4 +37,31 @@ class ReaderProgressTest {
 
 		assertTrue(percent < 1f)
 	}
+
+	@Test
+	fun absoluteWebtoonBottomStaysCompleteWhenFreshPageListDiffers() {
+		assertEquals(
+			1f,
+			calculatePersistedReaderPercent(
+				chapterIndex = 312,
+				chaptersCount = 313,
+				pageIndex = 43,
+				pagesCount = 46,
+				scrollOffset = 10_000,
+			),
+		)
+	}
+
+	@Test
+	fun absoluteBottomDoesNotCompleteAnEarlierChapter() {
+		assertTrue(
+			calculatePersistedReaderPercent(
+				chapterIndex = 311,
+				chaptersCount = 313,
+				pageIndex = 43,
+				pagesCount = 46,
+				scrollOffset = 10_000,
+			) < 1f,
+		)
+	}
 }

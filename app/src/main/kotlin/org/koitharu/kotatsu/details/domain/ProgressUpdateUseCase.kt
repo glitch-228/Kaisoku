@@ -12,7 +12,7 @@ import org.koitharu.kotatsu.list.domain.ReadingProgress.Companion.PROGRESS_NONE
 import org.koitharu.kotatsu.local.data.LocalMangaRepository
 import org.koitharu.kotatsu.parsers.model.Manga
 import javax.inject.Inject
-import org.koitharu.kotatsu.reader.ui.calculateReaderPercent
+import org.koitharu.kotatsu.reader.ui.calculatePersistedReaderPercent
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.koitharu.kotatsu.core.prefs.SourceSettings
@@ -62,7 +62,13 @@ class ProgressUpdateUseCase @Inject constructor(
 		} else {
 			val pagesCount = chapterRepo.getPages(chapter).size
 			if (pagesCount == 0) return PROGRESS_NONE
-			calculateReaderPercent(chapterIndex, chaptersCount, history.page, pagesCount)
+			calculatePersistedReaderPercent(
+				chapterIndex = chapterIndex,
+				chaptersCount = chaptersCount,
+				pageIndex = history.page,
+				pagesCount = pagesCount,
+				scrollOffset = history.scroll.toInt(),
+			)
 		}
 		if (result != history.percent || history.chaptersCount != chaptersCount) {
 			database.getHistoryDao().update(
