@@ -1366,4 +1366,6 @@
 	<string name="community_nickname_summary">Choose the name shown beside your comments</string>
 	<string name="community_nickname_hint">Nickname</string>
 	<string name="community_nickname_saved">Nickname saved</string>
+    <string name="community_show_spoiler">Spoiler — tap to reveal</string>
+    <string name="community_load_more">Load more comments</string>
 </resources>

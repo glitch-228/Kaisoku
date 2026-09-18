@@ -603,14 +603,14 @@ class DetailsActivity :
 			try {
 				val result = withContext(Dispatchers.IO) {
 					community.ensureIdentity()
-					community.getRating(manga) to community.getComments(manga)
+					community.getRating(manga) to community.getCommentsPage(manga, limit = 1)
 				}
 				val rating = result.first
 				viewBinding.textViewCommunitySummary?.text = if (rating.count > 0) {
 					getString(R.string.community_rating) + ": %.1f/5 · ".format(rating.average) +
-						getString(R.string.community_comments_count, result.second.size)
+						getString(R.string.community_comments_count, result.second.total)
 				} else {
-					getString(R.string.community_comments_count, result.second.size)
+					getString(R.string.community_comments_count, result.second.total)
 				}
 			} catch (error: Throwable) {
 				viewBinding.textViewCommunitySummary?.text = getString(

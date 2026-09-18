@@ -15,6 +15,7 @@ import org.koitharu.kotatsu.core.db.entity.MangaEntity
 import org.koitharu.kotatsu.core.db.entity.TagEntity
 import org.koitharu.kotatsu.core.exceptions.BadBackupFormatException
 import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
+import org.koitharu.kotatsu.core.parser.mihon.mihonStableId
 import org.koitharu.kotatsu.favourites.data.FavouriteCategoryEntity
 import org.koitharu.kotatsu.favourites.data.FavouriteEntity
 import org.koitharu.kotatsu.history.data.HistoryEntity
@@ -68,12 +69,12 @@ class MihonBackupManager @Inject constructor(
 					continue
 				}
 				val source = sourceNames[item.source] ?: "mihon:${item.source}"
-				val mangaId = "$source:${item.url}".longHashCode()
+				val mangaId = mihonStableId(source, item.url)
 				val chaptersFromBackup = item.chapters
 					.sortedWith(compareByDescending<MihonBackupChapter> { it.sourceOrder }.thenBy { it.chapterNumber })
 				val chapters = chaptersFromBackup.mapIndexed { index, chapter ->
 					ChapterEntity(
-						chapterId = "$mangaId:${chapter.url}".longHashCode(),
+						chapterId = mihonStableId(source, chapter.url.ifBlank { chapter.name.ifBlank { chapter.chapterNumber.toString() } }),
 						mangaId = mangaId,
 						title = chapter.name,
 						number = chapter.chapterNumber,
@@ -177,10 +178,10 @@ class MihonBackupManager @Inject constructor(
 					database.getScrobblingDao().upsert(
 						ScrobblingEntity(
 							scrobbler = service,
-							id = remoteId.toInt(),
+							id = (tracking.libraryId.takeIf { it > 0 } ?: remoteId).toInt(),
 							mangaId = mangaId,
 							targetId = remoteId,
-							status = trackingStatus(tracking.status),
+							status = mihonTrackingStatus(tracking.syncId, tracking.status),
 							chapter = tracking.lastChapterRead.toInt().coerceAtLeast(0),
 							comment = null,
 							rating = (tracking.score / 10f).coerceIn(0f, 1f),
@@ -267,15 +268,6 @@ class MihonBackupManager @Inject constructor(
 		else -> null
 	}
 
-	private fun trackingStatus(status: Int): String? = when (status) {
-		1 -> "planned"
-		2 -> "reading"
-		3 -> "completed"
-		4 -> "on_hold"
-		5 -> "dropped"
-		6 -> "re_reading"
-		else -> null
-	}
 
 	private companion object {
 		const val DEFAULT_CATEGORY = "Default"

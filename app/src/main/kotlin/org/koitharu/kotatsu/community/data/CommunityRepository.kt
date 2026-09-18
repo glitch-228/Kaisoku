@@ -5,6 +5,10 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Base64
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -12,11 +16,14 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okio.ByteString.Companion.encodeUtf8
 import org.json.JSONArray
 import org.json.JSONObject
 import org.koitharu.kotatsu.core.network.BaseHttpClient
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.util.ext.parseJsonOrNull
+import org.koitharu.kotatsu.core.util.ext.processLifecycleScope
+import org.koitharu.kotatsu.parsers.model.ContentRating
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.util.await
 import org.koitharu.kotatsu.BuildConfig
@@ -30,8 +37,8 @@ import javax.inject.Singleton
  * Kotatsu-Redo's open community client/server design; Kaisoku identifies itself on every request.
  *
  * The server deliberately has no password or login endpoint.  A random 256-bit bearer secret is
- * generated on the device and is the pseudonymous account credential.  Nothing is sent until the
- * user enables Community features.  Aggregate source scores remain cacheable public data.
+ * generated on the device and is the pseudonymous account credential.	Nothing is sent until the
+ * user enables Community features.	 Aggregate source scores remain cacheable public data.
  */
 @Singleton
 class CommunityRepository @Inject constructor(
@@ -41,10 +48,10 @@ class CommunityRepository @Inject constructor(
 ) {
 	private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 	private val jsonType = "application/json; charset=utf-8".toMediaType()
-	private val scoresLock = Any()
+	private val identityMutex = Mutex()
+	private val scoreCache = CommunityScoreCache()
 	private val telemetryLock = Any()
-	private var scores: Map<String, CommunitySourceScore> = emptyMap()
-	private var scoresLoadedAt = 0L
+	private val telemetryMutex = Mutex()
 	private val deviceId: String = Settings.Secure.getString(
 		context.contentResolver,
 		Settings.Secure.ANDROID_ID,
@@ -72,56 +79,65 @@ class CommunityRepository @Inject constructor(
 	}
 
 	suspend fun ensureIdentity(): CommunityIdentity = withContext(Dispatchers.IO) {
-		check(isEnabled) { "Community features are disabled" }
-		val secret = getOrCreateSecret()
-		val body = JSONObject().put("ssaid", deviceId)
-		val response = request("/v1/identity/hello", method = "POST", body = body, secret = secret)
-		parseIdentity(response)
+		identityMutex.withLock {
+			check(isEnabled) { "Community features are disabled" }
+			parseIdentity(request(
+				"/v1/identity/hello",
+				method = "POST",
+				body = JSONObject().put("ssaid", deviceId),
+				secret = getOrCreateSecret(),
+			))
+		}
 	}
 
 	suspend fun identityOrNull(): CommunityIdentity? = withContext(Dispatchers.IO) {
 		if (!isEnabled || !hasIdentity) return@withContext null
-		runCatching {
+		try {
 			parseIdentity(request("/v1/identity/me", secret = requireSecret()))
-		}.getOrNull()
+		} catch (error: CancellationException) {
+			throw error
+		} catch (_: Exception) {
+			null
+		}
 	}
 
 	suspend fun importRecoveryKey(value: String): CommunityIdentity = withContext(Dispatchers.IO) {
-		val decoded = Base64.decode(value.trim(), Base64.DEFAULT)
-		check(decoded.size == SECRET_BYTES) { "Invalid community recovery key" }
-		val secret = Base64.encodeToString(decoded, Base64.NO_WRAP)
-		prefs.edit().putString(KEY_SECRET, secret).apply()
-		try {
-			ensureIdentity()
-		} catch (error: Throwable) {
-			prefs.edit().remove(KEY_SECRET).apply()
-			throw error
+		identityMutex.withLock {
+			check(isEnabled) { "Community features are disabled" }
+			val decoded = Base64.decode(value.trim(), Base64.DEFAULT)
+			check(decoded.size == SECRET_BYTES) { "Invalid community recovery key" }
+			val secret = Base64.encodeToString(decoded, Base64.NO_WRAP)
+			// Validate an existing account without replacing the current key or creating a new account.
+			val identity = parseIdentity(request("/v1/identity/me", secret = secret))
+			prefs.edit().putString(KEY_SECRET, secret).remove(KEY_NOTIFICATION_CURSOR)
+				.remove(KEY_TELEMETRY_PENDING).apply()
+			identity
 		}
 	}
 
 	fun exportRecoveryKey(): String? = prefs.getString(KEY_SECRET, null)
 
 	suspend fun deleteIdentity() = withContext(Dispatchers.IO) {
-		if (hasIdentity) {
-			runCatching { request("/v1/identity/me", method = "DELETE", secret = requireSecret()) }
-		}
-		prefs.edit().remove(KEY_SECRET).apply()
-		synchronized(scoresLock) {
-			scores = emptyMap()
-			scoresLoadedAt = 0L
+		identityMutex.withLock {
+			if (hasIdentity) {
+				request("/v1/identity/me", method = "DELETE", secret = requireSecret())
+			}
+			// Keep the credential on failure so the user can retry deleting their server data.
+			prefs.edit().remove(KEY_SECRET).remove(KEY_NOTIFICATION_CURSOR)
+				.remove(KEY_TELEMETRY_PENDING).apply()
 		}
 	}
 
 	suspend fun resolveWork(manga: Manga): Long = withContext(Dispatchers.IO) {
-		val cacheKey = "${manga.source.name}\u0000${manga.url.ifBlank { manga.publicUrl }}"
-		prefs.getString(KEY_WORK_PREFIX + cacheKey.hashCode(), null)?.toLongOrNull()?.let { return@withContext it }
+		val cacheKey = "${manga.source.name}\u0000${manga.url.ifBlank { manga.publicUrl }}".encodeUtf8().sha256().hex()
+		prefs.getString(KEY_WORK_PREFIX + cacheKey, null)?.toLongOrNull()?.let { return@withContext it }
 		val fingerprint = JSONObject()
 			.put("source", manga.source.name)
 			.put("key", manga.url.ifBlank { manga.publicUrl })
 			.put("title", manga.title)
 			.put("alt_titles", JSONArray(manga.altTitles.toList()))
 			.put("content_type", "manga")
-			.put("nsfw", manga.contentRating != null)
+			.put("nsfw", manga.contentRating == ContentRating.ADULT)
 		val response = request(
 			path = "/v1/works/resolve",
 			method = "POST",
@@ -132,7 +148,7 @@ class CommunityRepository @Inject constructor(
 			?: error("Community server returned no work identity")
 		val workId = resolved.optString("work_id").toLongOrNull()
 			?: error("Community server returned an invalid work identity")
-		prefs.edit().putString(KEY_WORK_PREFIX + cacheKey.hashCode(), workId.toString()).apply()
+		prefs.edit().putString(KEY_WORK_PREFIX + cacheKey, workId.toString()).apply()
 		workId
 	}
 
@@ -282,23 +298,14 @@ class CommunityRepository @Inject constructor(
 
 	suspend fun refreshScores(force: Boolean = false): Map<String, CommunitySourceScore> = withContext(Dispatchers.IO) {
 		if (!isEnabled) return@withContext emptyMap()
-		synchronized(scoresLock) {
-			if (!force && scores.isNotEmpty() && System.currentTimeMillis() - scoresLoadedAt < SCORE_CACHE_MS) return@synchronized scores
-		}
-		val response = runCatching {
-			request("/v1/sources/scores?region=${java.util.Locale.getDefault().country}")
-		}.getOrElse {
-			return@withContext synchronized(scoresLock) { scores }
-		}
-		val loaded = (response.optJSONArray("sources") ?: response.optJSONArray("scores")).orEmpty().toScores()
-		synchronized(scoresLock) {
-			scores = loaded.associateBy { it.source }
-			scoresLoadedAt = System.currentTimeMillis()
-			return@synchronized scores
+		scoreCache.refresh(force) {
+			val response = request("/v1/sources/scores?region=${regionCode()}")
+			(response.optJSONArray("sources") ?: response.optJSONArray("scores")).orEmpty()
+				.toScores().associateBy { it.source }
 		}
 	}
 
-	fun scoreFor(source: String): CommunitySourceScore? = synchronized(scoresLock) { scores[source] }
+	fun scoreFor(source: String): CommunitySourceScore? = scoreCache.get(source)
 
 	suspend fun rankSources(sources: List<org.koitharu.kotatsu.core.model.MangaSourceInfo>): List<org.koitharu.kotatsu.core.model.MangaSourceInfo> {
 		if (!isEnabled || sources.size < 2) return sources
@@ -313,42 +320,44 @@ class CommunityRepository @Inject constructor(
 	}
 
 	/** Record only coarse source health data; no titles, URLs, or reading history are retained. */
-	suspend fun recordProbe(
+	fun recordProbe(
 		source: String,
 		operation: String,
 		ok: Boolean,
 		empty: Boolean = false,
 		latencyMs: Long = 0L,
 		cfBlocked: Boolean = false,
-	) = withContext(Dispatchers.IO) {
-		if (!isEnabled || !isTelemetryEnabled || !hasIdentity || source.isBlank()) return@withContext
-		val normalizedOperation = operation.uppercase(Locale.ROOT)
-		if (normalizedOperation !in TELEMETRY_OPERATIONS) return@withContext
-		val now = System.currentTimeMillis()
-		val pending = synchronized(telemetryLock) {
-			val rows = prefs.getString(KEY_TELEMETRY_PENDING, null).orEmpty()
-				.let { runCatching { JSONArray(it) }.getOrElse { JSONArray() } }
-			val existing = (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
-				.firstOrNull { it.optString("source") == source && it.optString("op") == normalizedOperation }
-			if (existing == null) {
-				rows.put(JSONObject().put("source", source).put("op", normalizedOperation)
-					.put("ok", if (ok) 1 else 0).put("fail", if (ok) 0 else 1)
-					.put("empty", if (empty) 1 else 0).put("cf_blocked", if (cfBlocked) 1 else 0)
-					.put("p50_ms", latencyMs.coerceIn(0L, 120_000L)).put("p90_ms", latencyMs.coerceIn(0L, 120_000L)))
-			} else {
-				existing.put("ok", existing.optInt("ok") + if (ok) 1 else 0)
-				existing.put("fail", existing.optInt("fail") + if (ok) 0 else 1)
-				existing.put("empty", existing.optInt("empty") + if (empty) 1 else 0)
-				existing.put("cf_blocked", existing.optInt("cf_blocked") + if (cfBlocked) 1 else 0)
-				val bounded = latencyMs.coerceIn(0L, 120_000L).toInt()
-				existing.put("p50_ms", maxOf(existing.optInt("p50_ms"), bounded))
-				existing.put("p90_ms", maxOf(existing.optInt("p90_ms"), bounded))
+	) = processLifecycleScope.launch(Dispatchers.IO) {
+		telemetryMutex.withLock {
+			if (!isEnabled || !isTelemetryEnabled || !hasIdentity || source.isBlank()) return@withLock
+			val normalizedOperation = operation.uppercase(Locale.ROOT)
+			if (normalizedOperation !in TELEMETRY_OPERATIONS) return@withLock
+			val now = System.currentTimeMillis()
+			val pending = synchronized(telemetryLock) {
+				val rows = prefs.getString(KEY_TELEMETRY_PENDING, null).orEmpty()
+					.let { runCatching { JSONArray(it) }.getOrElse { JSONArray() } }
+				val existing = (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
+					.firstOrNull { it.optString("source") == source && it.optString("op") == normalizedOperation }
+				if (existing == null) {
+					rows.put(JSONObject().put("source", source).put("op", normalizedOperation)
+						.put("ok", if (ok) 1 else 0).put("fail", if (ok) 0 else 1)
+						.put("empty", if (empty) 1 else 0).put("cf_blocked", if (cfBlocked) 1 else 0)
+						.put("p50_ms", latencyMs.coerceIn(0L, 120_000L)).put("p90_ms", latencyMs.coerceIn(0L, 120_000L)))
+				} else {
+					existing.put("ok", existing.optInt("ok") + if (ok) 1 else 0)
+					existing.put("fail", existing.optInt("fail") + if (ok) 0 else 1)
+					existing.put("empty", existing.optInt("empty") + if (empty) 1 else 0)
+					existing.put("cf_blocked", existing.optInt("cf_blocked") + if (cfBlocked) 1 else 0)
+					val bounded = latencyMs.coerceIn(0L, 120_000L).toInt()
+					existing.put("p50_ms", maxOf(existing.optInt("p50_ms"), bounded))
+					existing.put("p90_ms", maxOf(existing.optInt("p90_ms"), bounded))
+				}
+				prefs.edit().putString(KEY_TELEMETRY_PENDING, rows.toString()).apply()
+				rows
 			}
-			prefs.edit().putString(KEY_TELEMETRY_PENDING, rows.toString()).apply()
-			rows
-		}
-		if (pending.length() > 0 && now - prefs.getLong(KEY_TELEMETRY_SENT_AT, 0L) >= TELEMETRY_INTERVAL_MS) {
-			flushTelemetry(pending)
+			if (pending.length() > 0 && now - prefs.getLong(KEY_TELEMETRY_SENT_AT, 0L) >= TELEMETRY_INTERVAL_MS) {
+				flushTelemetry(pending)
+			}
 		}
 	}
 
@@ -439,12 +448,16 @@ class CommunityRepository @Inject constructor(
 		}
 	}
 
-	private fun parseIdentity(json: JSONObject) = CommunityIdentity(
+	private fun parseIdentity(json: JSONObject): CommunityIdentity {
+		check(json.optString("user_id").isNotBlank()) { "Community server returned no identity" }
+		return CommunityIdentity(
 		userId = json.optString("user_id"),
 		displayName = json.optString("display_name"),
 		nickname = json.optString("nickname").takeIf { it.isNotBlank() },
 		tier = json.optInt("tier"),
 	)
+
+	}
 
 	private fun JSONObject.toComment() = CommunityComment(
 		id = optString("id").toLongOrNull() ?: 0L,
@@ -507,7 +520,6 @@ class CommunityRepository @Inject constructor(
 		private const val KEY_TELEMETRY_SENT_AT = "telemetry_sent_at"
 		private const val KEY_NOTIFICATION_CURSOR = "notification_cursor"
 		private const val SECRET_BYTES = 32
-		private const val SCORE_CACHE_MS = 24 * 60 * 60 * 1000L
 		private const val TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000L
 		private const val CLIENT_MARKER = "kaisoku"
 		private val CLIENT_USER_AGENT = "Kaisoku/${BuildConfig.VERSION_NAME} (Kotatsu-Redo community client)"

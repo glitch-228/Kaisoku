@@ -327,6 +327,7 @@ private suspend fun loadRemoteList(
 					filter = filterState.listFilter,
 				)
 			} catch (error: Throwable) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
 				community.recordProbe(
 					source = probeSource.name,
 					operation = "SEARCH",

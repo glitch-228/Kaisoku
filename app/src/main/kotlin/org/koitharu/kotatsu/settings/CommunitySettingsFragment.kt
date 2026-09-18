@@ -10,6 +10,7 @@ import androidx.preference.SwitchPreferenceCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -88,8 +89,7 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 				bindIdentitySummary()
 				Snackbar.make(listView, R.string.community_identity_ready, Snackbar.LENGTH_SHORT).show()
 			} catch (error: Throwable) {
-				community.setEnabled(false)
-				enabled.isChecked = false
+				if (error is CancellationException) throw error
 				Snackbar.make(listView, getString(R.string.community_setup_failed, error.getDisplayMessage(resources)), Snackbar.LENGTH_LONG).show()
 			}
 		}
@@ -123,15 +123,17 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 			.setView(input)
 			.setNegativeButton(android.R.string.cancel, null)
 			.setPositiveButton(R.string.save) { _, _ ->
+				val nickname = input.text.toString()
 				viewLifecycleScope.launch {
 					try {
 						val identity = withContext(Dispatchers.IO) {
 							community.ensureIdentity()
-							community.setNickname(input.text.toString())
+							community.setNickname(nickname)
 						}
 						findPreference<Preference>("community_nickname")?.summary = identity.displayName
 						Snackbar.make(listView, R.string.community_nickname_saved, Snackbar.LENGTH_SHORT).show()
 					} catch (error: Throwable) {
+						if (error is CancellationException) throw error
 						Snackbar.make(listView, getString(R.string.community_setup_failed, error.getDisplayMessage(resources)), Snackbar.LENGTH_LONG).show()
 					}
 				}
@@ -159,6 +161,7 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 					.setPositiveButton(android.R.string.ok, null)
 					.show()
 			} catch (error: Throwable) {
+				if (error is CancellationException) throw error
 				Snackbar.make(listView, getString(R.string.community_setup_failed, error.getDisplayMessage(resources)), Snackbar.LENGTH_LONG).show()
 			}
 		}
@@ -180,6 +183,7 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 					putExtra(Intent.EXTRA_TEXT, data)
 				}, getString(R.string.community_export_title)))
 			} catch (error: Throwable) {
+				if (error is CancellationException) throw error
 				Snackbar.make(listView, getString(R.string.community_export_failed, error.getDisplayMessage(resources)), Snackbar.LENGTH_LONG).show()
 			}
 		}
@@ -203,12 +207,14 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 			}
 			.setNegativeButton(android.R.string.cancel, null)
 			.setPositiveButton(R.string.community_import_key) { _, _ ->
+				val recoveryKey = input.text.toString()
 				viewLifecycleScope.launch {
 					try {
-						withContext(Dispatchers.IO) { community.importRecoveryKey(input.text.toString()) }
+						withContext(Dispatchers.IO) { community.importRecoveryKey(recoveryKey) }
 						bindIdentitySummary()
 						Snackbar.make(listView, R.string.community_identity_ready, Snackbar.LENGTH_SHORT).show()
 					} catch (error: Throwable) {
+						if (error is CancellationException) throw error
 						Snackbar.make(listView, getString(R.string.community_setup_failed, error.getDisplayMessage(resources)), Snackbar.LENGTH_LONG).show()
 					}
 				}
@@ -223,12 +229,17 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 			.setNegativeButton(android.R.string.cancel, null)
 			.setPositiveButton(R.string.delete) { _, _ ->
 				viewLifecycleScope.launch {
-					withContext(Dispatchers.IO) { community.deleteIdentity() }
-					community.setEnabled(false)
-					enabled.isChecked = false
-					telemetry.isChecked = false
-					bindIdentitySummary()
-					Snackbar.make(listView, R.string.community_deleted, Snackbar.LENGTH_SHORT).show()
+					try {
+						withContext(Dispatchers.IO) { community.deleteIdentity() }
+						community.setEnabled(false)
+						enabled.isChecked = false
+						telemetry.isChecked = false
+						bindIdentitySummary()
+						Snackbar.make(listView, R.string.community_deleted, Snackbar.LENGTH_SHORT).show()
+					} catch (error: Exception) {
+						if (error is CancellationException) throw error
+						Snackbar.make(listView, error.getDisplayMessage(resources), Snackbar.LENGTH_LONG).show()
+					}
 				}
 			}
 			.show()
