@@ -1314,6 +1314,8 @@
 	<string name="upscale_activation_help">Applies when the page is enlarged above the selected threshold. Strength 0 disables processing.</string>
 	<string name="community">Community</string>
 	<string name="community_summary">Optional ratings, comments and source reliability</string>
+	<string name="community_attribution_title">Community client attribution</string>
+	<string name="community_attribution_summary">Kaisoku’s community client is adapted from the open Kotatsu-Redo community client and server protocol. Requests identify Kaisoku to the server owner.</string>
 	<string name="community_enabled">Community features</string>
 	<string name="community_enabled_summary">Use the Kotatsu-Redo community server for ratings and comments</string>
 	<string name="community_telemetry">Share source reliability telemetry</string>

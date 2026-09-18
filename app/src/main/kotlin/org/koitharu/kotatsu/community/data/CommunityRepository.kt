@@ -19,13 +19,15 @@ import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.util.ext.parseJsonOrNull
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.util.await
+import org.koitharu.kotatsu.BuildConfig
 import java.security.SecureRandom
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Client for the Kotatsu-Redo community API.
+ * Client for the Kotatsu-Redo community API. The protocol and server integration are adapted from
+ * Kotatsu-Redo's open community client/server design; Kaisoku identifies itself on every request.
  *
  * The server deliberately has no password or login endpoint.  A random 256-bit bearer secret is
  * generated on the device and is the pseudonymous account credential.  Nothing is sent until the
@@ -406,6 +408,8 @@ class CommunityRepository @Inject constructor(
 	): JSONObject {
 		val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
 			.header("Accept", "application/json")
+			.header("X-Kaisoku-Client", CLIENT_MARKER)
+			.header("User-Agent", CLIENT_USER_AGENT)
 			.apply { secret?.let { header("Authorization", "Bearer $it") } }
 			.apply {
 				when (method) {
@@ -422,6 +426,8 @@ class CommunityRepository @Inject constructor(
 	private suspend fun requestText(path: String, secret: String? = null): String {
 		val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
 			.header("Accept", "application/json")
+			.header("X-Kaisoku-Client", CLIENT_MARKER)
+			.header("User-Agent", CLIENT_USER_AGENT)
 			.apply { secret?.let { header("Authorization", "Bearer $it") } }
 			.get()
 			.build()
@@ -503,6 +509,8 @@ class CommunityRepository @Inject constructor(
 		private const val SECRET_BYTES = 32
 		private const val SCORE_CACHE_MS = 24 * 60 * 60 * 1000L
 		private const val TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000L
+		private const val CLIENT_MARKER = "kaisoku"
+		private val CLIENT_USER_AGENT = "Kaisoku/${BuildConfig.VERSION_NAME} (Kotatsu-Redo community client)"
 		private val TELEMETRY_OPERATIONS = setOf("SEARCH", "DETAILS", "PAGES")
 	}
 }
