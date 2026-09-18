@@ -882,4 +882,5 @@
     <string name="hide_empty_sources">Esconder fontes vazias</string>
     <string name="pinned_sources_only">Apenas fontes fixadas</string>
     <string name="auto_double_foldable">Duas Páginas Automático em Tela Dobrável</string>
+    <string name="donations">Doações</string>
 </resources>
