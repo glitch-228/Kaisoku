@@ -255,6 +255,7 @@ class DetailsActivity :
 					source = manga.source,
 					preview = CoilMemoryCacheKey.from(viewBinding.imageViewCover),
 					anchor = v,
+					manga = manga,
 				)
 			}
 
@@ -265,6 +266,7 @@ class DetailsActivity :
 					source = manga.source,
 					preview = CoilMemoryCacheKey.from(viewBinding.backdrop),
 					anchor = viewBinding.backdrop,
+					manga = manga,
 				)
 			}
 

@@ -17,6 +17,7 @@ import android.view.ViewPropertyAnimator
 import androidx.annotation.AttrRes
 import androidx.annotation.StyleRes
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.view.doOnNextLayout
 import androidx.core.view.isVisible
 import androidx.customview.view.AbsSavedState
 import androidx.interpolator.view.animation.FastOutLinearInInterpolator
@@ -255,6 +256,7 @@ class SlidingBottomNavigationView @JvmOverloads constructor(
 		currentState = STATE_DOWN
 		val target = hideOffset
 		if (target == 0f) {
+			doOnNextLayout { applyHiddenPosition() }
 			return
 		}
 		animateTranslation(
@@ -262,6 +264,17 @@ class SlidingBottomNavigationView @JvmOverloads constructor(
 			SLIDE_DOWN_ANIMATION_DURATION,
 			FastOutLinearInInterpolator(),
 		)
+	}
+
+	private fun applyHiddenPosition() {
+		if (currentState != STATE_DOWN) {
+			return
+		}
+		val target = hideOffset
+		if (target == 0f) {
+			return
+		}
+		super.setTranslationY(target)
 	}
 
 	fun showOrHide(show: Boolean) {

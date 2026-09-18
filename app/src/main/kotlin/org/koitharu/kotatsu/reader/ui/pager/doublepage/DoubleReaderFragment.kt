@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
+import androidx.core.view.children
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
@@ -14,8 +15,11 @@ import kotlinx.coroutines.yield
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.os.NetworkState
 import org.koitharu.kotatsu.core.prefs.AppSettings
+import org.koitharu.kotatsu.core.prefs.ReaderAnimation
 import org.koitharu.kotatsu.core.ui.list.lifecycle.RecyclerViewLifecycleDispatcher
 import org.koitharu.kotatsu.core.util.ext.firstVisibleItemPosition
+import org.koitharu.kotatsu.core.util.ext.observe
+import org.koitharu.kotatsu.core.util.ext.resetTransformations
 import org.koitharu.kotatsu.databinding.FragmentReaderDoubleBinding
 import org.koitharu.kotatsu.reader.domain.PageLoader
 import org.koitharu.kotatsu.reader.ui.ReaderState
@@ -62,6 +66,9 @@ open class DoubleReaderFragment : BaseReaderFragment<FragmentReaderDoubleBinding
 			}
 			addOnScrollListener(PageScrollListener())
 			DoublePageSnapHelper(settings).attachToRecyclerView(this)
+		}
+		viewModel.pageAnimation.observe(viewLifecycleOwner) {
+			binding.recyclerView.scrollBy(0, 0)
 		}
 	}
 
@@ -186,18 +193,75 @@ open class DoubleReaderFragment : BaseReaderFragment<FragmentReaderDoubleBinding
 
 		override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
 			super.onScrolled(recyclerView, dx, dy)
-			val lm = recyclerView.layoutManager as? LinearLayoutManager
-			if (lm == null) {
+			val lm = recyclerView.layoutManager as? LinearLayoutManager ?: run {
 				firstPos = RecyclerView.NO_POSITION
 				lastPos = RecyclerView.NO_POSITION
 				return
 			}
 			val newFirstPos = lm.findFirstVisibleItemPosition()
 			val newLastPos = lm.findLastVisibleItemPosition()
+			applyPageAnimation(recyclerView, lm, newFirstPos)
 			if (newFirstPos != firstPos || newLastPos != lastPos) {
 				firstPos = newFirstPos
 				lastPos = newLastPos
 				notifyPageChanged(newFirstPos, newLastPos)
+			}
+		}
+
+		private fun applyPageAnimation(
+			recyclerView: RecyclerView,
+			layoutManager: LinearLayoutManager,
+			firstVisiblePosition: Int,
+		) {
+			if (!isAnimationEnabled() || viewModel.pageAnimation.value != ReaderAnimation.ADVANCED) {
+				recyclerView.children.forEach { it.resetTransformations() }
+				return
+			}
+			if (firstVisiblePosition == RecyclerView.NO_POSITION) return
+			val width = recyclerView.width.toFloat()
+			val start = firstVisiblePosition.toPagePosition()
+			val left = layoutManager.findViewByPosition(start) ?: return
+			val offset = -left.left
+			if (width <= 0f || offset == 0) {
+				recyclerView.children.forEach { it.resetTransformations() }
+				return
+			}
+			val fraction = (offset / width).coerceIn(0f, 1f)
+			val half = width / 2f
+			recyclerView.children.forEach { child ->
+				when (recyclerView.getChildAdapterPosition(child)) {
+					start -> {
+						child.translationX = offset.toFloat()
+						child.translationZ = 0f
+						child.rotationY = 0f
+						child.alpha = 1f
+					}
+					start + 1 -> {
+						child.translationX = half - child.left
+						child.pivotX = 0f
+						child.pivotY = child.height / 2f
+						child.cameraDistance = 20_000f
+						child.translationZ = 3f
+						child.rotationY = -180f * fraction
+						child.alpha = if (fraction < 0.5f) 1f else 0f
+					}
+					start + 2 -> {
+						child.translationX = -child.left.toFloat()
+						child.pivotX = child.width.toFloat()
+						child.pivotY = child.height / 2f
+						child.cameraDistance = 20_000f
+						child.translationZ = 3f
+						child.rotationY = 180f * (1f - fraction)
+						child.alpha = if (fraction >= 0.5f) 1f else 0f
+					}
+					start + 3 -> {
+						child.translationX = half - child.left
+						child.translationZ = 0f
+						child.rotationY = 0f
+						child.alpha = 1f
+					}
+					else -> child.resetTransformations()
+				}
 			}
 		}
 	}

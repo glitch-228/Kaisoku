@@ -249,6 +249,9 @@
     <string name="backup_restore">Backup and restore</string>
     <string name="create_backup">Create data backup</string>
     <string name="restore_backup">Restore from backup</string>
+    <string name="import_mihon_backup">Import Mihon backup</string>
+    <string name="mihon_backup_import_summary">Import library, chapters, progress, bookmarks, and tracking from a .tachibk file</string>
+    <string name="mihon_backup_imported">Imported %1$d manga and %2$d chapters (%3$d tracking entries); %4$d sources are not installed</string>
     <string name="merge_with_existing_data">Merge with existing data</string>
     <string name="data_restored">Restored</string>
     <string name="preparing_">Preparing…</string>

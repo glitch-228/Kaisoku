@@ -223,12 +223,19 @@ class AppRouter private constructor(
         )
     }
 
-    fun openImage(url: String, source: MangaSource?, anchor: View? = null, preview: CoilMemoryCacheKey? = null) {
+    fun openImage(
+        url: String,
+        source: MangaSource?,
+        anchor: View? = null,
+        preview: CoilMemoryCacheKey? = null,
+        manga: Manga? = null,
+    ) {
         startActivity(
             Intent(contextOrNull(), ImageActivity::class.java)
                 .setData(url.toUri())
                 .putExtra(KEY_SOURCE, source?.name)
-                .putExtra(KEY_PREVIEW, preview),
+                .putExtra(KEY_PREVIEW, preview)
+                .putExtra(KEY_MANGA, manga?.let { ParcelableManga(it, withDescription = false) }),
             anchor?.let { scaleUpActivityOptionsOf(it) },
         )
     }

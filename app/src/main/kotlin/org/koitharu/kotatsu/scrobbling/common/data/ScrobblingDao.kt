@@ -9,8 +9,14 @@ import kotlinx.coroutines.isActive
 @Dao
 abstract class ScrobblingDao {
 
+	@Query("SELECT * FROM scrobblings WHERE manga_id = :mangaId")
+	abstract suspend fun findForManga(mangaId: Long): List<ScrobblingEntity>
+
 	@Query("SELECT * FROM scrobblings WHERE scrobbler = :scrobbler AND manga_id = :mangaId")
 	abstract suspend fun find(scrobbler: Int, mangaId: Long): ScrobblingEntity?
+
+	@Query("SELECT manga_id FROM scrobblings WHERE scrobbler = :scrobbler AND target_id = :targetId AND manga_id != :mangaId LIMIT 1")
+	abstract suspend fun findMangaId(scrobbler: Int, targetId: Long, mangaId: Long): Long?
 
 	@Query("SELECT * FROM scrobblings WHERE scrobbler = :scrobbler AND manga_id = :mangaId")
 	abstract fun observe(scrobbler: Int, mangaId: Long): Flow<ScrobblingEntity?>

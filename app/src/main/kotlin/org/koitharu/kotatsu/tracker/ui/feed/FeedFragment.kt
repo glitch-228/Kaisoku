@@ -109,6 +109,11 @@ class FeedFragment :
 		viewModel.update()
 	}
 
+	override fun onResume() {
+		super.onResume()
+		viewModel.updateIfNeeded()
+	}
+
 	override fun onFilterOptionClick(view: View, option: ListFilterOption) {
 		if (option is ListFilterOption.State) {
 			showStateFilterPopupMenu(view, option) { selectedState ->

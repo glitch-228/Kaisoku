@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.alternatives.domain.MigrateUseCase
+import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.model.FavouriteCategory
 import org.koitharu.kotatsu.core.model.ids
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
@@ -39,6 +40,7 @@ class FavoriteDialogViewModel @Inject constructor(
 	private val favouritesRepository: FavouritesRepository,
 	settings: AppSettings,
 	private val migrator: MigrateUseCase,
+	private val database: MangaDatabase,
 ) : BaseViewModel() {
 
 	val manga = savedStateHandle.require<List<ParcelableManga>>(AppRouter.KEY_MANGA_LIST).map {
@@ -67,12 +69,18 @@ class FavoriteDialogViewModel @Inject constructor(
 			if (isChecked && !force) {
 				manga.firstOrNull()?.let { m ->
 					val names = m.altTitles + m.title
-					favouritesRepository
-						.getAllManga()
-						.firstOrNull { f ->
+					val favourites = favouritesRepository.getAllManga()
+					val trackerDuplicateId = database.getScrobblingDao()
+						.findForManga(m.id)
+						.firstNotNullOfOrNull { tracker ->
+							database.getScrobblingDao().findMangaId(tracker.scrobbler, tracker.targetId, m.id)
+						}
+					val duplicate = favourites.firstOrNull { it.id == trackerDuplicateId }
+						?: favourites.firstOrNull { f ->
 							f.id != m.id &&
 								(f.altTitles + f.title).any { a -> names.any { b -> a.equals(b, true) } }
-						}?.let { dup -> return@launchJob onDuplicate.call(dup to categoryId) }
+						}
+					duplicate?.let { dup -> return@launchJob onDuplicate.call(dup to categoryId) }
 				}
 			}
 			if (isChecked) {
