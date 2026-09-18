@@ -2,6 +2,7 @@ package org.koitharu.kotatsu.settings
 
 import android.os.Bundle
 import android.text.InputType
+import android.content.Intent
 import android.view.View
 import android.widget.EditText
 import androidx.preference.Preference
@@ -57,12 +58,24 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 			verifyIdentity()
 			true
 		}
+		"community_nickname" -> {
+			showNicknameDialog()
+			true
+		}
 		"community_recovery" -> {
 			showRecoveryDialog()
 			true
 		}
 		"community_delete" -> {
 			confirmDelete()
+			true
+		}
+		"community_notifications" -> {
+			showNotifications()
+			true
+		}
+		"community_export" -> {
+			exportData()
 			true
 		}
 		else -> super.onPreferenceTreeClick(preference)
@@ -87,6 +100,88 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 			!community.isEnabled -> getString(R.string.disabled)
 			community.hasIdentity -> getString(R.string.enabled)
 			else -> getString(R.string.community_identity_summary)
+		}
+		viewLifecycleScope.launch {
+			val identity = withContext(Dispatchers.IO) { community.identityOrNull() }
+			findPreference<Preference>("community_nickname")?.summary = identity?.displayName
+				?.takeIf { it.isNotBlank() }
+				?: getString(R.string.community_nickname_summary)
+		}
+	}
+
+	private fun showNicknameDialog() {
+		if (!community.isEnabled) {
+			Snackbar.make(listView, R.string.community_enabled_summary, Snackbar.LENGTH_LONG).show()
+			return
+		}
+		val input = EditText(requireContext()).apply {
+			inputType = InputType.TYPE_CLASS_TEXT
+			hint = getString(R.string.community_nickname_hint)
+		}
+		MaterialAlertDialogBuilder(requireContext())
+			.setTitle(R.string.community_nickname)
+			.setView(input)
+			.setNegativeButton(android.R.string.cancel, null)
+			.setPositiveButton(R.string.save) { _, _ ->
+				viewLifecycleScope.launch {
+					try {
+						val identity = withContext(Dispatchers.IO) {
+							community.ensureIdentity()
+							community.setNickname(input.text.toString())
+						}
+						findPreference<Preference>("community_nickname")?.summary = identity.displayName
+						Snackbar.make(listView, R.string.community_nickname_saved, Snackbar.LENGTH_SHORT).show()
+					} catch (error: Throwable) {
+						Snackbar.make(listView, getString(R.string.community_setup_failed, error.getDisplayMessage(resources)), Snackbar.LENGTH_LONG).show()
+					}
+				}
+			}
+			.show()
+	}
+
+	private fun showNotifications() {
+		if (!community.isEnabled) {
+			Snackbar.make(listView, R.string.community_enabled_summary, Snackbar.LENGTH_LONG).show()
+			return
+		}
+		viewLifecycleScope.launch {
+			try {
+				val replies = withContext(Dispatchers.IO) {
+					community.ensureIdentity()
+					community.getNotifications()
+				}
+				val message = replies.takeIf { it.isNotEmpty() }?.joinToString("\n\n") {
+					"${it.author}: ${it.preview}"
+				} ?: getString(R.string.community_no_notifications)
+				MaterialAlertDialogBuilder(requireContext())
+					.setTitle(R.string.community_notifications)
+					.setMessage(message)
+					.setPositiveButton(android.R.string.ok, null)
+					.show()
+			} catch (error: Throwable) {
+				Snackbar.make(listView, getString(R.string.community_setup_failed, error.getDisplayMessage(resources)), Snackbar.LENGTH_LONG).show()
+			}
+		}
+	}
+
+	private fun exportData() {
+		if (!community.isEnabled) {
+			Snackbar.make(listView, R.string.community_enabled_summary, Snackbar.LENGTH_LONG).show()
+			return
+		}
+		viewLifecycleScope.launch {
+			try {
+				val data = withContext(Dispatchers.IO) {
+					community.ensureIdentity()
+					community.exportData()
+				}
+				startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+					type = "application/json"
+					putExtra(Intent.EXTRA_TEXT, data)
+				}, getString(R.string.community_export_title)))
+			} catch (error: Throwable) {
+				Snackbar.make(listView, getString(R.string.community_export_failed, error.getDisplayMessage(resources)), Snackbar.LENGTH_LONG).show()
+			}
 		}
 	}
 
@@ -139,4 +234,3 @@ class CommunitySettingsFragment : BasePreferenceFragment(R.string.community) {
 			.show()
 	}
 }
-

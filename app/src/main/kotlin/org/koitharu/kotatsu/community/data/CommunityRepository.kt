@@ -146,8 +146,9 @@ class CommunityRepository @Inject constructor(
 	}
 
 	suspend fun setRating(manga: Manga, stars: Float): CommunityRating = withContext(Dispatchers.IO) {
+		if (stars <= 0f) return@withContext clearRating(manga)
 		val workId = resolveWork(manga)
-		val value = (stars.coerceIn(1f, 5f) * 2f).toInt()
+		val value = (stars.coerceIn(0.5f, 5f) * 2f).toInt()
 		val response = request(
 			"/v1/works/$workId/rating",
 			method = "PUT",
@@ -157,19 +158,54 @@ class CommunityRepository @Inject constructor(
 		CommunityRating(workId, response.optInt("count"), response.optDouble("average", 0.0).toFloat(), response.optDouble("mine", stars.toDouble()).toFloat())
 	}
 
-	suspend fun getComments(manga: Manga, chapter: Long? = null): List<CommunityComment> = withContext(Dispatchers.IO) {
+	suspend fun clearRating(manga: Manga): CommunityRating = withContext(Dispatchers.IO) {
+		val workId = resolveWork(manga)
+		val response = request("/v1/works/$workId/rating", method = "DELETE", secret = requireSecret())
+		CommunityRating(workId, response.optInt("count"), response.optDouble("average", 0.0).toFloat(), null)
+	}
+
+	suspend fun getComments(
+		manga: Manga,
+		chapter: Long? = null,
+		sort: String = "top",
+		lang: String? = null,
+		offset: Int = 0,
+		limit: Int = 100,
+	): List<CommunityComment> = getCommentsPage(manga, chapter, sort, lang, offset, limit).comments
+
+	suspend fun getCommentsPage(
+		manga: Manga,
+		chapter: Long? = null,
+		sort: String = "top",
+		lang: String? = null,
+		offset: Int = 0,
+		limit: Int = 100,
+	): CommunityCommentPage = withContext(Dispatchers.IO) {
 		val workId = resolveWork(manga)
 		val url = serverUrl.toHttpUrl().newBuilder()
 			.addPathSegments("v1/works/$workId/comments")
-			.addQueryParameter("sort", "top")
-			.addQueryParameter("limit", "100")
+			.addQueryParameter("sort", if (sort == "new") "new" else "top")
+			.addQueryParameter("limit", limit.coerceIn(1, 100).toString())
+			.addQueryParameter("offset", offset.coerceAtLeast(0).toString())
+			.apply { lang?.takeIf { it.isNotBlank() }?.let { addQueryParameter("lang", it) } }
 			.apply { chapter?.let { addQueryParameter("chapter", it.toString()) } }
 			.build()
 		val response = request(url.toString(), secret = requireSecret())
-		return@withContext response.optJSONArray("comments")?.toComments().orEmpty()
+		return@withContext CommunityCommentPage(
+			comments = response.optJSONArray("comments")?.toComments().orEmpty(),
+			total = response.optInt("total"),
+			byLanguage = response.optJSONObject("by_language")?.toIntMap().orEmpty(),
+			minimumLength = response.optJSONObject("rules")?.optInt("min_length", 20) ?: 20,
+		)
 	}
 
-	suspend fun postComment(manga: Manga, body: String, chapter: Long? = null, spoiler: Boolean = false): CommunityComment = withContext(Dispatchers.IO) {
+	suspend fun postComment(
+		manga: Manga,
+		body: String,
+		chapter: Long? = null,
+		parentId: Long? = null,
+		spoiler: Boolean = false,
+	): CommunityComment = withContext(Dispatchers.IO) {
 		val workId = resolveWork(manga)
 		val url = serverUrl.toHttpUrl().newBuilder()
 			.addPathSegments("v1/works/$workId/comments")
@@ -177,10 +213,25 @@ class CommunityRepository @Inject constructor(
 			.build()
 		val payload = JSONObject()
 			.put("body", body.trim())
+			.apply { parentId?.let { put("parent_id", it.toString()) } }
 			.put("is_spoiler", spoiler)
 			.put("lang", java.util.Locale.getDefault().language)
 		val response = request(url.toString(), method = "POST", body = payload, secret = requireSecret())
 		response.toComment()
+	}
+
+	suspend fun editComment(commentId: Long, body: String): CommunityComment = withContext(Dispatchers.IO) {
+		request(
+			"/v1/comments/$commentId",
+			method = "PATCH",
+			body = JSONObject().put("body", body.trim()).put("lang", Locale.getDefault().language),
+			secret = requireSecret(),
+		).toComment()
+	}
+
+	suspend fun deleteComment(commentId: Long) = withContext(Dispatchers.IO) {
+		request("/v1/comments/$commentId", method = "DELETE", secret = requireSecret())
+		Unit
 	}
 
 	suspend fun vote(commentId: Long, value: Int): CommunityComment = withContext(Dispatchers.IO) {
@@ -190,6 +241,41 @@ class CommunityRepository @Inject constructor(
 			body = JSONObject().put("value", value.coerceIn(-1, 1)),
 			secret = requireSecret(),
 		).toComment()
+	}
+
+	suspend fun setNickname(nickname: String): CommunityIdentity = withContext(Dispatchers.IO) {
+		request(
+			"/v1/identity/nickname",
+			method = "POST",
+			body = JSONObject().put("nickname", nickname.trim()),
+			secret = requireSecret(),
+		).let(::parseIdentity)
+	}
+
+	suspend fun getNotifications(limit: Int = 100): List<CommunityNotification> = withContext(Dispatchers.IO) {
+		val url = serverUrl.toHttpUrl().newBuilder()
+			.addPathSegments("v1/notifications")
+			.addQueryParameter("limit", limit.coerceIn(1, 100).toString())
+			.apply {
+				prefs.getString(KEY_NOTIFICATION_CURSOR, null)?.takeIf { it.isNotBlank() }?.let {
+					addQueryParameter("since", it)
+				}
+			}
+			.build()
+		val response = request(url.toString(), secret = requireSecret())
+		response.optString("cursor").takeIf { it.isNotBlank() }?.let {
+			prefs.edit().putString(KEY_NOTIFICATION_CURSOR, it).apply()
+		}
+		response.optJSONArray("replies")?.toNotifications().orEmpty()
+	}
+
+	suspend fun exportData(): String = withContext(Dispatchers.IO) {
+		requestText("/v1/identity/export", secret = requireSecret())
+	}
+
+	suspend fun disputeFilterBlock(blockId: Long) = withContext(Dispatchers.IO) {
+		request("/v1/filter/blocks/$blockId/dispute", method = "POST", secret = requireSecret())
+		Unit
 	}
 
 	suspend fun refreshScores(force: Boolean = false): Map<String, CommunitySourceScore> = withContext(Dispatchers.IO) {
@@ -325,11 +411,26 @@ class CommunityRepository @Inject constructor(
 				when (method) {
 					"POST" -> post((body ?: JSONObject()).toString().toRequestBody(jsonType))
 					"PUT" -> put((body ?: JSONObject()).toString().toRequestBody(jsonType))
+					"PATCH" -> patch((body ?: JSONObject()).toString().toRequestBody(jsonType))
 					"DELETE" -> delete()
 				}
 			}
 			.build()
 		return client.newCall(request).await().parseJsonOrNull() ?: JSONObject()
+	}
+
+	private suspend fun requestText(path: String, secret: String? = null): String {
+		val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
+			.header("Accept", "application/json")
+			.apply { secret?.let { header("Authorization", "Bearer $it") } }
+			.get()
+			.build()
+		return client.newCall(request).await().use { response ->
+			if (!response.isSuccessful) {
+				throw java.io.IOException("Community server HTTP ${response.code}: ${response.body?.string()?.take(300)}")
+			}
+			response.body?.string().orEmpty()
+		}
 	}
 
 	private fun parseIdentity(json: JSONObject) = CommunityIdentity(
@@ -341,17 +442,41 @@ class CommunityRepository @Inject constructor(
 
 	private fun JSONObject.toComment() = CommunityComment(
 		id = optString("id").toLongOrNull() ?: 0L,
+		workId = optString("work_id").toLongOrNull() ?: 0L,
+		chapterId = optString("chapter_id").toLongOrNull(),
+		parentId = optString("parent_id").toLongOrNull(),
+		depth = optInt("depth"),
 		author = optString("author"),
 		body = optString("body"),
 		createdAt = optString("created_at"),
 		score = optDouble("score", 0.0),
+		up = optInt("up"),
+		down = optInt("down"),
 		myVote = optInt("my_vote"),
 		isMine = optBoolean("is_mine"),
 		isSpoiler = optBoolean("is_spoiler"),
+		lang = optString("lang").takeIf { it.isNotBlank() },
 		deleted = optBoolean("deleted"),
 	)
 
 	private fun JSONArray.toComments(): List<CommunityComment> = (0 until length()).mapNotNull { optJSONObject(it)?.toComment() }
+
+	private fun JSONArray.toNotifications(): List<CommunityNotification> = (0 until length()).mapNotNull { index ->
+		val json = optJSONObject(index) ?: return@mapNotNull null
+		val commentId = json.optString("comment_id").toLongOrNull() ?: return@mapNotNull null
+		val workId = json.optString("work_id").toLongOrNull() ?: return@mapNotNull null
+		CommunityNotification(
+			commentId = commentId,
+			workId = workId,
+			chapterId = json.optString("chapter_id").toLongOrNull(),
+			parentId = json.optString("parent_id").toLongOrNull(),
+			author = json.optString("author"),
+			preview = json.optString("preview"),
+			createdAt = json.optString("created_at"),
+		)
+	}
+
+	private fun JSONObject.toIntMap(): Map<String, Int> = keys().asSequence().associateWith { optInt(it) }
 
 	private fun JSONArray.toScores(): List<CommunitySourceScore> = (0 until length()).mapNotNull { item ->
 		val json = optJSONObject(item) ?: return@mapNotNull null
@@ -374,6 +499,7 @@ class CommunityRepository @Inject constructor(
 		private const val KEY_WORK_PREFIX = "work_"
 		private const val KEY_TELEMETRY_PENDING = "telemetry_pending"
 		private const val KEY_TELEMETRY_SENT_AT = "telemetry_sent_at"
+		private const val KEY_NOTIFICATION_CURSOR = "notification_cursor"
 		private const val SECRET_BYTES = 32
 		private const val SCORE_CACHE_MS = 24 * 60 * 60 * 1000L
 		private const val TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000L

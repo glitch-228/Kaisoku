@@ -16,14 +16,38 @@ data class CommunityRating(
 
 data class CommunityComment(
 	val id: Long,
+	val workId: Long = 0L,
+	val chapterId: Long? = null,
+	val parentId: Long? = null,
+	val depth: Int = 0,
 	val author: String,
 	val body: String,
 	val createdAt: String,
 	val score: Double,
+	val up: Int = 0,
+	val down: Int = 0,
 	val myVote: Int,
 	val isMine: Boolean,
 	val isSpoiler: Boolean,
+	val lang: String? = null,
 	val deleted: Boolean,
+)
+
+data class CommunityCommentPage(
+	val comments: List<CommunityComment>,
+	val total: Int,
+	val byLanguage: Map<String, Int> = emptyMap(),
+	val minimumLength: Int = 20,
+)
+
+data class CommunityNotification(
+	val commentId: Long,
+	val workId: Long,
+	val chapterId: Long?,
+	val parentId: Long?,
+	val author: String,
+	val preview: String,
+	val createdAt: String,
 )
 
 data class CommunitySourceScore(

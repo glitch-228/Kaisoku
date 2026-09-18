@@ -1344,4 +1344,24 @@
 	<string name="community_rating_saved">Rating saved</string>
 	<string name="community_comment_posted">Comment posted</string>
 	<string name="community_load_failed">Could not load community data: %1$s</string>
+	<string name="community_spoiler">Contains spoilers</string>
+	<string name="community_comment_too_short">Comments must contain at least %1$d characters</string>
+	<string name="community_deleted_comment">[deleted comment]</string>
+	<string name="community_like">Like</string>
+	<string name="community_dislike">Dislike</string>
+	<string name="community_reply">Reply</string>
+	<string name="community_edit">Edit</string>
+	<string name="community_delete_comment">Delete comment</string>
+	<string name="community_delete_comment_confirm">Delete this comment? Replies will remain visible.</string>
+	<string name="community_notifications">Reply notifications</string>
+	<string name="community_notifications_summary">Check for replies to your comments</string>
+	<string name="community_no_notifications">No new replies</string>
+	<string name="community_export">Export my community data</string>
+	<string name="community_export_summary">Share a copy of your comments, ratings and votes</string>
+	<string name="community_export_title">Community data</string>
+	<string name="community_export_failed">Could not export community data: %1$s</string>
+	<string name="community_nickname">Nickname</string>
+	<string name="community_nickname_summary">Choose the name shown beside your comments</string>
+	<string name="community_nickname_hint">Nickname</string>
+	<string name="community_nickname_saved">Nickname saved</string>
 </resources>
