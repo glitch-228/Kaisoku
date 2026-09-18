@@ -2,6 +2,7 @@ package org.koitharu.kotatsu.details.ui
 
 import android.app.assist.AssistContent
 import android.content.Context
+import android.content.Intent
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
@@ -15,6 +16,7 @@ import android.view.ViewTreeObserver
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.core.text.buildSpannedString
 import androidx.core.text.inSpans
 import android.text.format.DateFormat
@@ -49,15 +51,22 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.bookmarks.domain.Bookmark
+import org.koitharu.kotatsu.community.data.CommunityRepository
+import org.koitharu.kotatsu.community.ui.CommunityActivity
 import org.koitharu.kotatsu.core.image.CoilMemoryCacheKey
 import org.koitharu.kotatsu.core.model.FavouriteCategory
 import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.UnknownMangaSource
+import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
 import org.koitharu.kotatsu.core.model.getSummary
 import org.koitharu.kotatsu.core.model.getTitle
 import org.koitharu.kotatsu.core.model.titleResId
+import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.nav.ReaderIntent
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.os.AppShortcutManager
@@ -82,6 +91,7 @@ import org.koitharu.kotatsu.core.util.ext.drawableStart
 import org.koitharu.kotatsu.core.util.ext.end
 import org.koitharu.kotatsu.core.util.ext.enqueueWith
 import org.koitharu.kotatsu.core.util.ext.getQuantityStringSafe
+import org.koitharu.kotatsu.core.util.ext.getDisplayMessage
 import org.koitharu.kotatsu.core.util.ext.isAnimationsEnabled
 import org.koitharu.kotatsu.core.util.ext.isTextTruncated
 import org.koitharu.kotatsu.core.util.ext.joinToStringWithLimit
@@ -142,6 +152,9 @@ class DetailsActivity :
 	@Inject
 	lateinit var settings: AppSettings
 
+	@Inject
+	lateinit var community: CommunityRepository
+
 	private val viewModel: DetailsViewModel by viewModels()
 	private lateinit var menuProvider: DetailsMenuProvider
 	private lateinit var infoBinding: LayoutDetailsTableBinding
@@ -167,6 +180,7 @@ class DetailsActivity :
 		viewBinding.buttonDescriptionMore.setOnClickListener(this)
 		viewBinding.buttonScrobblingMore.setOnClickListener(this)
 		viewBinding.buttonRelatedMore.setOnClickListener(this)
+		viewBinding.buttonCommunity?.setOnClickListener(this)
 		viewBinding.textViewDescription.addOnLayoutChangeListener(this)
 		viewBinding.swipeRefreshLayout.setOnRefreshListener(this)
 		viewBinding.textViewDescription.viewTreeObserver.addOnDrawListener(this)
@@ -294,6 +308,14 @@ class DetailsActivity :
 			R.id.button_related_more -> {
 				val manga = viewModel.getMangaOrNull() ?: return
 				router.openRelated(manga)
+			}
+
+			R.id.button_community -> {
+				val manga = viewModel.getMangaOrNull() ?: return
+				startActivity(
+					Intent(this, CommunityActivity::class.java)
+						.putExtra(AppRouter.KEY_MANGA, ParcelableManga(manga)),
+				)
 			}
 
 			R.id.textView_title -> {
@@ -563,6 +585,40 @@ class DetailsActivity :
 		}
 		title = manga.title
 		invalidateOptionsMenu()
+		bindCommunity(manga)
+	}
+
+	private fun bindCommunity(manga: Manga) {
+		if (!community.isEnabled) {
+			viewBinding.textViewCommunityTitle?.isVisible = false
+			viewBinding.textViewCommunitySummary?.isVisible = false
+			viewBinding.buttonCommunity?.isVisible = false
+			return
+		}
+		viewBinding.textViewCommunityTitle?.isVisible = true
+		viewBinding.textViewCommunitySummary?.isVisible = true
+		viewBinding.buttonCommunity?.isVisible = true
+		viewBinding.textViewCommunitySummary?.text = getString(R.string.loading_)
+		lifecycleScope.launch {
+			try {
+				val result = withContext(Dispatchers.IO) {
+					community.ensureIdentity()
+					community.getRating(manga) to community.getComments(manga)
+				}
+				val rating = result.first
+				viewBinding.textViewCommunitySummary?.text = if (rating.count > 0) {
+					getString(R.string.community_rating) + ": %.1f/5 · ".format(rating.average) +
+						getString(R.string.community_comments_count, result.second.size)
+				} else {
+					getString(R.string.community_comments_count, result.second.size)
+				}
+			} catch (error: Throwable) {
+				viewBinding.textViewCommunitySummary?.text = getString(
+					R.string.community_load_failed,
+					error.getDisplayMessage(resources),
+				)
+			}
+		}
 	}
 
 	private fun onMangaRemoved(manga: Manga) {

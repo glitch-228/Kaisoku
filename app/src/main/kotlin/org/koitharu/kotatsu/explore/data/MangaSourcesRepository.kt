@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.core.LocalizedAppContext
@@ -44,6 +45,7 @@ import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
 import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
 import org.koitharu.kotatsu.core.parser.mihon.repo.MihonPrivateExtensionStore
 import org.koitharu.kotatsu.core.prefs.AppSettings
+import org.koitharu.kotatsu.community.data.CommunityRepository
 import org.koitharu.kotatsu.core.prefs.observeAsFlow
 import org.koitharu.kotatsu.core.ui.util.ReversibleHandle
 import org.koitharu.kotatsu.core.util.ext.flattenLatest
@@ -67,6 +69,7 @@ class MangaSourcesRepository @Inject constructor(
 	private val mihonExtensionManager: MihonExtensionManager,
 	private val nsfwOverridesLoader: NsfwOverridesLoader,
 	private val lnReaderSourceManager: LnReaderSourceManager,
+	private val community: CommunityRepository,
 ) {
 
 	data class ParserSourceSnapshot(
@@ -407,6 +410,9 @@ class MangaSourcesRepository @Inject constructor(
 			filteredExternal.mapTo(list) { MangaSourceInfo(it, isEnabled = true, isPinned = true) }
 			list.addAll(enabled)
 			list
+		}
+		.mapLatest { sources ->
+			if (settings.sourcesSortOrder == SourcesSortOrder.POPULARITY) community.rankSources(sources) else sources
 		}
 
 	fun observeAll(): Flow<List<Pair<MangaSource, Boolean>>> = registryUpdates.flatMapLatest {

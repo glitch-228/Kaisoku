@@ -115,6 +115,9 @@
 			</intent-filter>
 		</activity>
 		<activity
+			android:name="org.koitharu.kotatsu.community.ui.CommunityActivity"
+			android:label="@string/community" />
+		<activity
 			android:name="org.koitharu.kotatsu.reader.ui.ReaderActivity"
 			android:exported="true">
 			<intent-filter>

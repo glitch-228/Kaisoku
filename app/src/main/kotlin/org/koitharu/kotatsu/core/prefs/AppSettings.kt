@@ -105,6 +105,14 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getBoolean(KEY_TRANSLATE_ENABLED, false)
 		set(value) = prefs.edit { putBoolean(KEY_TRANSLATE_ENABLED, value) }
 
+	var isCommunityEnabled: Boolean
+		get() = prefs.getBoolean(KEY_COMMUNITY_ENABLED, false)
+		set(value) = prefs.edit { putBoolean(KEY_COMMUNITY_ENABLED, value) }
+
+	var isCommunityTelemetryEnabled: Boolean
+		get() = prefs.getBoolean(KEY_COMMUNITY_TELEMETRY, false)
+		set(value) = prefs.edit { putBoolean(KEY_COMMUNITY_TELEMETRY, value) }
+
 	/** Whether the selected provider has everything it needs to run (Google Lens needs no key). */
 	val isPageTranslationConfigured: Boolean
 		get() = translateProvider == org.koitharu.kotatsu.reader.translate.TranslateProvider.GOOGLE_LENS ||
@@ -1131,6 +1139,8 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_TRANSLATE_RPM = "translate_rpm"
 		const val KEY_TRANSLATE_ENABLED = "translate_enabled"
 		const val KEY_TRANSLATE_CLEAR_CACHE = "translate_clear_cache"
+		const val KEY_COMMUNITY_ENABLED = "community_enabled"
+		const val KEY_COMMUNITY_TELEMETRY = "community_telemetry"
 
 		// keys for non-persistent preferences
 		const val KEY_APP_VERSION = "app_version"

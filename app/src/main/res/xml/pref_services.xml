@@ -10,6 +10,13 @@
 		android:title="@string/sync" />
 
 	<PreferenceScreen
+		android:fragment="org.koitharu.kotatsu.settings.CommunitySettingsFragment"
+		android:key="community"
+		android:summary="@string/community_summary"
+		android:title="@string/community"
+		app:allowDividerAbove="true" />
+
+	<PreferenceScreen
 		android:fragment="org.koitharu.kotatsu.settings.SuggestionsSettingsFragment"
 		android:key="suggestions"
 		android:title="@string/suggestions"

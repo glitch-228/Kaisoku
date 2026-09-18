@@ -55,7 +55,8 @@ class AppBackupAgent : BackupAgent() {
 					settings = AppSettings(applicationContext),
 					mihonExtensionManager = backupEntryPoint.mihonExtensionManager,
 					nsfwOverridesLoader = backupEntryPoint.nsfwOverridesLoader,
-					lnReaderSourceManager = backupEntryPoint.lnReaderSourceManager,
+				lnReaderSourceManager = backupEntryPoint.lnReaderSourceManager,
+				community = backupEntryPoint.communityRepository,
 				),
 				savedFiltersRepository = SavedFiltersRepository(
 					context = applicationContext,
@@ -93,6 +94,7 @@ class AppBackupAgent : BackupAgent() {
 						mihonExtensionManager = backupEntryPoint.mihonExtensionManager,
 						nsfwOverridesLoader = backupEntryPoint.nsfwOverridesLoader,
 						lnReaderSourceManager = backupEntryPoint.lnReaderSourceManager,
+						community = backupEntryPoint.communityRepository,
 					),
 					savedFiltersRepository = SavedFiltersRepository(
 						context = applicationContext,
