@@ -197,7 +197,11 @@ class CommunityRepository @Inject constructor(
 		synchronized(scoresLock) {
 			if (!force && scores.isNotEmpty() && System.currentTimeMillis() - scoresLoadedAt < SCORE_CACHE_MS) return@synchronized scores
 		}
-		val response = request("/v1/sources/scores?region=${java.util.Locale.getDefault().country}")
+		val response = runCatching {
+			request("/v1/sources/scores?region=${java.util.Locale.getDefault().country}")
+		}.getOrElse {
+			return@withContext synchronized(scoresLock) { scores }
+		}
 		val loaded = (response.optJSONArray("sources") ?: response.optJSONArray("scores")).orEmpty().toScores()
 		synchronized(scoresLock) {
 			scores = loaded.associateBy { it.source }
