@@ -22,6 +22,11 @@ class ExploreMenuProvider(
 				true
 			}
 
+			R.id.action_add_lnreader_sources -> {
+				router.openLnReaderRepos()
+				true
+			}
+
 			R.id.action_add_browser_source -> {
 				router.showAddBrowserSourceSheet()
 				true

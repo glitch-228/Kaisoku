@@ -67,7 +67,7 @@
     <string name="_import">Uvoz</string>
     <string name="delete">Izbriši</string>
     <string name="operation_not_supported">Ova operacija nije podržana</string>
-    <string name="text_file_not_supported">Odaberite ZIP ili CBZ datoteku.</string>
+    <string name="text_file_not_supported">Odaberite ZIP ili CBZ datoteku. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Bez opisa</string>
     <string name="clear_pages_cache">Očisti predmemoriju stranice</string>
     <string name="read_mode">Modus čitanja</string>
@@ -542,7 +542,7 @@
     <string name="sync_settings">Postavke sinkronizacije</string>
     <string name="nothing_here">Ovdje nema ničega</string>
     <string name="user_agent">Zaglavlje UserAgent-a</string>
-    <string name="comics_archive_import_description">Možete odabrati jednu ili više .cbz ili .zip datoteka, svaka će datoteka biti prepoznata kao zasebna manga.</string>
+    <string name="comics_archive_import_description">Možete odabrati jednu ili više .cbz ili .zip datoteka, svaka će datoteka biti prepoznata kao zasebna manga. CBR (.cbr).</string>
     <string name="show_on_shelf">Prikaži na polici</string>
     <string name="sync_auth_hint">Možete se prijaviti na postojeći račun ili stvoriti novi</string>
     <string name="text_downloads_list_holder">Nemate preuzimanja</string>

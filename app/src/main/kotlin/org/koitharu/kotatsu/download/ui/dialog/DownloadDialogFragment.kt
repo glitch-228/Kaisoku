@@ -108,10 +108,14 @@ class DownloadDialogFragment : AlertDialogFragment<DialogDownloadBinding>(), Vie
 				showMoreOptions(binding.textViewMore.isChecked)
 			}
 
-			R.id.button -> when (v.parentView?.id ?: return) {
-				R.id.option_whole_branch -> showBranchSelection(v)
-				R.id.option_first_chapters -> showFirstChaptersCountSelection(v)
-				R.id.option_unread_chapters -> showUnreadChaptersCountSelection(v)
+			R.id.button -> {
+				val parentId = v.parentView?.id ?: return
+				setCheckedOption(parentId)
+				when (parentId) {
+					R.id.option_whole_branch -> showBranchSelection(v)
+					R.id.option_first_chapters -> showFirstChaptersCountSelection(v)
+					R.id.option_unread_chapters -> showUnreadChaptersCountSelection(v)
+				}
 			}
 
 			else -> if (v is TwoLinesItemView) {

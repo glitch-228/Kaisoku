@@ -68,6 +68,7 @@ class PreviewFragment : BaseFragment<FragmentPreviewBinding>(), View.OnClickList
 				url = manga.largeCoverUrl.ifNullOrEmpty { manga.coverUrl } ?: return,
 				source = manga.source,
 				anchor = v,
+				manga = manga,
 			)
 		}
 	}

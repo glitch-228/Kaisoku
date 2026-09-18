@@ -8,6 +8,7 @@ data class SourcesCatalogFilter(
 	val isNewOnly: Boolean,
 	val mihonMode: SourceCatalogFilterMode,
 	val pluginMode: SourceCatalogFilterMode,
+	val novelMode: SourceCatalogFilterMode = SourceCatalogFilterMode.NONE,
 )
 
 enum class SourceCatalogFilterMode {

@@ -105,6 +105,14 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getBoolean(KEY_TRANSLATE_ENABLED, false)
 		set(value) = prefs.edit { putBoolean(KEY_TRANSLATE_ENABLED, value) }
 
+	var isCommunityEnabled: Boolean
+		get() = prefs.getBoolean(KEY_COMMUNITY_ENABLED, false)
+		set(value) = prefs.edit { putBoolean(KEY_COMMUNITY_ENABLED, value) }
+
+	var isCommunityTelemetryEnabled: Boolean
+		get() = prefs.getBoolean(KEY_COMMUNITY_TELEMETRY, false)
+		set(value) = prefs.edit { putBoolean(KEY_COMMUNITY_TELEMETRY, value) }
+
 	/** Whether the selected provider has everything it needs to run (Google Lens needs no key). */
 	val isPageTranslationConfigured: Boolean
 		get() = translateProvider == org.koitharu.kotatsu.reader.translate.TranslateProvider.GOOGLE_LENS ||
@@ -168,6 +176,26 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 
 	val isQuickFilterEnabled: Boolean
 		get() = prefs.getBoolean(KEY_QUICK_FILTER, true)
+
+	var isListCheckpointEnabled: Boolean
+		get() = prefs.getBoolean(KEY_LIST_CHECKPOINT, true)
+		set(value) = prefs.edit { putBoolean(KEY_LIST_CHECKPOINT, value) }
+
+	/** Opaque record of where the user was in the list identified by [scope]. */
+	fun getListCheckpoint(scope: String): String? {
+		val key = KEY_LIST_CHECKPOINT + '_' + scope
+		return try {
+			prefs.getString(key, null)
+		} catch (e: ClassCastException) {
+			// An earlier build stored a bare manga id under this key - drop it and start over.
+			prefs.edit { remove(key) }
+			null
+		}
+	}
+
+	fun setListCheckpoint(scope: String, value: String) {
+		prefs.edit { putString(KEY_LIST_CHECKPOINT + '_' + scope, value) }
+	}
 
 	val isDescriptionExpanded: Boolean
 		get() = !prefs.getBoolean(KEY_COLLAPSE_DESCRIPTION, true)
@@ -242,6 +270,21 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	var isReaderUpscaleEnabled: Boolean
 		get() = prefs.getBoolean(KEY_READER_UPSCALE, false)
 		set(value) = prefs.edit { putBoolean(KEY_READER_UPSCALE, value) }
+
+	var readerUpscaleStrength: Int
+		get() = prefs.getInt(KEY_UPSCALE_STRENGTH, 75).coerceIn(0, 100)
+		set(value) = prefs.edit { putInt(KEY_UPSCALE_STRENGTH, value.coerceIn(0, 100)) }
+
+	var readerUpscalePasses: Int
+		get() = prefs.getInt(KEY_UPSCALE_PASSES, 0).coerceIn(0, 4)
+		set(value) = prefs.edit { putInt(KEY_UPSCALE_PASSES, value.coerceIn(0, 4)) }
+
+	var readerUpscaleThreshold: Float
+		get() = prefs.getFloat(KEY_UPSCALE_THRESHOLD, 1.5f).takeIf { it in setOf(1f, 1.5f, 2f, 3f) } ?: 1.5f
+		set(value) = prefs.edit { putFloat(KEY_UPSCALE_THRESHOLD, value) }
+
+	val readerUpscaleConfig: org.koitharu.kotatsu.reader.domain.UpscaleConfig
+		get() = org.koitharu.kotatsu.reader.domain.UpscaleConfig(readerUpscaleStrength, readerUpscalePasses, readerUpscaleThreshold)
 
 	val isEInkFlashEnabled: Boolean
 		get() = prefs.getBoolean(KEY_EINK_FLASH, false)
@@ -891,6 +934,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_ADBLOCK = "adblock"
 		const val KEY_LIST_MODE = "list_mode_2"
 		const val KEY_LIST_MODE_HISTORY = "list_mode_history"
+		const val KEY_LIST_CHECKPOINT = "list_checkpoint"
 		const val KEY_LIST_MODE_FAVORITES = "list_mode_favorites"
 		const val KEY_LIST_MODE_SUGGESTIONS = "list_mode_suggestions"
 		const val KEY_THEME = "theme"
@@ -995,6 +1039,9 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_SHORTCUTS = "dynamic_shortcuts"
 		const val KEY_READER_TAP_ACTIONS = "reader_tap_actions"
 		const val KEY_READER_OPTIMIZE = "reader_optimize"
+		const val KEY_UPSCALE_STRENGTH = "reader_upscale_strength"
+		const val KEY_UPSCALE_PASSES = "reader_upscale_passes"
+		const val KEY_UPSCALE_THRESHOLD = "reader_upscale_threshold"
 		const val KEY_READER_UPSCALE = "reader_upscale"
 		const val KEY_EINK_FLASH = "eink_flash"
 		const val KEY_EINK_FLASH_DURATION = "eink_flash_duration"
@@ -1092,6 +1139,8 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_TRANSLATE_RPM = "translate_rpm"
 		const val KEY_TRANSLATE_ENABLED = "translate_enabled"
 		const val KEY_TRANSLATE_CLEAR_CACHE = "translate_clear_cache"
+		const val KEY_COMMUNITY_ENABLED = "community_enabled"
+		const val KEY_COMMUNITY_TELEMETRY = "community_telemetry"
 
 		// keys for non-persistent preferences
 		const val KEY_APP_VERSION = "app_version"
@@ -1103,7 +1152,8 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_LINK_MANUAL = "about_help"
 		const val KEY_DONATION_TON = "donation_ton"
 		const val KEY_DONATION_ETH = "donation_eth"
-		const val KEY_DONATION_XMR = "donation_xmr"
+		const val KEY_DONATION_SOL = "donation_sol"
+		const val KEY_DONATION_BTC = "donation_btc"
 		const val KEY_PROXY_TEST = "proxy_test"
 		const val KEY_OPEN_BROWSER = "open_browser"
 		const val KEY_HANDLE_LINKS = "handle_links"

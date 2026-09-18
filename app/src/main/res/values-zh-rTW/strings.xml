@@ -57,7 +57,7 @@
     <string name="exclude_nsfw_from_history_summary">標記為 NSFW 的漫畫將永遠不會被加入到歷史資料中，您的進度也不會被儲存</string>
     <string name="backup_information">您可以建立您的歷史紀錄與最愛的備份，並還原它</string>
     <string name="crash_text">發生了一些問題。請向開發人員提交一個錯誤告告，以幫助我們修復它。</string>
-    <string name="text_file_not_supported">選擇 ZIP 或 CBZ 檔案。</string>
+    <string name="text_file_not_supported">選擇 ZIP 或 CBZ 檔案。 (CBZ / ZIP / CBR)</string>
     <string name="no_bookmarks_summary">您可以在閱讀漫畫時建立書籤</string>
     <string name="show_notification_new_chapters_on">您將會收到您正在閱讀的漫畫的更新通知</string>
     <string name="tracker_warning">一些裝置有不同的系統行為，這可能會破壞背景任務。</string>
@@ -198,7 +198,7 @@
     <string name="sources_reorder_tip">點擊並按住一個項目以重新排序它們</string>
     <string name="speed">速度</string>
     <string name="show_on_shelf">在書架上顯示</string>
-    <string name="comics_archive_import_description">您可以選擇一個或多個 .cbz 或 .zip 檔案，每個檔案將被認定為個別的漫畫。</string>
+    <string name="comics_archive_import_description">您可以選擇一個或多個 .cbz 或 .zip 檔案，每個檔案將被認定為個別的漫畫。 CBR (.cbr).</string>
     <string name="folder_with_images_import_description">您可以選擇一個圖片資料夾或壓縮檔。每個壓縮檔 (或子目錄) 將被認定為個別的章節。</string>
     <string name="find_similar">尋找相似</string>
     <string name="server_address">伺服器位址</string>

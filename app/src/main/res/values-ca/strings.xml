@@ -53,7 +53,7 @@
     <string name="_import">Importar</string>
     <string name="delete">Suprimir</string>
     <string name="operation_not_supported">Aquesta operació no està suportada</string>
-    <string name="text_file_not_supported">Trieu un fitxer ZIP o bé un CBZ.</string>
+    <string name="text_file_not_supported">Trieu un fitxer ZIP o bé un CBZ. (CBZ / ZIP / CBR)</string>
     <string name="webtoon">Webtoon</string>
     <string name="read_mode">Mode de lectura</string>
     <string name="grid_size">Mida de la quadrícula</string>

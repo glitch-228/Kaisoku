@@ -55,6 +55,12 @@
             android:summary="@string/show_quick_filters_summary"
             android:title="@string/show_quick_filters" />
 
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="list_checkpoint"
+            android:summary="@string/list_checkpoint_settings_summary"
+            android:title="@string/list_checkpoint_settings" />
+
         <ListPreference
             android:entries="@array/progress_indicators"
             android:key="progress_indicators"

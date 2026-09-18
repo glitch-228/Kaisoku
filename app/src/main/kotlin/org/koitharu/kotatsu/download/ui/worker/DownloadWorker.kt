@@ -214,6 +214,7 @@ class DownloadWorker @AssistedInject constructor(
 				)
 				val coverUrl = mangaDetails.largeCoverUrl.ifNullOrEmpty { mangaDetails.coverUrl }
 				if (!coverUrl.isNullOrEmpty()) {
+					runCatchingCancellable {
 					downloadFile(
 						url = coverUrl,
 						destination = destination,
@@ -225,6 +226,7 @@ class DownloadWorker @AssistedInject constructor(
 						output.addCover(file, getMediaType(coverUrl, file))
 						file.deleteAwait()
 					}
+					}.onFailure(Throwable::printStackTraceDebug)
 				}
 				val chapters = getChapters(mangaDetails, task)
 				for ((chapterIndex, chapter) in chapters.withIndex()) {
@@ -234,7 +236,35 @@ class DownloadWorker @AssistedInject constructor(
 						continue
 					}
 					val pages = runFailsafe {
+						if (repo is org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaRepository) {
+							val images = mutableListOf<Pair<File, MimeType>>()
+							val html = org.koitharu.kotatsu.local.data.NovelChapterArchive.prepare(
+								repo.getChapterHtml(chapter.value),
+							) { url, number ->
+								val file = downloadFile(url, destination, repo.source, tempFiles, repo,
+									MangaPage(number.toLong(), url, null, repo.source))
+								val type = getMediaType(url, file)
+								if (type?.isImage != true) throw IOException("Invalid novel image: $url")
+								images += file to type
+							}
+							if (html.isBlank()) throw IOException("Chapter returned no text: ${chapter.value.title}")
+							val file = destination.createTempFile("html").also { tempFiles += it }
+							withContext(Dispatchers.IO) { file.writeText(html) }
+							for ((index, image) in images.withIndex()) {
+								output.addPage(chapter, image.first, index + 1, image.second)
+								image.first.deleteAwait()
+							}
+							output.addPage(chapter, file, 0, "text/html".toMimeTypeOrNull())
+							file.deleteAwait()
+							publishState(currentState.copy(
+								totalChapters = chapters.size, currentChapter = chapterIndex,
+								totalPages = 1, currentPage = 0, isIndeterminate = false,
+							))
+							// The text and image entries are already stored; no image pages remain to fetch.
+							emptyList()
+						} else {
 						repo.getPages(chapter.value)
+						}
 					} ?: continue
 					val pageCounter = AtomicInteger(0)
 					val successfulPages = AtomicInteger(0)
@@ -412,6 +442,19 @@ class DownloadWorker @AssistedInject constructor(
 		repository: org.koitharu.kotatsu.core.parser.MangaRepository? = null,
 		page: MangaPage? = null,
 	): File {
+		if (url.startsWith("data:image/", ignoreCase = true)) {
+			val metadata = url.substringBefore(',')
+			if (!metadata.endsWith(";base64", ignoreCase = true)) throw IOException("Unsupported inline image encoding")
+			val bytes = try {
+				java.util.Base64.getMimeDecoder().decode(url.substringAfter(','))
+			} catch (e: IllegalArgumentException) {
+				throw IOException("Invalid inline image", e)
+			}
+			return destination.createTempFile("tmp").also { file ->
+				tempFiles += file
+				withContext(Dispatchers.IO) { file.writeBytes(bytes) }
+			}
+		}
 		if (url.startsWith("content:", ignoreCase = true) || url.startsWith("file:", ignoreCase = true)) {
 			val uri = url.toUri()
 			val cr = applicationContext.contentResolver

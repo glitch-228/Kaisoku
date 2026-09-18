@@ -108,7 +108,7 @@
     <string name="protect_application_summary">Kaisoku सुरु गर्दा पासवर्ड माग्नुहोस्</string>
     <string name="repeat_password">पासवर्ड दोहोर्याउनुहोस्</string>
     <string name="delete">हटाउनुहोस्</string>
-    <string name="text_file_not_supported">या त ZIP वा CBZ फाइल छान्नुहोस्।</string>
+    <string name="text_file_not_supported">या त ZIP वा CBZ फाइल छान्नुहोस्। (CBZ / ZIP / CBR)</string>
     <string name="text_file_sizes">B|kB|MB|GB|TB</string>
     <string name="notifications">सूचनाहरू</string>
     <string name="enabled_d_of_d" tools:ignore="PluralsCandidate">%2$d को %1$d अन</string>

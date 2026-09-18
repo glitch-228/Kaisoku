@@ -6,6 +6,13 @@ import org.junit.Test
 
 class ReaderProgressTest {
 
+	@Test fun reported313ChapterCompletionAndOtherCountsStayExactlyComplete() {
+		for (count in 1..2000) {
+			assertEquals("Chapter count $count", 1f, calculateReaderPercent(count - 1, count, 29, 30), 0f)
+		}
+		assertTrue(calculateReaderPercent(312, 313, 28, 30) < 1f)
+	}
+
 	@Test
 	fun finalPageOfFinalChapterIsExactlyComplete() {
 		assertEquals(

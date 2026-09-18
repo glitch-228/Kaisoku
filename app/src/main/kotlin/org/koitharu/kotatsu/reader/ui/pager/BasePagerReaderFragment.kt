@@ -118,12 +118,12 @@ abstract class BasePagerReaderFragment : BaseReaderFragment<FragmentReaderPagerB
 
 	override suspend fun onPagesChanged(pages: List<ReaderPage>, pendingState: ReaderState?) = coroutineScope {
 		val items = launch {
-			requireAdapter().setItems(pages)
+			requireAdapter().setItems(adapterPages(pages))
 			yield()
 			pagerLifecycleDispatcher?.postInvalidate()
 		}
 		if (pendingState != null) {
-			val position = pages.indexOfFirst {
+			val position = adapterPages(pages).indexOfFirst {
 				it.chapterId == pendingState.chapterId && it.index == pendingState.page
 			}
 			items.join()

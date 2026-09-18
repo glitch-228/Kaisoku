@@ -13,6 +13,7 @@ import coil3.target.Target
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.exceptions.resolve.CaptchaHandler.Companion.suppressCaptchaErrors
 import org.koitharu.kotatsu.core.image.CoilImageView
+import org.koitharu.kotatsu.core.model.getTitle
 import org.koitharu.kotatsu.core.parser.favicon.faviconUri
 import org.koitharu.kotatsu.core.util.ext.faviconCacheOnly
 import org.koitharu.kotatsu.core.util.ext.isAnimationsEnabled
@@ -50,9 +51,10 @@ class FaviconView @JvmOverloads constructor(
 		get() = context.applicationContext
 
 	fun setImageAsync(mangaSource: MangaSource, cacheOnly: Boolean = false): Disposable {
-		val fallbackImage: Image = FaviconDrawable(context, iconStyle, mangaSource.name).asImage()
+		val sourceTitle = mangaSource.getTitle(context)
+		val fallbackImage: Image = FaviconDrawable(context, iconStyle, sourceTitle).asImage()
 		val placeholderImage: Image = if (context.isAnimationsEnabled) {
-			AnimatedFaviconDrawable(context, iconStyle, mangaSource.name).asImage()
+			AnimatedFaviconDrawable(context, iconStyle, sourceTitle).asImage()
 		} else {
 			fallbackImage
 		}

@@ -54,7 +54,7 @@
     <string name="share_image">Compartilhar imagem</string>
     <string name="_import">Importar</string>
     <string name="delete">Deletar</string>
-    <string name="text_file_not_supported">Escolha um arquivo ZIP ou CBZ.</string>
+    <string name="text_file_not_supported">Escolha um arquivo ZIP ou CBZ. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Sem descrição</string>
     <string name="clear_pages_cache">Limpar cache da página</string>
     <string name="text_file_sizes">B|kB|MB|GB|TB</string>
@@ -355,7 +355,7 @@
     <string name="clear_new_chapters_counters">Também limpe as informações sobre novos capítulos</string>
     <string name="sync_auth_hint">Você pode entrar em uma conta existente ou criar uma nova</string>
     <string name="allow_unstable_updates_summary">Receber notificações sobre versões beta</string>
-    <string name="comics_archive_import_description">Você pode selecionar um ou mais arquivos .cbz ou .zip; cada arquivo será reconhecido como uma obra separada.</string>
+    <string name="comics_archive_import_description">Você pode selecionar um ou mais arquivos .cbz ou .zip; cada arquivo será reconhecido como uma obra separada. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Você pode selecionar um diretório com arquivos ou imagens. Cada arquivo (ou subdiretório) será reconhecido como um capítulo.</string>
     <string name="speed">Velocidade</string>
     <string name="show_on_shelf">Mostrar na Prateleira</string>

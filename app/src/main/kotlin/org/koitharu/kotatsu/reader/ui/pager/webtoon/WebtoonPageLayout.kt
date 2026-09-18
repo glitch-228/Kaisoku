@@ -42,6 +42,19 @@ internal fun calculateScaledPageHeight(
 		.toInt()
 }
 
+internal fun calculateScaledPageScrollRange(
+	sourceWidth: Int,
+	sourceHeight: Int,
+	targetWidth: Int,
+	viewHeight: Int,
+): Int {
+	if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || viewHeight <= 0) return 0
+	// Use exactly the same pixel rounding as onMeasure. Rounding up here leaves a phantom
+	// scroll pixel on short images, preventing the existing absolute-bottom completion path.
+	val totalHeight = calculateScaledPageHeight(sourceWidth, sourceHeight, targetWidth, Int.MAX_VALUE)
+	return (totalHeight - viewHeight).coerceAtLeast(0)
+}
+
 internal fun calculateUnresolvedPageHeight(
 	viewportHeight: Int,
 	compactHeight: Int,

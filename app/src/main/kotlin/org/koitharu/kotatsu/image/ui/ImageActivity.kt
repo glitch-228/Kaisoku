@@ -29,6 +29,7 @@ import org.koitharu.kotatsu.core.exceptions.resolve.SnackbarErrorObserver
 import org.koitharu.kotatsu.core.image.CoilImageView
 import org.koitharu.kotatsu.core.image.CoilMemoryCacheKey
 import org.koitharu.kotatsu.core.model.MangaSource
+import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
 import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.ui.BaseActivity
 import org.koitharu.kotatsu.core.ui.util.PopupMenuMediator
@@ -68,10 +69,12 @@ class ImageActivity : BaseActivity<ActivityImageBinding>(),
 		viewBinding.buttonBack.setOnClickListener(this)
 		viewBinding.buttonMenu.setOnClickListener(this)
 
+		val manga = intent.getParcelableExtraCompat<ParcelableManga>(AppRouter.KEY_MANGA)?.manga
 		val menuProvider = ImageMenuProvider(
 			activity = this,
 			snackbarHost = viewBinding.root,
 			viewModel = viewModel,
+			manga = manga,
 		)
 		menuMediator = PopupMenuMediator(menuProvider)
 		viewModel.isLoading.observe(this, ::onLoadingStateChanged)

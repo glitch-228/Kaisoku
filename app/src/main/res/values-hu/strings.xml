@@ -39,7 +39,7 @@
     <string name="share_image">Kép megosztása</string>
     <string name="_import">Importálás</string>
     <string name="operation_not_supported">Ez a művelet nem engedélyezett</string>
-    <string name="text_file_not_supported">Válassz ZIP vagy CBZ fájlt.</string>
+    <string name="text_file_not_supported">Válassz ZIP vagy CBZ fájlt. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Nincs leírás</string>
     <string name="local_storage">Helyi tárhely</string>
     <string name="favourites">Kedvencek</string>
@@ -385,7 +385,7 @@
     <string name="got_it">Értettem</string>
     <string name="sources_reorder_tip">Koppints és tartsd nyomva egy elemet a sorrend megváltoztatásához</string>
     <string name="user_agent">UserAgent fejléc</string>
-    <string name="comics_archive_import_description">Választhatsz egy vagy több .cbz vagy .zip fájlt, minden egyes fájlt külön manga-ként fog felismerni.</string>
+    <string name="comics_archive_import_description">Választhatsz egy vagy több .cbz vagy .zip fájlt, minden egyes fájlt külön manga-ként fog felismerni. CBR (.cbr).</string>
     <string name="speed">Sebesség</string>
     <string name="sync_auth_hint">Bejelentkezhetsz egy meglévő fiókba vagy létrehozhatsz egy újat</string>
     <string name="find_similar">Hasonló keresése</string>

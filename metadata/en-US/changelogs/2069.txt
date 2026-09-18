@@ -1,0 +1,9 @@
+- Added LNReader novel support: JS novel plugins, Explore browsing, and a dedicated text reader
+- Added a novels filter chip to the sources catalog
+- Added the broken-source replacement wizard, Google Drive sync, safe CBR imports, and a reader upscaler
+- Added recently-read tracker downloads, swipe-to-remove feed entries, and duplicate-favourite warnings
+- Added favourite covers from other sources, extension auto-update, and Mihon downloads import
+- Added a jump-back-to-last-position pill in History
+- Added new sources Ryukomik and OniSaga
+- Fixed InkStory, DragonTea, BatCave, Com-X, and TruyenQQ sources
+- Improved webtoon stability, Cloudflare detection, WebView cookies, and autoscroll restore

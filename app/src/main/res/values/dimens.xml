@@ -90,4 +90,7 @@
 	<dimen name="reader_toolbar_float_gap">12dp</dimen>
 	<dimen name="reader_toolbar_corner_radius">20dp</dimen>
 	<dimen name="reader_toolbar_float_elevation">6dp</dimen>
+
+	<!-- Ring on the selected cover thumbnail in the alternative covers carousel. -->
+	<dimen name="cover_selection_stroke">3dp</dimen>
 </resources>

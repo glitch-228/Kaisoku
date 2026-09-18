@@ -47,7 +47,7 @@
     <string name="save_page">페이지 저장</string>
     <string name="page_saved">저장됨</string>
     <string name="share_image">이미지 공유하기</string>
-    <string name="text_file_not_supported">ZIP 혹은 CBZ 파일을 선택하세요.</string>
+    <string name="text_file_not_supported">ZIP 혹은 CBZ 파일을 선택하세요. (CBZ / ZIP / CBR)</string>
     <string name="delete_manga">만화 제거</string>
     <string name="nothing_found">결과 없음</string>
     <string name="add_to_favourites">즐겨찾기 추가</string>

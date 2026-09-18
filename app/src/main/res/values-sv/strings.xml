@@ -2,7 +2,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="light">Ljust</string>
     <string name="pages">Sidor</string>
-    <string name="text_file_not_supported">Välj en ZIP- eller CBZ-fil.</string>
+    <string name="text_file_not_supported">Välj en ZIP- eller CBZ-fil. (CBZ / ZIP / CBR)</string>
     <string name="local_storage">Lokal lagring</string>
     <string name="favourites">Favoriter</string>
     <string name="history">Historik</string>
@@ -352,7 +352,7 @@
     <string name="nothing_here">Det finns inget här</string>
     <string name="services">Tjänster</string>
     <string name="allow_unstable_updates">Tillåt instabila uppdateringar</string>
-    <string name="comics_archive_import_description">Du kan välja en eller flera .cbz- eller .zip-filer. Varje fil kommer läsas in som separata manga.</string>
+    <string name="comics_archive_import_description">Du kan välja en eller flera .cbz- eller .zip-filer. Varje fil kommer läsas in som separata manga. CBR (.cbr).</string>
     <string name="prefetch_content">Innehållsnedladdning på förhand</string>
     <string name="scrobbling_empty_hint">För att spåra ditt läsförlopp, tryck på Meny → Spårning på mangans informationsskärm.</string>
     <string name="ignore_ssl_errors">Ignorera SSL-fel</string>

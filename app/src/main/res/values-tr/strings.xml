@@ -57,7 +57,7 @@
     <string name="remove_category">Kaldır</string>
     <string name="delete">Sil</string>
     <string name="chapter_d_of_d">Bölüm %1$d / %2$d</string>
-    <string name="text_file_not_supported">Bir ZIP veya CBZ dosyası seçin.</string>
+    <string name="text_file_not_supported">Bir ZIP veya CBZ dosyası seçin. (CBZ / ZIP / CBR)</string>
     <string name="read_mode">Okuma modu</string>
     <string name="grid_size">Izgara boyutu</string>
     <string name="webtoon">Webtoon</string>
@@ -372,7 +372,7 @@
     <string name="downloads_wifi_only">Sadece Wi-Fi ile indir</string>
     <string name="got_it">Anladım</string>
     <string name="sources_reorder_tip">Yeniden sıralamak için bir öğeye dokunun ve basılı tutun</string>
-    <string name="comics_archive_import_description">Bir veya daha fazla .cbz veya .zip dosyası seçebilirsiniz, her dosya ayrı bir manga olarak tanınacaktır.</string>
+    <string name="comics_archive_import_description">Bir veya daha fazla .cbz veya .zip dosyası seçebilirsiniz, her dosya ayrı bir manga olarak tanınacaktır. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Arşivler veya resimler içeren bir konum seçebilirsiniz. Her arşiv (veya alt konum) bir bölüm olarak tanınacaktır.</string>
     <string name="speed">Hız</string>
     <string name="show_on_shelf">Rafta Göster</string>

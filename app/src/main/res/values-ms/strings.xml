@@ -53,7 +53,7 @@
     <string name="save_page">Simpan muka surat</string>
     <string name="share_image">Kongsi imej</string>
     <string name="_import">Import</string>
-    <string name="text_file_not_supported">Pilih antara fail ZIP atau CBZ.</string>
+    <string name="text_file_not_supported">Pilih antara fail ZIP atau CBZ. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Tiada huraian</string>
     <string name="clear_pages_cache">Kosongkan cache muka surat</string>
     <string name="standard">Standard</string>
@@ -367,7 +367,7 @@
     <string name="sources_reorder_tip">Ketik dan tahan item untuk menyusun semula mereka</string>
     <string name="user_agent">Pengepala useragent</string>
     <string name="settings_apply_restart_required">Sila mulakan semula permohonan untuk menerapkan perubahan ini</string>
-    <string name="comics_archive_import_description">Anda boleh memilih satu atau lebih fail .cbz atau .zip, setiap fail akan diiktiraf sebagai manga yang berasingan.</string>
+    <string name="comics_archive_import_description">Anda boleh memilih satu atau lebih fail .cbz atau .zip, setiap fail akan diiktiraf sebagai manga yang berasingan. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Anda boleh memilih direktori dengan arkib atau imej. Setiap arkib (atau subdirektori) akan diiktiraf sebagai bab.</string>
     <string name="speed">Kelajuan</string>
     <string name="show_on_shelf">Tunjukkan di rak</string>

@@ -206,7 +206,7 @@
     <string name="logged_in_as">به عنوان %s وارد اکانت شدید</string>
     <string name="nsfw">18+</string>
     <string name="operation_not_supported">این عملیات پشتیبانی نمی شود</string>
-    <string name="text_file_not_supported">لطفا یک فایل با فرمت ZIP یا CBZ انتخاب کنید.</string>
+    <string name="text_file_not_supported">لطفا یک فایل با فرمت ZIP یا CBZ انتخاب کنید. (CBZ / ZIP / CBR)</string>
     <string name="tracker_warning">بعضی از دستگاه ها دارای رفتار سیستمی متفاوت می باشند، که ممکن است برخی از پروسه های پس زمینه را مختل کنند.</string>
     <string name="onboard_text">زبان های مانگاهایی که میخواهید بخوانید را وارد کنید. میتوانید در بخش تنظیمات، آنها را بعدا تغییر دهید.</string>
     <string name="chapters_empty">این مانگا هیچ چپتری ندارد</string>
@@ -370,7 +370,7 @@
     <string name="sources_reorder_tip">برای مرتب‌سازی مجدد آیتم‌ها، روی آنها ضربه بزنید و نگه دارید</string>
     <string name="user_agent">هدر UserAgent</string>
     <string name="settings_apply_restart_required">لطفا برای اعمال این تغییرات، برنامه را مجددا راه اندازی کنید</string>
-    <string name="comics_archive_import_description">میتونی یک یا چند فایل .cbz یا .zip رو انتخاب کنی، هر فایل به صورت یک مانگای مجزا شناخته میشه.</string>
+    <string name="comics_archive_import_description">میتونی یک یا چند فایل .cbz یا .zip رو انتخاب کنی، هر فایل به صورت یک مانگای مجزا شناخته میشه. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">میتونی یک پوشه حاوی آرشیو ها یا تصاویر انتخاب کنی. هر آرشیو (یا زیرشاخه) به عنوان یک فصل شناخته میشن.</string>
     <string name="speed">سرعت</string>
     <string name="show_on_shelf">نمایش در ققسه</string>

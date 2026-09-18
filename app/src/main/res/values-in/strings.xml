@@ -49,7 +49,7 @@
     <string name="clear_history">Hapus riwayat</string>
     <string name="delete">Hapus</string>
     <string name="operation_not_supported">Tindakan ini tidak didukung</string>
-    <string name="text_file_not_supported">Pilih antara berkas ZIP atau CBZ.</string>
+    <string name="text_file_not_supported">Pilih antara berkas ZIP atau CBZ. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Tidak ada deskripsi</string>
     <string name="_s_deleted_from_local_storage">\"%s\" dihapus dari penyimpanan</string>
     <string name="save_page">Simpan halaman</string>
@@ -359,7 +359,7 @@
     <string name="network_unavailable">Jaringan tidak tersedia</string>
     <string name="got_it">Oke</string>
     <string name="sources_reorder_tip">Ketuk dan tahan item untuk menyusun ulang</string>
-    <string name="comics_archive_import_description">Anda dapat memilih satu atau beberapa berkas .cbz atau .zip, setiap file akan dikenali sebagai manga terpisah.</string>
+    <string name="comics_archive_import_description">Anda dapat memilih satu atau beberapa berkas .cbz atau .zip, setiap file akan dikenali sebagai manga terpisah. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Anda dapat memilih direktori yang berisi arsip atau gambar. Setiap arsip (atau subdirektori) akan dikenali sebagai sebuah bab.</string>
     <string name="speed">Kecepatan</string>
     <string name="show_on_shelf">Tampilkan di Rak</string>

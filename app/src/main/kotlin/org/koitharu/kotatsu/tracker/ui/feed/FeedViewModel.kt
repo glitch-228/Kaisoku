@@ -40,9 +40,11 @@ import org.koitharu.kotatsu.tracker.ui.feed.model.FeedItem
 import org.koitharu.kotatsu.tracker.ui.feed.model.UpdatedMangaHeader
 import org.koitharu.kotatsu.tracker.work.TrackWorker
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
 private const val PAGE_SIZE = 20
+private const val AUTO_UPDATE_DEBOUNCE_MS = 15 * 60 * 1000L
 
 @HiltViewModel
 class FeedViewModel @Inject constructor(
@@ -55,6 +57,7 @@ class FeedViewModel @Inject constructor(
 
 	private val limit = MutableStateFlow(PAGE_SIZE)
 	private val isReady = AtomicBoolean(false)
+	private val lastAutoUpdateTime = AtomicLong(0L)
 
 	val isRunning = scheduler.observeIsRunning()
 		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Lazily, false)
@@ -125,7 +128,17 @@ class FeedViewModel @Inject constructor(
 	}
 
 	fun update() {
+		lastAutoUpdateTime.set(System.currentTimeMillis())
 		scheduler.startNow()
+	}
+
+	/** Refresh the feed when it comes to the foreground, while avoiding repeated network checks. */
+	fun updateIfNeeded() {
+		val now = System.currentTimeMillis()
+		val last = lastAutoUpdateTime.get()
+		if (now - last >= AUTO_UPDATE_DEBOUNCE_MS) {
+			update()
+		}
 	}
 
 	fun setHeaderEnabled(value: Boolean) {
@@ -135,6 +148,17 @@ class FeedViewModel @Inject constructor(
 	fun onItemClick(item: FeedItem) {
 		launchJob(Dispatchers.Default, CoroutineStart.ATOMIC) {
 			repository.markAsRead(item.id)
+		}
+	}
+
+	fun removeItem(item: FeedItem) {
+		launchJob(Dispatchers.Default) {
+			val removed = repository.removeLog(item.id) ?: return@launchJob
+			onActionDone.call(
+				ReversibleAction(R.string.update_removed) {
+					repository.restoreLog(removed)
+				},
+			)
 		}
 	}
 

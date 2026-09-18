@@ -200,6 +200,7 @@
 	<string-array name="tracker_download_strategies" translatable="false">
 		<item>@string/never</item>
 		<item>@string/manga_with_downloaded_chapters</item>
+		<item>@string/recently_read_manga</item>
 	</string-array>
 	<string-array name="metered_network_options" translatable="false">
 		<item>@string/allow_always</item>

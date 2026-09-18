@@ -143,7 +143,7 @@
     <string name="text_file_sizes">B|kB|MB|GB|TB</string>
     <string name="clear_pages_cache">Seitencache löschen</string>
     <string name="no_description">Keine Beschreibung</string>
-    <string name="text_file_not_supported">Wähle entweder eine ZIP- oder CBZ-Datei.</string>
+    <string name="text_file_not_supported">Wähle entweder eine ZIP- oder CBZ-Datei. (CBZ / ZIP / CBR)</string>
     <string name="operation_not_supported">Dieser Vorgang wird nicht unterstützt</string>
     <string name="delete">Löschen</string>
     <string name="_import">Importieren</string>
@@ -352,7 +352,7 @@
     <string name="got_it">Alles klar</string>
     <string name="sources_reorder_tip">Drücke und halte eine Quelle, um diese umzusortieren</string>
     <string name="settings_apply_restart_required">Bitte starte die App neu, um die Änderungen anzuwenden</string>
-    <string name="comics_archive_import_description">Du kannst eine oder mehrere .cbz oder .zip Dateien auswählen, jede Datei wird als einzelner Manga erkannt.</string>
+    <string name="comics_archive_import_description">Du kannst eine oder mehrere .cbz oder .zip Dateien auswählen, jede Datei wird als einzelner Manga erkannt. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Du kannst einen Ordner mit Archiven oder Bildern auswählen. Jedes Archiv (oder Unterverzeichnis) wird als ein Kapitel erkannt.</string>
     <string name="speed">Geschwindigkeit</string>
     <string name="show_on_shelf">Im Regal anzeigen</string>

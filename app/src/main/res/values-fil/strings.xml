@@ -18,7 +18,7 @@
     <string name="_import">Mag-import</string>
     <string name="delete">Tanggalin</string>
     <string name="operation_not_supported">Hindi suportado ang operasyong ito</string>
-    <string name="text_file_not_supported">Pumili ng ZIP o CBZ file.</string>
+    <string name="text_file_not_supported">Pumili ng ZIP o CBZ file. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Walang paglalarawan</string>
     <string name="grid_size">Laki ng grid</string>
     <string name="search_on_s">Hanapin sa %s</string>
@@ -361,7 +361,7 @@
     <string name="sources_reorder_tip">I-tap at hawakan ang isang aytem upang muling ayusin ang mga ito</string>
     <string name="show_on_shelf">Ipakita sa Istante</string>
     <string name="speed">Bilis</string>
-    <string name="comics_archive_import_description">Maaari kang pumili ng isa o higit pang .cbz o .zip file, ang bawat file ay makikilala bilang isang hiwalay na manga.</string>
+    <string name="comics_archive_import_description">Maaari kang pumili ng isa o higit pang .cbz o .zip file, ang bawat file ay makikilala bilang isang hiwalay na manga. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Maaari kang pumili ng isang directory na may mga archive o mga larawan. Ang bawat archive (o subdirectory) ay makikilala bilang isang kabanata.</string>
     <string name="find_similar">Maghanap ng katulad</string>
     <string name="sync_auth_hint">Maaari kang mag-sign in sa isang umiiral na account o lumikha ng bago</string>

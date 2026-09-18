@@ -105,6 +105,7 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 			is Boolean -> viewModel.setNewOnly(!chip.isChecked)
 			SourcesCatalogChip.Mihon -> viewModel.cycleMihonMode()
 			SourcesCatalogChip.Plugin -> viewModel.cyclePluginMode()
+			SourcesCatalogChip.Novel -> viewModel.cycleNovelMode()
 			else -> showLocalesMenu(chip)
 		}
 	}
@@ -168,6 +169,16 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 			tint = appliedFilter.pluginMode.sourceKindTint(),
 			data = SourcesCatalogChip.Plugin,
 		)
+		chips += ChipModel(
+			title = appliedFilter.novelMode.sourceKindTitle(
+				includedTitle = getString(R.string.content_type_novel),
+				excludedTitle = getString(R.string.no_novels),
+			),
+			icon = appliedFilter.novelMode.sourceKindIcon(R.drawable.ic_book_open),
+			isChecked = appliedFilter.novelMode == SourceCatalogFilterMode.INCLUDE,
+			tint = appliedFilter.novelMode.sourceKindTint(),
+			data = SourcesCatalogChip.Novel,
+		)
 		contentTypes.mapTo(chips) { type ->
 			ChipModel(
 				title = getString(type.titleResId),
@@ -181,6 +192,7 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 	private enum class SourcesCatalogChip {
 		Mihon,
 		Plugin,
+		Novel,
 	}
 
 	private fun showLocalesMenu(anchor: View) {

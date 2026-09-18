@@ -16,6 +16,7 @@ import org.json.JSONObject
 import org.koitharu.kotatsu.core.network.BaseHttpClient
 import org.koitharu.kotatsu.core.parser.DynamicParserManager
 import org.koitharu.kotatsu.core.parser.PluginFileLoader
+import org.koitharu.kotatsu.core.parser.mihon.repo.MihonExtensionRepoRepository
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.parsers.util.await
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
@@ -28,6 +29,7 @@ import javax.inject.Singleton
 class UpdatePluginsProvider @Inject constructor(
 	@ApplicationContext private val context: Context,
 	@BaseHttpClient private val okHttpClient: OkHttpClient,
+	private val mihonRepoRepository: MihonExtensionRepoRepository,
 ) {
 	private val mutex = Mutex()
 	private val prefs by lazy {
@@ -42,30 +44,56 @@ class UpdatePluginsProvider @Inject constructor(
 				if (now - settings.lastAutoPlugins < COOLDOWN) return@withContext
 				settings.lastAutoPlugins = now
 				val installed = DynamicParserManager.getInstalledPlugins(context).toSet()
-				if (installed.isEmpty()) return@withContext
-				val meta = readAndCleanDto(installed)
-				if (meta.isEmpty()) return@withContext
-				val pluginsDir = PluginFileLoader.pluginsDir(context)
-				val results = installed.map { jarName ->
-					async {
-						val info = meta[jarName] ?: return@async null
-						val release = requestRelease(info.repository) ?: return@async null
-						if (release.tag == info.tag) return@async null
-						if (replacePlugin(release.downloadUrl, File(pluginsDir, jarName))) {
-							jarName to RemoteReleaseDto(repository = info.repository, tag = release.tag)
-						} else {
-							null
+				if (installed.isNotEmpty()) {
+					val meta = readAndCleanDto(installed)
+					if (meta.isNotEmpty()) {
+						val pluginsDir = PluginFileLoader.pluginsDir(context)
+						val results = installed.map { jarName ->
+							async {
+								val info = meta[jarName] ?: return@async null
+								val release = requestRelease(info.repository) ?: return@async null
+								if (release.tag == info.tag) return@async null
+								if (replacePlugin(release.downloadUrl, File(pluginsDir, jarName))) {
+									jarName to RemoteReleaseDto(repository = info.repository, tag = release.tag)
+								} else {
+									null
+								}
+							}
+						}.awaitAll().filterNotNull()
+						if (results.isNotEmpty()) {
+							results.forEach { (name, dto) -> meta[name] = dto }
+							writeDto(meta)
+							reloadPlugins(pluginsDir)
 						}
 					}
-				}.awaitAll().filterNotNull()
-				if (results.isNotEmpty()) {
-					results.forEach { (name, dto) -> meta[name] = dto }
-					writeDto(meta)
-					reloadPlugins(pluginsDir)
 				}
+				updateInstalledMihonExtensions()
 			}
 		} finally {
 			mutex.unlock()
+		}
+	}
+
+	/**
+	 * Auto-update also covers installed Mihon-style APK extensions: for each configured repo, fetch
+	 * its index and install any entry whose version is newer than what is already on the device.
+	 * Repos and individual extensions that fail are skipped rather than aborting the run.
+	 */
+	private suspend fun updateInstalledMihonExtensions() {
+		if (!mihonRepoRepository.getRepos().any()) {
+			return
+		}
+		mihonRepoRepository.getRepos().forEach { repo ->
+			runCatchingCancellable {
+				mihonRepoRepository.getExtensions(repo.baseUrl)
+			}.getOrNull().orEmpty()
+				.filter { it.isInstalledExternally || it.isInstalledPrivately }
+				.filter { it.hasUpdate }
+				.forEach { descriptor ->
+					runCatchingCancellable {
+						mihonRepoRepository.installExtension(descriptor.extension)
+					}
+				}
 		}
 	}
 

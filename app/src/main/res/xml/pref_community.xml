@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+	<Preference
+		android:key="community_attribution"
+		android:selectable="false"
+		android:summary="@string/community_attribution_summary"
+		android:title="@string/community_attribution_title" />
+	<SwitchPreferenceCompat
+		android:defaultValue="false"
+		android:key="community_enabled"
+		android:summary="@string/community_enabled_summary"
+		android:title="@string/community_enabled" />
+	<SwitchPreferenceCompat
+		android:defaultValue="false"
+		android:key="community_telemetry"
+		android:summary="@string/community_telemetry_summary"
+		android:title="@string/community_telemetry" />
+	<Preference
+		android:key="community_identity"
+		android:summary="@string/community_identity_summary"
+		android:title="@string/community_identity" />
+	<Preference
+		android:key="community_nickname"
+		android:summary="@string/community_nickname_summary"
+		android:title="@string/community_nickname" />
+	<Preference
+		android:key="community_recovery"
+		android:summary="@string/community_recovery_summary"
+		android:title="@string/community_recovery" />
+	<Preference
+		android:key="community_delete"
+		android:summary="@string/community_delete_summary"
+		android:title="@string/community_delete" />
+	<Preference
+		android:key="community_notifications"
+		android:summary="@string/community_notifications_summary"
+		android:title="@string/community_notifications" />
+	<Preference
+		android:key="community_export"
+		android:summary="@string/community_export_summary"
+		android:title="@string/community_export" />
+</PreferenceScreen>

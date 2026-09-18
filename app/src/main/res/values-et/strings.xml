@@ -177,7 +177,7 @@
     <string name="allow_unstable_updates_summary">Saa teateid ebastabiilsete uuenduste kohta</string>
     <string name="sync_title">Sünkroniseeri oma andmed</string>
     <string name="appwidget_shelf_description">Manga sinu lemmikutest</string>
-    <string name="comics_archive_import_description">Sa võid valida üks või veel .cbz või .zip faile, iga fail võetakse kui erinev manga.</string>
+    <string name="comics_archive_import_description">Sa võid valida üks või veel .cbz või .zip faile, iga fail võetakse kui erinev manga. CBR (.cbr).</string>
     <string name="search_history_cleared">Tühjendatud</string>
     <string name="_s_deleted_from_local_storage">\"%s\" eemaldatud lokaasest salvestusruumist</string>
     <string name="too_many_requests_message">Liiga palju taotlusi. Proovige hiljem uuesti</string>
@@ -207,7 +207,7 @@
     <string name="_import">Impordi</string>
     <string name="color_correction">Värvi korektsioon</string>
     <string name="just_now">Just nüüd</string>
-    <string name="text_file_not_supported">Vali kas ZIP või CBZ fail.</string>
+    <string name="text_file_not_supported">Vali kas ZIP või CBZ fail. (CBZ / ZIP / CBR)</string>
     <string name="download">Lae alla</string>
     <string name="chapter_is_missing">See peatükk puudub</string>
     <string name="categories_delete_confirm">Kas sa oled kindel, et tahad kustutada valitud lemmikud kategooriad? \nKõik manga nende sees kaob ja seda tagasi ei saa.</string>

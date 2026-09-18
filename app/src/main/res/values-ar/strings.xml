@@ -64,7 +64,7 @@
     <string name="switch_pages">تغییر صفحات</string>
     <string name="delete">حذف</string>
     <string name="share_image">شارك الصورة</string>
-    <string name="text_file_not_supported">إما أن تختار ملف ZIP أو CBZ.</string>
+    <string name="text_file_not_supported">إما أن تختار ملف ZIP أو CBZ. (CBZ / ZIP / CBR)</string>
     <string name="_import">استورد</string>
     <string name="operation_not_supported">هذا الخيار غير مدعوم</string>
     <string name="grid_size">حجم الشبكة</string>
@@ -323,7 +323,7 @@
     <string name="categories_delete_confirm">هل أنت متأكد أنك تريد حذف قوائم المُفضلة المحددة \n؟ سيتم فقدان جميع المانجا فيها ولا يمكن التراجع عن هذا.</string>
     <string name="pages_cache">بيانات التخزين المؤقت للصفحات</string>
     <string name="not_found_404">المحتوى غير موجود أو تمت إزالته</string>
-    <string name="comics_archive_import_description">يمكنك اختيار ملف أو أكثر بتنسيق cbz أو zip ، سيتم التعرف على كل ملف على أنه مانغا منفصلة.</string>
+    <string name="comics_archive_import_description">يمكنك اختيار ملف أو أكثر بتنسيق cbz أو zip ، سيتم التعرف على كل ملف على أنه مانغا منفصلة. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">يمكنك اختيار مكان في الذاكرة يحتوي على أرشيفات أو صور. سيتم التعرف على كل أرشيف (أو مجلد فرعي) على أنه فصل.</string>
     <string name="speed">السرعة</string>
     <string name="feed">الموجز</string>

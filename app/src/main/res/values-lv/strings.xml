@@ -61,7 +61,7 @@
     <string name="light">Gaišs</string>
     <string name="dark">Tumšs</string>
     <string name="follow_system">Līdzīgi sistēmai</string>
-    <string name="text_file_not_supported">Ņem vai nu ZIP, vai CBZ failu.</string>
+    <string name="text_file_not_supported">Ņem vai nu ZIP, vai CBZ failu. (CBZ / ZIP / CBR)</string>
     <string name="operation_not_supported">Šī darbība nav atbalstīta</string>
     <string name="clear_pages_cache">Attīrīt lapas sīkdatnes</string>
     <string name="no_description">Nav apraksta</string>

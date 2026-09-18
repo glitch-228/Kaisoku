@@ -19,6 +19,10 @@ jobs:
           NUMBER: ${{ github.event.issue.number }}
           TIMESTAMP: ${{ github.event.issue.created_at }}
         run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "No DISCORD_ISSUE_WEBHOOK secret configured, skipping notification."
+            exit 0
+          fi
           # Discord caps embed description at 4096 chars (total embed 6000). Crash-report
           # bodies dwarf that and Discord answers 400 — silently killing the webhook.
           # Truncate with headroom so we never trip the limit.

@@ -5,14 +5,20 @@ import org.koitharu.kotatsu.core.model.getPreferredBranch
 import org.koitharu.kotatsu.core.model.isLocal
 import org.koitharu.kotatsu.core.os.NetworkState
 import org.koitharu.kotatsu.core.parser.MangaRepository
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaSource
 import org.koitharu.kotatsu.history.data.HistoryEntity
 import org.koitharu.kotatsu.list.domain.ReadingProgress
 import org.koitharu.kotatsu.list.domain.ReadingProgress.Companion.PROGRESS_NONE
 import org.koitharu.kotatsu.local.data.LocalMangaRepository
 import org.koitharu.kotatsu.parsers.model.Manga
 import javax.inject.Inject
+import org.koitharu.kotatsu.reader.ui.calculateReaderPercent
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import org.koitharu.kotatsu.core.prefs.SourceSettings
 
 class ProgressUpdateUseCase @Inject constructor(
+	@ApplicationContext private val context: Context,
 	private val mangaRepositoryFactory: MangaRepository.Factory,
 	private val database: MangaDatabase,
 	private val localMangaRepository: LocalMangaRepository,
@@ -48,13 +54,16 @@ class ProgressUpdateUseCase @Inject constructor(
 			return PROGRESS_NONE
 		}
 		val chapterIndex = chapters.indexOfFirst { x -> x.id == history.chapterId }
-		val pagesCount = chapterRepo.getPages(chapter).size
-		if (pagesCount == 0) {
-			return PROGRESS_NONE
+		// Novel scroll stores a character ratio, not an image-page number.
+		val result = if (seed.source.name.startsWith(LnReaderMangaSource.NAME_PREFIX)) {
+			val ratio = org.koitharu.kotatsu.reader.ui.novel.novelProgressRatio(history.scroll.toInt())
+			val index = if (SourceSettings(context, seed.source).isNovelReadingReversed) chaptersCount - chapterIndex - 1 else chapterIndex
+			(index + ratio) / chaptersCount
+		} else {
+			val pagesCount = chapterRepo.getPages(chapter).size
+			if (pagesCount == 0) return PROGRESS_NONE
+			calculateReaderPercent(chapterIndex, chaptersCount, history.page, pagesCount)
 		}
-		val pagePercent = (history.page + 1) / pagesCount.toFloat()
-		val ppc = 1f / chaptersCount
-		val result = ppc * chapterIndex + ppc * pagePercent
 		if (result != history.percent || history.chaptersCount != chaptersCount) {
 			database.getHistoryDao().update(
 				history.copy(

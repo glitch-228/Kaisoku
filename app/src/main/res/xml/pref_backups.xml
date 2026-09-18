@@ -16,6 +16,12 @@
         android:summary="@string/restore_summary"
         android:title="@string/restore_backup" />
 
+    <Preference
+        android:key="mihon_import"
+        android:persistent="false"
+        android:summary="@string/mihon_backup_import_summary"
+        android:title="@string/import_mihon_backup" />
+
     <PreferenceScreen
         android:fragment="org.koitharu.kotatsu.backups.ui.periodical.PeriodicalBackupSettingsFragment"
         android:key="backup_periodic"

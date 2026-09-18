@@ -47,7 +47,48 @@ import kotlin.math.sqrt
 
 @AndroidEntryPoint
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-class UpscalePreviewDialog : AppCompatDialogFragment() {
+class UpscalePreviewDialog : AppCompatDialogFragment(), android.content.SharedPreferences.OnSharedPreferenceChangeListener {
+
+	@Inject lateinit var settings: org.koitharu.kotatsu.core.prefs.AppSettings
+	private var previewFitScale = 0f
+	private val powerReceiver = object : android.content.BroadcastReceiver() {
+		override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) = applyPreviewEffect()
+	}
+
+	override fun onStart() {
+		super.onStart()
+		settings.subscribe(this)
+		androidx.core.content.ContextCompat.registerReceiver(requireContext(), powerReceiver,
+			android.content.IntentFilter(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+			androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+		applyPreviewEffect()
+	}
+
+	override fun onStop() {
+		settings.unsubscribe(this)
+		requireContext().unregisterReceiver(powerReceiver)
+		super.onStop()
+	}
+
+	override fun onSharedPreferenceChanged(prefs: android.content.SharedPreferences?, key: String?) {
+		applyPreviewEffect()
+	}
+
+	private fun applyPreviewEffect() {
+		val b = binding ?: return
+		val powerSave = requireContext().getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode == true
+		val effect = if (UpscaleEffect.shouldApply(true, settings.isReaderUpscaleEnabled, powerSave, previewFitScale, settings.readerUpscaleConfig)) UpscaleEffect.create(previewFitScale, settings.readerUpscaleConfig) else null
+		b.imageEnhanced.setRenderEffect(effect)
+		b.textStatus.text = when {
+			!settings.isReaderUpscaleEnabled -> getString(R.string.disabled)
+			powerSave -> getString(R.string.upscale_power_save)
+			settings.readerUpscaleStrength == 0 -> getString(R.string.upscale_strength_value, 0)
+			else -> getString(R.string.upscale_threshold_value, settings.readerUpscaleThreshold.toString())
+		}
+		b.textStatus.isVisible = effect == null
+		b.divider.isVisible = effect != null
+		b.dividerThumb.isVisible = effect != null
+	}
 
 	private val viewModel by activityViewModels<ReaderViewModel>()
 
@@ -92,8 +133,7 @@ class UpscalePreviewDialog : AppCompatDialogFragment() {
 		)
 		b.imagesContainer.setOnTouchListener { v, event -> onImageTouch(v, event) }
 		b.textSettings.setOnClickListener {
-			startActivity(AppRouter.readerSettingsIntent(it.context))
-			dismiss()
+			UpscaleSettingsDialog().show(parentFragmentManager, "upscaleSettings")
 		}
 		loadPreview()
 		return MaterialAlertDialogBuilder(requireContext())
@@ -190,14 +230,8 @@ class UpscalePreviewDialog : AppCompatDialogFragment() {
 		b.imageOriginal.setImageBitmap(bitmap)
 		b.imageEnhanced.setImageBitmap(bitmap)
 		applyMatrix()
-		if (originalFitScale > UpscaleEffect.MIN_SCALE) {
-			b.imageEnhanced.setRenderEffect(UpscaleEffect.create(originalFitScale))
-		} else {
-			b.textStatus.setText(R.string.upscale_not_applied)
-			b.textStatus.isVisible = true
-			b.divider.isVisible = false
-			b.dividerThumb.isVisible = false
-		}
+		previewFitScale = viewport?.fitScale ?: originalFitScale
+		applyPreviewEffect()
 		applyClip(clipFraction)
 	}
 

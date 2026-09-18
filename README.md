@@ -32,6 +32,13 @@ online content sources and Mihon/Tachiyomi-compatible extension support.**
 * Periodic Telegram backups, including support for using your own bot token
 * Support for older devices running Android 6.0+
 
+### Community server attribution
+
+Kaisoku's optional Community client is adapted from the open [Kotatsu-Redo community client and
+server protocol](https://github.com/Kotatsu-Redo/KotatsuRedo-Server). Community requests identify
+the client as `Kaisoku` to the server owner; this marker is metadata only and is never added to
+comments, ratings, or other content visible to readers.
+
 </div>
 
 ### In-App Screenshots

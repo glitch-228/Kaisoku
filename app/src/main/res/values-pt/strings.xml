@@ -82,7 +82,7 @@
     <string name="chapters">Capítulos</string>
     <string name="add_new_category">Nova categoria</string>
     <string name="text_delete_local_manga">Apagar permanentemente «%s» do dispositivo?</string>
-    <string name="text_file_not_supported">Escolha um ficheiro ZIP ou CBZ.</string>
+    <string name="text_file_not_supported">Escolha um ficheiro ZIP ou CBZ. (CBZ / ZIP / CBR)</string>
     <string name="clear_search_history">Limpar histórico de pesquisa</string>
     <string name="enabled_d_of_d" tools:ignore="PluralsCandidate">Ativado %1$d de %2$d</string>
     <string name="notification_sound">Som de notificação</string>
@@ -358,7 +358,7 @@
     <string name="allow_unstable_updates_summary">Receber notificações sobre versões instáveis</string>
     <string name="got_it">Entendi</string>
     <string name="sources_reorder_tip">Toque e segure em um item para reordená-lo</string>
-    <string name="comics_archive_import_description">Você pode selecionar um ou mais arquivos .cbz ou .zip, cada arquivo será reconhecido como um mangá separado.</string>
+    <string name="comics_archive_import_description">Você pode selecionar um ou mais arquivos .cbz ou .zip, cada arquivo será reconhecido como um mangá separado. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Você pode selecionar um diretório com arquivos ou imagens. Cada arquivo (ou subdiretório) será reconhecido como um capítulo.</string>
     <string name="sync_host_description">Você pode usar um servidor de sincronização auto-hospedado ou um padrão. Não mude isso se não tiver certeza do que está fazendo.</string>
     <string name="address">Endereço</string>

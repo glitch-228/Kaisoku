@@ -76,6 +76,7 @@ abstract class BasePageHolder<B : ViewBinding>(
 
 	protected val settings: ReaderSettings
 		get() = viewModel.settingsProducer.value
+	private var appliedSettings: ReaderSettings? = null
 
 	val context: Context
 		get() = itemView.context
@@ -115,6 +116,12 @@ abstract class BasePageHolder<B : ViewBinding>(
 
 	@CallSuper
 	protected open fun onConfigChanged(settings: ReaderSettings) {
+		val previous = appliedSettings
+		appliedSettings = settings
+		if (previous?.copy(isUpscaleEnabled = settings.isUpscaleEnabled, upscaleConfig = settings.upscaleConfig) == settings) {
+			applyUpscale()
+			return
+		}
 		settings.applyBackground(itemView)
 		if (settings.applyBitmapConfig(ssiv)) {
 			reloadImage()
@@ -329,12 +336,12 @@ abstract class BasePageHolder<B : ViewBinding>(
 			0f
 		}
 		val powerSaveMode = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
-		val effect = if (UpscaleEffect.shouldApply(true, settings.isUpscaleEnabled, powerSaveMode, fitScale)) {
-			UpscaleEffect.create(fitScale)
+		val effect = if (UpscaleEffect.shouldApply(true, settings.isUpscaleEnabled, powerSaveMode, fitScale, settings.upscaleConfig)) {
+			UpscaleEffect.create(fitScale, settings.upscaleConfig)
 		} else {
 			null
 		}
-		UpscaleEffect.registerView(page.id, ssiv, settings.isUpscaleEnabled)
+		UpscaleEffect.registerView(page.id, ssiv, settings.isUpscaleEnabled, settings.upscaleConfig)
 		ssiv.setRenderEffect(effect)
 		UpscaleEffect.setActive(page.id, effect != null)
 	}

@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
 import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.alternatives.domain.MigrateUseCase
+import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.model.FavouriteCategory
 import org.koitharu.kotatsu.core.model.ids
 import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
@@ -20,12 +22,16 @@ import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.observeAsFlow
 import org.koitharu.kotatsu.core.ui.BaseViewModel
+import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
+import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.util.ext.require
 import org.koitharu.kotatsu.favourites.domain.FavouritesRepository
 import org.koitharu.kotatsu.favourites.ui.categories.select.model.MangaCategoryItem
 import org.koitharu.kotatsu.list.ui.model.EmptyState
 import org.koitharu.kotatsu.list.ui.model.ListModel
 import org.koitharu.kotatsu.list.ui.model.LoadingState
+import org.koitharu.kotatsu.parsers.model.Manga
+import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,11 +39,16 @@ class FavoriteDialogViewModel @Inject constructor(
 	savedStateHandle: SavedStateHandle,
 	private val favouritesRepository: FavouritesRepository,
 	settings: AppSettings,
+	private val migrator: MigrateUseCase,
+	private val database: MangaDatabase,
 ) : BaseViewModel() {
 
 	val manga = savedStateHandle.require<List<ParcelableManga>>(AppRouter.KEY_MANGA_LIST).map {
 		it.manga
 	}
+
+	val onDuplicate = MutableEventFlow<Pair<Manga, Long>>()
+	val onMigrated = MutableEventFlow<Manga>()
 
 	private val refreshTrigger = MutableStateFlow(Any())
 	val content = combine(
@@ -49,8 +60,29 @@ class FavoriteDialogViewModel @Inject constructor(
 	}.withErrorHandling()
 		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, listOf(LoadingState))
 
-	fun setChecked(categoryId: Long, isChecked: Boolean) {
+	fun setChecked(
+		categoryId: Long,
+		isChecked: Boolean,
+		force: Boolean = false,
+	) {
 		launchJob(Dispatchers.Default) {
+			if (isChecked && !force) {
+				manga.firstOrNull()?.let { m ->
+					val names = m.altTitles + m.title
+					val favourites = favouritesRepository.getAllManga()
+					val trackerDuplicateId = database.getScrobblingDao()
+						.findForManga(m.id)
+						.firstNotNullOfOrNull { tracker ->
+							database.getScrobblingDao().findMangaId(tracker.scrobbler, tracker.targetId, m.id)
+						}
+					val duplicate = favourites.firstOrNull { it.id == trackerDuplicateId }
+						?: favourites.firstOrNull { f ->
+							f.id != m.id &&
+								(f.altTitles + f.title).any { a -> names.any { b -> a.equals(b, true) } }
+						}
+					duplicate?.let { dup -> return@launchJob onDuplicate.call(dup to categoryId) }
+				}
+			}
 			if (isChecked) {
 				favouritesRepository.addToCategory(categoryId, manga)
 			} else {
@@ -58,6 +90,11 @@ class FavoriteDialogViewModel @Inject constructor(
 			}
 			refreshTrigger.value = Any()
 		}
+	}
+
+	fun migrate(dup: Manga) = launchJob(Dispatchers.Default) {
+		manga.firstOrNull()?.let { runCatchingCancellable { migrator(it, dup) } }
+		onMigrated.call(dup)
 	}
 
 	private suspend fun mapList(categories: List<FavouriteCategory>, tracker: Boolean): List<ListModel> {
@@ -83,15 +120,16 @@ class FavoriteDialogViewModel @Inject constructor(
 			ids.forEach { id -> cats[id]?.add(m.id) }
 		}
 		return categories.map { cat ->
+			val checkedState = when (cats[cat.id]?.size ?: 0) {
+				0 -> MaterialCheckBox.STATE_UNCHECKED
+				manga.size -> MaterialCheckBox.STATE_CHECKED
+				else -> MaterialCheckBox.STATE_INDETERMINATE
+			}
 			MangaCategoryItem(
 				category = cat,
-				checkedState = when (cats[cat.id]?.size ?: 0) {
-					0 -> MaterialCheckBox.STATE_UNCHECKED
-					manga.size -> MaterialCheckBox.STATE_CHECKED
-					else -> MaterialCheckBox.STATE_INDETERMINATE
-				},
+				checkedState = checkedState,
 				isTrackerEnabled = tracker,
-				addedAt = addedAtByCategory[cat.id],
+				addedAt = if (checkedState == MaterialCheckBox.STATE_CHECKED) addedAtByCategory[cat.id] else null,
 			)
 		}
 	}

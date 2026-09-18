@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="no_description">Nessuna descrizione</string>
-    <string name="text_file_not_supported">File non valido. Sono supportati solo ZIP e CBZ.</string>
+    <string name="text_file_not_supported">File non valido. Sono supportati solo ZIP e CBZ. (CBZ / ZIP / CBR)</string>
     <string name="operation_not_supported">Questa operazione non è supportata</string>
     <string name="delete">Elimina</string>
     <string name="_import">Importa</string>
@@ -519,7 +519,7 @@
     <string name="sync_auth">Accedi per sincronizzare l\'account</string>
     <string name="proxy">Proxy</string>
     <string name="got_it">Ho capito</string>
-    <string name="comics_archive_import_description">Puoi selezionare uno o più file .cbz o .zip, ogni file sarà riconosciuto come un manga a parte.</string>
+    <string name="comics_archive_import_description">Puoi selezionare uno o più file .cbz o .zip, ogni file sarà riconosciuto come un manga a parte. CBR (.cbr).</string>
     <string name="show_on_shelf">Mostra sullo Scaffale</string>
     <string name="state_upcoming">Prossime</string>
     <string name="by_name_reverse">Nome invertito</string>

@@ -50,7 +50,7 @@
     <string name="history">इतिहास</string>
     <string name="grid">ग्रिड</string>
     <string name="loading_">लोड हो रहा है…</string>
-    <string name="text_file_not_supported">ZIP या CBZ मैं से एक फाइल चुनें।</string>
+    <string name="text_file_not_supported">ZIP या CBZ मैं से एक फाइल चुनें। (CBZ / ZIP / CBR)</string>
     <string name="updated">अद्यतित</string>
     <string name="_s_deleted_from_local_storage">\"%s\" को स्थानीय स्टोरेज से मिटा दिया गया</string>
     <string name="save_page">पृष्ठ सहेजें</string>
@@ -271,7 +271,7 @@
     <string name="scrobbling_empty_hint">पढ़ने की प्रगति को ट्रैक करने के लिए, मंगा विवरण स्क्रीन पर मेनू → ट्रैक का चयन करें।</string>
     <string name="services">सेवाएं</string>
     <string name="settings_apply_restart_required">कृपया इन परिवर्तनों को लागू करने के लिए एप्लिकेशन को पुनः आरंभ करें</string>
-    <string name="comics_archive_import_description">आप एक या अधिक .cbz या .zip फाइलों का चयन कर सकते हैं, प्रत्येक फाइल को एक अलग मंगा के रूप में पहचाना जाएगा।</string>
+    <string name="comics_archive_import_description">आप एक या अधिक .cbz या .zip फाइलों का चयन कर सकते हैं, प्रत्येक फाइल को एक अलग मंगा के रूप में पहचाना जाएगा। CBR (.cbr).</string>
     <string name="user_agent">UserAgent शीर्षलेख</string>
     <string name="speed">गति</string>
     <string name="show_on_shelf">दराज पर दिखाएं</string>

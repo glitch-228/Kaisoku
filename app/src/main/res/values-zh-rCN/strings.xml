@@ -85,7 +85,7 @@
     <string name="_import">导入</string>
     <string name="delete">删除</string>
     <string name="operation_not_supported">操作无效</string>
-    <string name="text_file_not_supported">必须选择一个 ZIP 或 CBZ 文件。</string>
+    <string name="text_file_not_supported">必须选择一个 ZIP 或 CBZ 文件。 (CBZ / ZIP / CBR)</string>
     <string name="no_description">暂无简介</string>
     <string name="clear_pages_cache">清除页面缓存</string>
     <string name="text_file_sizes">B|kB|MB|GB|TB</string>
@@ -361,7 +361,7 @@
     <string name="got_it">知道了</string>
     <string name="speed">速度</string>
     <string name="show_on_shelf">在收藏中显示</string>
-    <string name="comics_archive_import_description">可选择一个或多个 CBZ 或 ZIP 文件，每个文件都将识别为一个单独的漫画。</string>
+    <string name="comics_archive_import_description">可选择一个或多个 CBZ 或 ZIP 文件，每个文件都将识别为一个单独的漫画。 CBR (.cbr).</string>
     <string name="folder_with_images_import_description">可选择一个包含压缩包或图片的文件夹，每个压缩包 (或子文件夹) 都会被识别为一个章节。</string>
     <string name="find_similar">搜索相似漫画</string>
     <string name="web_view_unavailable">WebView不可用：检查是否已安装WebView</string>

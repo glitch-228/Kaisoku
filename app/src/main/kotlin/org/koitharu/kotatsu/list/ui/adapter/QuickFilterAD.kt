@@ -29,7 +29,7 @@ private class WeakQuickFilterChipClickListener(
 
 	override fun onChipClick(chip: com.google.android.material.chip.Chip, data: Any?) {
 		if (data is ListFilterOption) {
-			listenerRef.get()?.onFilterOptionClick(data)
+			listenerRef.get()?.onFilterOptionClick(chip, data)
 		}
 	}
 }

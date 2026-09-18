@@ -304,7 +304,60 @@
 			</LinearLayout>
 		</LinearLayout>
 
-		<!-- Row 4: Chapters (full width) -->
+		<!-- Row 4: Favourite Date -->
+		<LinearLayout
+			android:id="@+id/meta_favourite_row"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:baselineAligned="false"
+			android:orientation="horizontal"
+			android:paddingVertical="10dp"
+			android:visibility="gone"
+			tools:visibility="visible">
+
+			<LinearLayout
+				android:id="@+id/meta_favourite_cell"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:gravity="center_vertical"
+				android:orientation="horizontal">
+
+				<ImageView
+					android:layout_width="16dp"
+					android:layout_height="16dp"
+					android:contentDescription="@null"
+					android:src="@drawable/ic_heart_outline"
+					app:tint="?colorPrimary" />
+
+				<LinearLayout
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="10dp"
+					android:layout_weight="1"
+					android:orientation="vertical">
+
+					<TextView
+						android:id="@+id/textView_favourite_label"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:letterSpacing="0.08"
+						android:singleLine="true"
+						android:text="@string/added_to_favourites"
+						android:textAppearance="?textAppearanceLabelSmall"
+						android:textColor="?android:textColorSecondary" />
+
+					<TextView
+						android:id="@+id/textView_favourite_date"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:singleLine="true"
+						android:textAppearance="?textAppearanceBodyMedium"
+						tools:text="05.09.2026" />
+				</LinearLayout>
+			</LinearLayout>
+		</LinearLayout>
+
+		<!-- Row 5: Chapters (full width) -->
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"

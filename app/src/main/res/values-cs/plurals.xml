@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<!-- All callers use Android getQuantityString with integer counts; fractional CLDR many is unreachable. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingQuantity">
     <plurals name="items">
         <item quantity="one">%1$d předmět</item>
         <item quantity="few">%1$d předměty</item>

@@ -38,6 +38,10 @@ class DetailsInteractor @Inject constructor(
 		return favouritesRepository.observeCategories(mangaId)
 	}
 
+	fun observeFavoriteDate(mangaId: Long): Flow<Long?> {
+		return favouritesRepository.observeFavoriteDate(mangaId)
+	}
+
 	fun observeNewChapters(mangaId: Long): Flow<Int> {
 		return settings.observeAsFlow(AppSettings.KEY_TRACKER_ENABLED) { isTrackerEnabled }
 			.flatMapLatest { isEnabled ->

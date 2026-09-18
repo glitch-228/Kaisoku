@@ -120,7 +120,7 @@
     <string name="text_file_sizes">t|kt|Mt|Gt|Tt</string>
     <string name="clear_pages_cache">Tyhjennä sivujen välimuisti</string>
     <string name="no_description">Ei kuvausta</string>
-    <string name="text_file_not_supported">Virheellinen tiedosto. Vain ZIP ja CBZ ovat tuettuja.</string>
+    <string name="text_file_not_supported">Virheellinen tiedosto. Vain ZIP ja CBZ ovat tuettuja. (CBZ / ZIP / CBR)</string>
     <string name="operation_not_supported">Tätä toimintoa ei tueta</string>
     <string name="delete">Poista</string>
     <string name="_import">Tuo</string>

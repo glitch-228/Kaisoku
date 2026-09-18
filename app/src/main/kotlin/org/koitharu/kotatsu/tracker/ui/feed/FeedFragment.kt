@@ -4,9 +4,11 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import org.koitharu.kotatsu.list.ui.showStateFilterPopupMenu
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -37,6 +39,7 @@ import org.koitharu.kotatsu.list.ui.size.StaticItemSizeResolver
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaTag
 import org.koitharu.kotatsu.tracker.ui.feed.adapter.FeedAdapter
+import org.koitharu.kotatsu.tracker.ui.feed.adapter.FeedItemTouchCallback
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -79,6 +82,8 @@ class FeedFragment :
 		}
 		binding.swipeRefreshLayout.setOnRefreshListener(this)
 		addMenuProvider(FeedMenuProvider(binding.recyclerView, viewModel))
+		ItemTouchHelper(FeedItemTouchCallback(viewModel::removeItem))
+			.attachToRecyclerView(binding.recyclerView)
 
 		viewModel.isHeaderEnabled.drop(1).observe(viewLifecycleOwner, Lifecycle.State.STARTED, MenuInvalidator(requireActivity()))
 		viewModel.content.observe(viewLifecycleOwner, Lifecycle.State.STARTED, feedAdapter)
@@ -104,7 +109,23 @@ class FeedFragment :
 		viewModel.update()
 	}
 
-	override fun onFilterOptionClick(option: ListFilterOption) = viewModel.toggleFilterOption(option)
+	override fun onResume() {
+		super.onResume()
+		viewModel.updateIfNeeded()
+	}
+
+	override fun onFilterOptionClick(view: View, option: ListFilterOption) {
+		if (option is ListFilterOption.State) {
+			showStateFilterPopupMenu(view, option) { selectedState ->
+				viewModel.setFilterOption(
+					ListFilterOption.State(selectedState),
+					isApplied = selectedState != null,
+				)
+			}
+		} else {
+			viewModel.toggleFilterOption(option)
+		}
+	}
 
 	override fun onRetryClick(error: Throwable) = Unit
 

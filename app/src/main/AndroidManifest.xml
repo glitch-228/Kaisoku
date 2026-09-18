@@ -35,6 +35,9 @@
 		android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
 		tools:ignore="AllFilesAccessPolicy,ScopedStorage" />
 
+	<uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+	<uses-feature android:name="android.software.leanback" android:required="false" />
+
 	<queries>
 		<intent>
 			<action android:name="android.intent.action.PROCESS_TEXT" />
@@ -112,6 +115,9 @@
 			</intent-filter>
 		</activity>
 		<activity
+			android:name="org.koitharu.kotatsu.community.ui.CommunityActivity"
+			android:label="@string/community" />
+		<activity
 			android:name="org.koitharu.kotatsu.reader.ui.ReaderActivity"
 			android:exported="true">
 			<intent-filter>
@@ -181,10 +187,8 @@
 				<data android:scheme="file" android:mimeType="application/x-java-archive" />
 				<data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
 				<data android:scheme="file" android:mimeType="application/vnd.android.package-archive" />
-				<data android:scheme="content" android:mimeType="application/octet-stream" android:pathPattern=".*\\.jar" />
-				<data android:scheme="file" android:mimeType="application/octet-stream" android:pathPattern=".*\\.jar" />
-				<data android:scheme="content" android:mimeType="application/octet-stream" android:pathPattern=".*\\.JAR" />
-				<data android:scheme="file" android:mimeType="application/octet-stream" android:pathPattern=".*\\.JAR" />
+				<data android:scheme="content" android:mimeType="application/octet-stream" />
+				<data android:scheme="file" android:mimeType="application/octet-stream" />
 			</intent-filter>
 			<intent-filter>
 				<action android:name="android.intent.action.SEND" />
@@ -263,6 +267,9 @@
 		<activity
 			android:name="org.koitharu.kotatsu.settings.override.OverrideConfigActivity"
 			android:label="@string/edit" />
+		<activity
+			android:name="org.koitharu.kotatsu.alternatives.ui.covers.AlternativeCoversActivity"
+			android:label="@string/alternative_covers" />
 		<activity
 			android:name="org.koitharu.kotatsu.sync.ui.SyncAuthActivity"
 			android:exported="true"
@@ -350,17 +357,20 @@
 			android:name="org.koitharu.kotatsu.settings.sources.repo.MihonRepoExtensionsActivity"
 			android:label="@string/extensions" />
 		<activity
-			android:name="org.koitharu.kotatsu.scrobbling.kitsu.ui.KitsuAuthActivity"
-			android:exported="false"
-			android:label="@string/kitsu"
-			tools:ignore="AppLinkUrlError">
-				<intent-filter>
-					<action android:name="android.intent.action.VIEW" />
-					<category android:name="android.intent.category.DEFAULT" />
-					<data android:scheme="kaisoku+kitsu" />
-					<data android:scheme="kotatsu+kitsu" />
-				</intent-filter>
-			</activity>
+			android:name="org.koitharu.kotatsu.settings.sources.lnreader.LnReaderReposActivity"
+			android:label="@string/lnreader_repositories" />
+		<activity
+			android:name="org.koitharu.kotatsu.settings.sources.lnreader.LnReaderPluginsActivity"
+			android:label="@string/lnreader_plugins" />
+		<activity
+			android:name="org.koitharu.kotatsu.reader.ui.novel.NovelReaderActivity"
+			android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|uiMode"
+			android:label="@string/read" />
+        <!-- Opened explicitly by ScrobblerAuthHelper; this is an internal credentials form. -->
+        <activity
+            android:name="org.koitharu.kotatsu.scrobbling.kitsu.ui.KitsuAuthActivity"
+            android:exported="false"
+            android:label="@string/kitsu" />
 		<activity
 			android:name="org.koitharu.kotatsu.stats.ui.StatsActivity"
 			android:label="@string/reading_stats" />

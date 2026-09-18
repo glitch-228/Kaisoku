@@ -140,6 +140,9 @@ class ReaderControlDelegate(
 
 		fun onBookmarkClick()
 
+		/** Host-specific chapters/bookmarks sheet; the standard reader shows the pages sheet. */
+		fun showChaptersSheet(defaultTab: Int? = null)
+
 		fun openMenu()
 
 		fun onSavePageClick()

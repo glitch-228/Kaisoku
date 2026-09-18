@@ -58,7 +58,10 @@ class ChaptersPagesSheet : BaseAdaptiveSheet<SheetChaptersPagesBinding>(),
 
 		val args = arguments ?: Bundle.EMPTY
 		var defaultTab = args.getInt(AppRouter.KEY_TAB, settings.defaultDetailsTab)
-		val adapter = ChaptersPagesAdapter(this, settings.isPagesTabEnabled)
+		val requestedDefaultTab = defaultTab
+		var hasDetails = viewModel.mangaDetails.value != null
+		val adapter = ChaptersPagesAdapter(this,
+			settings.isPagesTabEnabled && viewModel.mangaDetails.value?.supportsPageThumbnails == true)
 		if (!adapter.isPagesTabEnabled) {
 			defaultTab = (defaultTab - 1).coerceAtLeast(TAB_CHAPTERS)
 		}
@@ -73,6 +76,18 @@ class ChaptersPagesSheet : BaseAdaptiveSheet<SheetChaptersPagesBinding>(),
 		binding.tabs.addOnTabSelectedListener(this)
 		binding.pager.setCurrentItem(defaultTab, false)
 		binding.tabs.isVisible = adapter.itemCount > 1
+		viewModel.mangaDetails.observe(viewLifecycleOwner) { details ->
+			if (details != null) {
+				val previousTab = if (hasDetails) adapter.getItemId(binding.pager.currentItem) else requestedDefaultTab.toLong()
+				hasDetails = true
+				adapter.isPagesTabEnabled = settings.isPagesTabEnabled && details.supportsPageThumbnails
+				binding.pager.setCurrentItem(when {
+					previousTab == 2L -> adapter.itemCount - 1
+					previousTab == 1L && !adapter.isPagesTabEnabled -> TAB_CHAPTERS
+					else -> previousTab.toInt()
+				}, false)
+			}
+		}
 
 		val menuProvider = ChapterPagesMenuProvider(viewModel, this, binding.pager, settings)
 		onBackPressedDispatcher.addCallback(viewLifecycleOwner, menuProvider)
@@ -155,7 +170,10 @@ class ChaptersPagesSheet : BaseAdaptiveSheet<SheetChaptersPagesBinding>(),
 
 	private fun onPageChanged(position: Int) {
 		viewBinding?.toolbar?.invalidateMenu()
-		settings.lastDetailsTab = position
+		if (viewModel.mangaDetails.value != null) {
+			val adapter = viewBinding?.pager?.adapter as? ChaptersPagesAdapter ?: return
+			settings.lastDetailsTab = adapter.getItemId(position).toInt()
+		}
 	}
 
 	private fun onNewChaptersChanged(counter: Int) {

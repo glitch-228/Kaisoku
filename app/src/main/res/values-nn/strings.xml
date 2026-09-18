@@ -30,7 +30,7 @@
     <string name="share_image">Del biletet</string>
     <string name="_import">Før inn</string>
     <string name="delete">Slett</string>
-    <string name="text_file_not_supported">Vel ei ZIP- eller CBZ-fil.</string>
+    <string name="text_file_not_supported">Vel ei ZIP- eller CBZ-fil. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Ingen utgreiing</string>
     <string name="clear_pages_cache">Tøm mellomminnet for sider</string>
     <string name="standard">Vanleg</string>
@@ -325,7 +325,7 @@
     <string name="show_on_shelf">Vis i hylla</string>
     <string name="folder_with_images_import_description">Du kan velja ei mappe med arkiv eller bilete. Kvart arkiv (eller undermappe) vert tydde som eit kapittel.</string>
     <string name="speed">Snøggleik</string>
-    <string name="comics_archive_import_description">Vel ei eller fleire .cbz eller .zip-filer, kvar fil vert tydde som ein eigen manga.</string>
+    <string name="comics_archive_import_description">Vel ei eller fleire .cbz eller .zip-filer, kvar fil vert tydde som ein eigen manga. CBR (.cbr).</string>
     <string name="clear_new_chapters_counters">Tøm au opplysingar om nye kapittel</string>
     <string name="scrobbling_empty_hint">Trykk «Meny → Spor» på ei mangadetaljside for å spore leseframdrifta.</string>
     <string name="got_it">Skjønar</string>

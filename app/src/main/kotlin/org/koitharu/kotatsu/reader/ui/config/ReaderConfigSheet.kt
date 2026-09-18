@@ -109,6 +109,7 @@ class ReaderConfigSheet :
         binding.buttonImageServer.setOnClickListener(this)
         binding.buttonColorFilter.setOnClickListener(this)
         binding.buttonUpscale.setOnClickListener(this)
+        binding.buttonUpscale.isVisible = true
         binding.buttonUpscalePreview.setOnClickListener(this)
         binding.buttonScrollTimer.setOnClickListener(this)
         binding.buttonBookmark.setOnClickListener(this)
@@ -126,8 +127,10 @@ class ReaderConfigSheet :
         binding.switchDoubleFoldable.setOnCheckedChangeListener(this)
         binding.switchDoubleCoverPage.setOnCheckedChangeListener(this)
         binding.sliderDoubleSensitivity.addOnChangeListener(this)
-        binding.buttonUpscale.isVisible = UpscaleEffect.isSupported
         bindUpscaleTitle()
+        settings.observeChanges().onEach { key ->
+            if (key == null || key == AppSettings.KEY_READER_UPSCALE) bindUpscaleTitle()
+        }.launchIn(viewLifecycleScope)
         UpscaleEffect.activePages.onEach { activePages ->
             viewBinding?.buttonUpscalePreview?.isVisible =
                 UpscaleEffect.isSupported && activePages.isNotEmpty()
@@ -189,8 +192,7 @@ class ReaderConfigSheet :
             }
 
             R.id.button_upscale -> {
-                settings.isReaderUpscaleEnabled = !settings.isReaderUpscaleEnabled
-                bindUpscaleTitle()
+                org.koitharu.kotatsu.reader.ui.upscale.UpscaleSettingsDialog().show(parentFragmentManager, "upscaleSettings")
             }
 
             R.id.button_upscale_preview -> {

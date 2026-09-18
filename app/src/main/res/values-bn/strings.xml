@@ -28,7 +28,7 @@
     <string name="history_is_empty">কোনো ইতিহাস নেই</string>
     <string name="read">পড়ুন</string>
     <string name="add_to_favourites">পছন্দ করুন</string>
-    <string name="text_file_not_supported">একটি ZIP অথবা CBZ ফাইল নিন</string>
+    <string name="text_file_not_supported">একটি ZIP অথবা CBZ ফাইল নিন (CBZ / ZIP / CBR)</string>
     <string name="no_description">কোনো বর্ণনা নেই</string>
     <string name="clear_pages_cache">পেজের ক্যাচ পরিষ্কার করুন</string>
     <string name="text_file_sizes">B|kB|MB|GB|TB</string>

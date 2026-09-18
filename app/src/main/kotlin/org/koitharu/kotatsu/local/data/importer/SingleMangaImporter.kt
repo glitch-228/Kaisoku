@@ -22,6 +22,7 @@ import org.koitharu.kotatsu.core.util.ext.resolveName
 import org.koitharu.kotatsu.core.util.ext.writeAllCancellable
 import org.koitharu.kotatsu.local.data.LocalStorageChanges
 import org.koitharu.kotatsu.local.data.LocalStorageManager
+import org.koitharu.kotatsu.local.data.hasRarComicExtension
 import org.koitharu.kotatsu.local.data.hasPdfExtension
 import org.koitharu.kotatsu.local.data.hasZipExtension
 import org.koitharu.kotatsu.local.data.input.LocalMangaParser
@@ -40,40 +41,54 @@ class SingleMangaImporter @Inject constructor(
 
 	private val contentResolver = context.contentResolver
 
-	suspend fun import(uri: Uri): LocalManga {
+	suspend fun import(uri: Uri): List<LocalManga> {
 		val result = if (isDirectory(uri) || isPdfUri(contentResolver, uri)) {
 			importDirectory(uri)
 		} else {
-			importFile(uri)
+			listOf(importFile(uri))
 		}
-		localStorageChanges.emit(result)
+		for (manga in result) {
+			localStorageChanges.emit(manga)
+		}
 		return result
 	}
 
 	private suspend fun importFile(uri: Uri): LocalManga = withContext(Dispatchers.IO) {
 		val contentResolver = storageManager.contentResolver
 		val name = contentResolver.resolveName(uri) ?: throw IOException("Cannot fetch name from uri: $uri")
-		if (!hasZipExtension(name)) {
-			throw UnsupportedFileException("Unsupported file $name on $uri")
+		val dest = when {
+			hasZipExtension(name) -> File(getOutputDir(), name).also { copyFile(uri, it) }
+			hasRarComicExtension(name) -> importCbr(uri, name)
+			else -> throw UnsupportedFileException("Unsupported file $name on $uri")
 		}
-		val dest = File(getOutputDir(), name)
+		parseManga(dest)
+	}
+
+	private suspend fun importCbr(uri: Uri, sourceName: String): File {
+		return CbrImportTransaction.import(
+			sourceName = sourceName,
+			outputDir = getOutputDir(),
+			copyInput = { inputTemp -> copyFile(uri, inputTemp) },
+		)
+	}
+
+	private suspend fun copyFile(uri: Uri, dest: File) {
 		runInterruptible {
-			contentResolver.openSource(uri)
+			storageManager.contentResolver.openSource(uri)
 		}.use { source ->
 			dest.sink().buffer().use { output ->
 				output.writeAllCancellable(source)
 			}
 		}
-		parseManga(dest)
 	}
 
-	private suspend fun importDirectory(uri: Uri): LocalManga = withContext(Dispatchers.IO) {
+	private suspend fun importDirectory(uri: Uri): List<LocalManga> = withContext(Dispatchers.IO) {
 		val name = contentResolver.resolveName(uri) ?: throw IOException("Cannot fetch name from uri: $uri")
-		val dest = when {
-			hasPdfExtension(name) || isPdfUri(contentResolver, uri) -> importPdf(uri, name)
+		val dirs = when {
+			hasPdfExtension(name) || isPdfUri(contentResolver, uri) -> listOf(importPdf(uri, name))
 			else -> importDocumentTree(uri)
 		}
-		parseManga(dest)
+		dirs.map { parseManga(it) }
 	}
 
 	private suspend fun importPdf(uri: Uri, name: String): File {
@@ -105,12 +120,46 @@ class SingleMangaImporter @Inject constructor(
 		}
 	}
 
-	private suspend fun importDocumentTree(uri: Uri): File {
+	private suspend fun importDocumentTree(uri: Uri): List<File> {
 		val root = DocumentFile.fromTreeUri(context, uri)
 			?: throw IllegalArgumentException("Provided uri $uri is not a tree")
-		return File(getOutputDir(), root.requireName()).also { dest ->
-			dest.mkdir()
-			root.listFiles().forEach { it.copyTo(dest) }
+		// A Mihon downloads root or source folder holds many titles, each of which becomes its own manga
+		val mangaDirs = root.findMangaDirs(contentResolver)
+		if (mangaDirs.isNotEmpty()) {
+			// Two sources can hold the same title, so each one needs a folder of its own here
+			return mangaDirs.map { importMangaDirectory(it, unique = true) }
+		}
+		return listOf(importMangaDirectory(root, unique = false))
+	}
+
+	private suspend fun importMangaDirectory(root: DocumentFile, unique: Boolean): File {
+		val dest = destinationDir(root.requireName(), unique)
+		dest.mkdir()
+		for (docFile in root.listFiles()) {
+			docFile.copyTo(dest)
+		}
+		// No-op unless the folder came from Mihon and carries ComicInfo.xml
+		runInterruptible(Dispatchers.IO) { writeMihonIndex(dest) }
+		return dest
+	}
+
+	/**
+	 * Re-importing the same folder keeps merging into it, as it always has. Only a batch import
+	 * sidesteps a folder that is already taken, so two same-named titles do not end up merged.
+	 */
+	private suspend fun destinationDir(name: String, unique: Boolean): File {
+		val outputDir = getOutputDir()
+		val dest = File(outputDir, name)
+		if (!unique || !dest.exists()) {
+			return dest
+		}
+		var i = 1
+		while (true) {
+			val candidate = File(outputDir, "${name}_$i")
+			if (!candidate.exists()) {
+				return candidate
+			}
+			i++
 		}
 	}
 
@@ -118,6 +167,9 @@ class SingleMangaImporter @Inject constructor(
 		LocalMangaParser(file).getManga(withDetails = false)
 
 	private suspend fun DocumentFile.copyTo(destDir: File) {
+		if (isImportJunk(name.orEmpty())) {
+			return
+		}
 		if (isDirectory) {
 			val subDir = File(destDir, requireName())
 			subDir.mkdir()

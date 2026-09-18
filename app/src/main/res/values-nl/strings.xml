@@ -60,7 +60,7 @@
     <string name="_import">Importeren</string>
     <string name="delete">Verwijderen</string>
     <string name="operation_not_supported">Deze bewerking word niet ondersteund</string>
-    <string name="text_file_not_supported">Kies een ZIP- of CBZ-bestand.</string>
+    <string name="text_file_not_supported">Kies een ZIP- of CBZ-bestand. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Geen beschrijving</string>
     <string name="clear_pages_cache">Pagina-cache wissen</string>
     <string name="standard">Standaard</string>

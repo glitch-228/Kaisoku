@@ -5,7 +5,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
+import org.koitharu.kotatsu.settings.sources.ExtensionLanguageFilter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,17 +50,38 @@ class MihonRepoExtensionsViewModel @Inject constructor(
 			?: savedStateHandle.get<String>(AppRouter.KEY_TITLE).orEmpty().ifBlank { context.getString(R.string.extensions) },
 	)
 
-	val content: StateFlow<List<ListModel>> = combine(
-		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT).distinctUntilChanged(),
-		refreshTrigger,
-		::Pair,
-	).mapLatest { (query, _) ->
-		loadContent(query)
-	}.withLoading().withErrorHandling().stateIn(
-		viewModelScope + Dispatchers.IO,
-		SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS),
-		listOf(LoadingState),
+	val languageFilter = ExtensionLanguageFilter(context, "mihon")
+	private val rawContent: StateFlow<List<ListModel>> = refreshTrigger.mapLatest {
+		withLoading {
+			runCatchingCancellable { loadContent(null) }.getOrElse { error ->
+				errorEvent.call(error)
+				listOf(MihonRepoExtensionListItem.Hint(R.drawable.ic_error_large, R.string.error, R.string.try_again))
+			}
+		}
+	}.stateIn(
+		viewModelScope + Dispatchers.IO, SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS), listOf(LoadingState),
 	)
+
+	val availableLanguages = rawContent.map { items ->
+		items.filterIsInstance<MihonRepoExtensionListItem.Extension>().flatMap {
+			(it.descriptor.extension.sources.map { source -> source.lang } + it.descriptor.extension.lang)
+		}.map(ExtensionLanguageFilter::normalize).distinct().sorted()
+	}.stateIn(viewModelScope, SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS), emptyList())
+
+	val content: StateFlow<List<ListModel>> = combine(
+		rawContent,
+		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT).distinctUntilChanged(),
+		languageFilter.selected,
+	) { items, query, languages ->
+		val extensions = items.filterIsInstance<MihonRepoExtensionListItem.Extension>()
+		if (extensions.isEmpty()) items else {
+			val filtered = extensions.filter {
+				(query.isNullOrEmpty() || it.descriptor.matchesQuery(query)) &&
+					ExtensionLanguageFilter.matches(languages, (it.descriptor.extension.sources.map { source -> source.lang } + it.descriptor.extension.lang))
+			}
+			filtered.ifEmpty { listOf(MihonRepoExtensionListItem.Hint(R.drawable.ic_empty_feed, R.string.nothing_found, R.string.no_repo_extensions_found)) }
+		}
+	}.stateIn(viewModelScope, SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS), listOf(LoadingState))
 
 	fun performSearch(query: String?) {
 		searchQuery.value = query?.trim()?.takeIf { it.isNotEmpty() }

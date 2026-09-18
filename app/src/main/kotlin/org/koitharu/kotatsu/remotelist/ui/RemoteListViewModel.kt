@@ -21,6 +21,7 @@ import kotlinx.coroutines.plus
 import kotlinx.coroutines.launch
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.MangaSource
+import org.koitharu.kotatsu.community.data.CommunityRepository
 import org.koitharu.kotatsu.core.model.distinctById
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
@@ -65,6 +66,7 @@ open class RemoteListViewModel @Inject constructor(
 	protected val mangaListMapper: MangaListMapper,
 	private val exploreRepository: ExploreRepository,
 	sourcesRepository: MangaSourcesRepository,
+	private val community: CommunityRepository,
 	mangaDataRepository: MangaDataRepository,
 	@LocalStorageChanges localStorageChanges: SharedFlow<LocalManga?>
 ) : MangaListViewModel(settings, mangaDataRepository, localStorageChanges), FilterCoordinator.Owner {
@@ -175,11 +177,14 @@ open class RemoteListViewModel @Inject constructor(
 		val currentHasNextPage = hasNextPage
 		val currentListError = listError
 		val currentErrorEvent = errorEvent
+		val currentSource = source
 		return viewModelScope.launch(Dispatchers.Default) {
 			currentLoadingCounter.update { it + 1 }
 			try {
 				loadRemoteList(
 					repository = currentRepository,
+					probeSource = currentSource,
+					community = community,
 					mangaList = currentMangaList,
 					listOffset = currentListOffset,
 					hasNextPage = currentHasNextPage,
@@ -292,6 +297,8 @@ private suspend fun buildRemoteListContent(
 
 private suspend fun loadRemoteList(
 	repository: MangaRepository,
+	probeSource: org.koitharu.kotatsu.parsers.model.MangaSource,
+	community: CommunityRepository,
 	mangaList: MutableStateFlow<List<Manga>?>,
 	listOffset: MutableStateFlow<Int>,
 	hasNextPage: MutableStateFlow<Boolean>,
@@ -312,10 +319,30 @@ private suspend fun loadRemoteList(
 		// list grows, the source returns nothing, or we exhaust the duplicate-page budget.
 		var emptyPages = 0
 		while (true) {
-			val list = repository.getList(
-				offset = listOffset.value,
-				order = filterState.sortOrder,
-				filter = filterState.listFilter,
+			val startedAt = System.nanoTime()
+			val list = try {
+				repository.getList(
+					offset = listOffset.value,
+					order = filterState.sortOrder,
+					filter = filterState.listFilter,
+				)
+			} catch (error: Throwable) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+				community.recordProbe(
+					source = probeSource.name,
+					operation = "SEARCH",
+					ok = false,
+					latencyMs = (System.nanoTime() - startedAt) / 1_000_000L,
+					cfBlocked = error.getCauseUrl()?.contains("cloudflare", ignoreCase = true) == true,
+				)
+				throw error
+			}
+			community.recordProbe(
+				source = probeSource.name,
+				operation = "SEARCH",
+				ok = true,
+				empty = list.isEmpty(),
+				latencyMs = (System.nanoTime() - startedAt) / 1_000_000L,
 			)
 			val prevList = mangaList.value.orEmpty()
 			if (!append) {

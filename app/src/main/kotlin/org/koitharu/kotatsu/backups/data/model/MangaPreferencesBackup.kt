@@ -40,6 +40,9 @@ data class MangaPreferencesBackup(
 		contentRatingOverride = prefs.contentRatingOverride,
 	)
 
+	/** New archives omit custom covers; old archives can still restore their embedded images. */
+	fun withoutCustomCover() = copy(coverOverride = null, coverData = null, coverExtension = null)
+
 	fun toEntity(restoredCoverOverride: String? = coverOverride) = MangaPrefsEntity(
 		mangaId = manga.id,
 		mode = mode,

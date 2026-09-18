@@ -237,6 +237,50 @@
 					app:layout_constraintTop_toBottomOf="@+id/textView_description" />
 
 				<TextView
+					android:id="@+id/textView_community_title"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="@dimen/margin_small"
+					android:layout_marginTop="@dimen/margin_normal"
+					android:padding="@dimen/grid_spacing"
+					android:text="@string/community"
+					android:textAppearance="?textAppearanceTitleSmall"
+					android:visibility="gone"
+					app:layout_constraintEnd_toEndOf="parent"
+					app:layout_constraintStart_toStartOf="parent"
+					app:layout_constraintTop_toBottomOf="@id/chips_tags" />
+
+				<TextView
+					android:id="@+id/textView_community_summary"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginHorizontal="@dimen/margin_normal"
+					android:maxLines="2"
+					android:textAppearance="?attr/textAppearanceBodyMedium"
+					android:visibility="gone"
+					app:layout_constraintEnd_toEndOf="parent"
+					app:layout_constraintStart_toStartOf="parent"
+					app:layout_constraintTop_toBottomOf="@id/textView_community_title" />
+
+				<Button
+					android:id="@+id/button_community"
+					style="@style/Widget.Kotatsu.Button.More"
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="@dimen/margin_normal"
+					android:text="@string/community_open"
+					android:visibility="gone"
+					app:layout_constraintStart_toStartOf="parent"
+					app:layout_constraintTop_toBottomOf="@id/textView_community_summary" />
+
+				<androidx.constraintlayout.widget.Barrier
+					android:id="@+id/barrier_community_bottom"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					app:barrierDirection="bottom"
+					app:constraint_referenced_ids="chips_tags,textView_community_title,textView_community_summary,button_community" />
+
+				<TextView
 					android:id="@+id/textView_scrobbling_title"
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
@@ -250,7 +294,7 @@
 					android:textAppearance="?textAppearanceTitleSmall"
 					app:layout_constraintEnd_toStartOf="@id/button_scrobbling_more"
 					app:layout_constraintStart_toStartOf="parent"
-					app:layout_constraintTop_toBottomOf="@id/chips_tags" />
+					app:layout_constraintTop_toBottomOf="@id/barrier_community_bottom" />
 
 				<Button
 					android:id="@+id/button_scrobbling_more"

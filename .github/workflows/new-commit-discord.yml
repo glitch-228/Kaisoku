@@ -12,6 +12,8 @@ jobs:
       - name: Send commit embed to Discord
         env:
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_ROLE_ID: ${{ secrets.DISCORD_ROLE_ID }}
+          REPO_FULL_NAME: ${{ github.repository }}
           REPO: ${{ github.event.repository.name }}
           COMMIT_URL: ${{ github.event.head_commit.url }}
           COMMIT_MSG: ${{ github.event.head_commit.message }}
@@ -19,8 +21,27 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "No DISCORD_WEBHOOK_URL secret configured, skipping notification."
+            exit 0
+          fi
+
+          DEFAULT_ROLE_ID="1507819392233242624"
+          ROLE_ID="$DISCORD_ROLE_ID"
+          if [ -z "$ROLE_ID" ] && [ "$REPO_FULL_NAME" = "glitch-228/Kaisoku" ]; then
+            ROLE_ID="$DEFAULT_ROLE_ID"
+          fi
+
+          CONTENT=""
+          ROLE_MENTIONS="[]"
+          if [ -n "$ROLE_ID" ]; then
+            CONTENT="<@&${ROLE_ID}>"
+            ROLE_MENTIONS="[\"${ROLE_ID}\"]"
+          fi
+
           jq -n \
-            --arg content "<@&1507819392233242624>" \
+            --arg content "$CONTENT" \
+            --argjson roles "$ROLE_MENTIONS" \
             --arg title "New Commit: ${REPO}" \
             --arg url "${COMMIT_URL}" \
             --arg description "${COMMIT_MSG}" \
@@ -30,7 +51,7 @@ jobs:
             --arg timestamp "${TIMESTAMP}" \
             '{
               content: $content,
-              allowed_mentions: { roles: ["1507819392233242624"] },
+              allowed_mentions: { roles: $roles },
               embeds: [{
                 title: $title,
                 url: $url,

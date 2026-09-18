@@ -67,7 +67,7 @@ class BackupRepository @Inject constructor(
     private val json = Json {
         allowSpecialFloatingPointValues = true
         coerceInputValues = true
-        encodeDefaults = true
+        encodeDefaults = false
         ignoreUnknownKeys = true
         useAlternativeNames = false
     }
@@ -77,6 +77,7 @@ class BackupRepository @Inject constructor(
         progress: FlowCollector<Progress>?,
 		sections: Set<BackupSection> = BackupSection.entries.toSet(),
     ) {
+        output.setLevel(java.util.zip.Deflater.BEST_COMPRESSION)
         progress?.emit(Progress.INDETERMINATE)
 		var commonProgress = Progress(0, sections.size)
 		for (section in BackupSection.entries.filter(sections::contains)) {
@@ -155,8 +156,7 @@ class BackupRepository @Inject constructor(
 					section = BackupSection.MANGA_PREFERENCES,
 					data = database.getPreferencesDao().dump().asFlow().map { prefs ->
 						val manga = checkNotNull(database.getMangaDao().find(prefs.mangaId))
-						val cover = readCustomCover(prefs.coverUrlOverride)
-						MangaPreferencesBackup(manga, prefs, cover?.first, cover?.second)
+						MangaPreferencesBackup(manga, prefs).withoutCustomCover()
 					},
 					serializer = serializer(),
 				)
@@ -340,14 +340,6 @@ class BackupRepository @Inject constructor(
 	private fun dumpReaderGridSettings(): String {
         return JSONObject(tapGridSettings.getAllValues()).toString()
     }
-
-	private fun readCustomCover(uriValue: String?): Pair<String, String?>? {
-		val uri = uriValue?.let(Uri::parse) ?: return null
-		if (uri.scheme != "file") return null
-		val file = uri.path?.let(::File)?.takeIf(File::isFile) ?: return null
-		if (file.length() !in 1L..MAX_CUSTOM_COVER_BYTES.toLong()) return null
-		return Base64.getEncoder().encodeToString(file.readBytes()) to file.extension.takeIf(String::isNotBlank)
-	}
 
 	private fun restoreCustomCover(backup: MangaPreferencesBackup): String? {
 		val data = backup.coverData ?: return backup.coverOverride

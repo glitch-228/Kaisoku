@@ -6,18 +6,21 @@ import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
-import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.MenuProvider
+import androidx.fragment.app.FragmentActivity
 import com.google.android.material.snackbar.Snackbar
 import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.util.ext.isZipUri
 import org.koitharu.kotatsu.core.util.ext.tryLaunch
+import org.koitharu.kotatsu.parsers.model.Manga
 
 class ImageMenuProvider(
-	private val activity: ComponentActivity,
+	private val activity: FragmentActivity,
 	private val snackbarHost: View,
 	private val viewModel: ImageViewModel,
+	private val manga: Manga? = null,
 ) : MenuProvider {
 
 	private val permissionLauncher = activity.registerForActivityResult(
@@ -38,6 +41,9 @@ class ImageMenuProvider(
 
 	override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
 		menuInflater.inflate(R.menu.opt_image, menu)
+		if (manga == null) {
+			menu.removeItem(R.id.action_edit)
+		}
 	}
 
 	override fun onMenuItemSelected(menuItem: MenuItem): Boolean = when (menuItem.itemId) {
@@ -47,6 +53,11 @@ class ImageMenuProvider(
 			} else {
 				saveImage()
 			}
+			true
+		}
+
+		R.id.action_edit -> {
+			manga?.let { activity.router.openMangaOverrideConfig(it) }
 			true
 		}
 

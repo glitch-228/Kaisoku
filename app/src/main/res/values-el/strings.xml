@@ -39,7 +39,7 @@
     <string name="share_image">Κοινοποίηση εικόνας</string>
     <string name="_import">Εισαγωγή</string>
     <string name="delete">Διαγραφή</string>
-    <string name="text_file_not_supported">Επιλέξτε ένα αρχείο ZIP ή CBZ.</string>
+    <string name="text_file_not_supported">Επιλέξτε ένα αρχείο ZIP ή CBZ. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Χωρίς περιγραφή</string>
     <string name="clear_pages_cache">Εκκαθάριση προσωρινής μνήμης σελίδων</string>
     <string name="text_file_sizes">B|kB|MB|GB|TB</string>
@@ -279,7 +279,7 @@
     <string name="allow_unstable_updates">Επίτρεψε ασταθείς ενημερώσεις</string>
     <string name="sources_reorder_tip">Πάτα παρατεταμένα ένα στοιχείο για να το αναταξινομήσεις</string>
     <string name="settings_apply_restart_required">Κάνε επανεκκίνηση της εφαρμογής για να εφαρμοστούν οι αλλαγές, παρακαλώ</string>
-    <string name="comics_archive_import_description">Μπορείς να επιλέξεις ένα ή περισσότερα .cbz ή .zip αρχεία, κάθε ένα θα αναγνωρίζεται ως ξεχωριστό manga.</string>
+    <string name="comics_archive_import_description">Μπορείς να επιλέξεις ένα ή περισσότερα .cbz ή .zip αρχεία, κάθε ένα θα αναγνωρίζεται ως ξεχωριστό manga. CBR (.cbr).</string>
     <string name="speed">Ταχύτητα</string>
     <string name="show_on_shelf">Εμφάνιση στο Ράφι</string>
     <string name="find_similar">Βρες παρόμοια</string>

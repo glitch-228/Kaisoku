@@ -33,10 +33,13 @@ import org.koitharu.kotatsu.bookmarks.domain.BookmarksRepository
 import org.koitharu.kotatsu.core.exceptions.EmptyMangaException
 import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.getPreferredBranch
+import org.koitharu.kotatsu.core.model.unwrap
 import org.koitharu.kotatsu.core.nav.MangaIntent
 import org.koitharu.kotatsu.core.nav.ReaderIntent
 import org.koitharu.kotatsu.core.os.AppShortcutManager
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
+import org.koitharu.kotatsu.core.parser.lnreader.LnReaderMangaSource
+import org.koitharu.kotatsu.core.model.isLocal
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.ReaderMode
 import org.koitharu.kotatsu.core.prefs.TriStateOption
@@ -134,6 +137,7 @@ class ReaderViewModel @Inject constructor(
     private var bookmarkJob: Job? = null
     private var stateChangeJob: Job? = null
     private var modeSwitchJob: Job? = null
+    @Volatile private var divertedToNovelReader = false
     private var lastScrollProgress: Float = -1f
     private val navCursor = ChapterSwitchCursor()
     // Page-list replacement and delayed page-state commits must be ordered together. Otherwise an
@@ -155,6 +159,7 @@ class ReaderViewModel @Inject constructor(
     val onLoadingError = MutableEventFlow<Throwable>()
     val onShowToast = MutableEventFlow<Int>()
     val onAskNsfwIncognito = MutableEventFlow<Unit>()
+    val onOpenNovelReader = MutableEventFlow<Manga>()
     val onShowOcrSheet = MutableEventFlow<Unit>()
     val onTranslateConfigMissing = MutableEventFlow<Unit>()
     val ocrSheetState = MutableStateFlow<org.koitharu.kotatsu.reader.translate.OcrSheetState>(
@@ -760,8 +765,22 @@ class ReaderViewModel @Inject constructor(
                         if (mangaDetails.value == null) {
                             mangaDetails.value = details
                         }
-                        chaptersLoader.init(details)
                         val manga = details.toManga()
+                        // Novels are rendered by the dedicated text reader; the standard pager
+                        // cannot display them (their only "page" is a data: URL). Details can come
+                        // from any entry point (Read button, chapter list, bookmarks, shortcuts),
+                        // so divert here rather than at each call site.
+                        val isNovel = manga.source.name.startsWith("lnreader:") ||
+                            (manga.isLocal && org.koitharu.kotatsu.local.data.input.LocalMangaParser(
+                                android.net.Uri.parse(manga.url),
+                            ).isNovel())
+                        if (isNovel && !divertedToNovelReader) {
+                            divertedToNovelReader = true
+                            onOpenNovelReader.call(manga)
+                            loadingJob?.cancel()
+                            return@collect
+                        }
+                        chaptersLoader.init(details)
                         // obtain state
                         if (readingState.value == null) {
                             val newState = getStateFromIntent(manga)

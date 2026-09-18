@@ -11,9 +11,20 @@ import org.koitharu.kotatsu.details.ui.pager.pages.PagesFragment
 
 class ChaptersPagesAdapter(
 	fragment: Fragment,
-	val isPagesTabEnabled: Boolean,
+	isPagesTabEnabled: Boolean,
 ) : FragmentStateAdapter(fragment),
 	TabLayoutMediator.TabConfigurationStrategy {
+
+	var isPagesTabEnabled: Boolean = isPagesTabEnabled
+		set(value) {
+			if (field == value) return
+			field = value
+			notifyDataSetChanged()
+		}
+
+	override fun getItemId(position: Int): Long = if (!isPagesTabEnabled && position == 1) 2L else position.toLong()
+
+	override fun containsItem(itemId: Long): Boolean = itemId == 0L || itemId == 2L || (itemId == 1L && isPagesTabEnabled)
 
 	override fun getItemCount(): Int = if (isPagesTabEnabled) 3 else 2
 

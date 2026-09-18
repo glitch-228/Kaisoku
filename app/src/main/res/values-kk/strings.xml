@@ -110,7 +110,7 @@
     <string name="downloads">Жүктелген</string>
     <string name="operation_not_supported">Қолжетімсіз амал</string>
     <string name="delete">Жою</string>
-    <string name="text_file_not_supported">CBZ не ZIP пішімде таңдаңыз.</string>
+    <string name="text_file_not_supported">CBZ не ZIP пішімде таңдаңыз. (CBZ / ZIP / CBR)</string>
     <string name="clear_pages_cache">Бет кәшін тазалау</string>
     <string name="read_mode">Оқу режімі</string>
     <string name="text_delete_local_manga">“%s” құрылғыдан біржолата жоямысыз?</string>
@@ -377,7 +377,7 @@
     <string name="show_suspicious_content">Күмәнді контентті көрсету</string>
     <string name="reader_info_bar_summary">Экранның үстінгі жағында уақыт пен оқу прогрессін көрсету</string>
     <string name="allow_unstable_updates_summary">Тұрақсыз нұсқа туралы мәлімдеме алу</string>
-    <string name="comics_archive_import_description">Бір не одан көп .cbz я .zip файлын таңдай аласыз, әр файыл бөлек маңга болып анықталады.</string>
+    <string name="comics_archive_import_description">Бір не одан көп .cbz я .zip файлын таңдай аласыз, әр файыл бөлек маңга болып анықталады. CBR (.cbr).</string>
     <string name="downloads_paused">Жүктеп алу тоқтап қалды</string>
     <string name="too_many_requests_message">Тым көп сұрату. Біраздан соң қайталап көріңіз</string>
     <string name="downloads_wifi_only">Wi-Fi арқылы ғана жүктеу</string>

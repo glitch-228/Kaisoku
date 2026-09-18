@@ -7,7 +7,7 @@
     <string name="share_image">แชร์รูปภาพ</string>
     <string name="_import">นำเข้า</string>
     <string name="delete">ลบ</string>
-    <string name="text_file_not_supported">เลือกไฟล์ ZIP หรือ CBZ</string>
+    <string name="text_file_not_supported">เลือกไฟล์ ZIP หรือ CBZ (CBZ / ZIP / CBR)</string>
     <string name="clear_pages_cache">เคลียร์แคชหน้ามังงะ</string>
     <string name="standard">มาตรฐาน</string>
     <string name="read_mode">โหมดอ่าน</string>
@@ -409,7 +409,7 @@
     <string name="years">ปี</string>
     <string name="enable_logging">เปิดใช้งานการบันทึกข้อมูล</string>
     <string name="share_logs">แชร์บันทึกข้อมูล</string>
-    <string name="comics_archive_import_description">คุณสามารถเลือกไฟล์ .cbz หรือ .zip ได้ตั้งแต่หนึ่งไฟล์ขึ้นไป โดยแต่ละไฟล์จะนับว่าเป็นมังงะแยกกัน</string>
+    <string name="comics_archive_import_description">คุณสามารถเลือกไฟล์ .cbz หรือ .zip ได้ตั้งแต่หนึ่งไฟล์ขึ้นไป โดยแต่ละไฟล์จะนับว่าเป็นมังงะแยกกัน CBR (.cbr).</string>
     <string name="popular_in_week">เป็นที่นิยมสัปดาห์นี้</string>
     <string name="added_long_ago">เพิ่มมานานแล้ว</string>
     <string name="recently_added">เพิ่มล่าสุด</string>

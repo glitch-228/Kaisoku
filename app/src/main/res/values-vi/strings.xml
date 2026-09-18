@@ -194,7 +194,7 @@
     <string name="_s_deleted_from_local_storage">\"%s\" đã bị xoá khỏi bộ nhớ cục bộ</string>
     <string name="share_image">Chia sẻ hình ảnh</string>
     <string name="page_saved">Đã lưu trang này</string>
-    <string name="text_file_not_supported">Vui lòng chọn tập tin ZIP hoặc CBZ.</string>
+    <string name="text_file_not_supported">Vui lòng chọn tập tin ZIP hoặc CBZ. (CBZ / ZIP / CBR)</string>
     <string name="error">Lỗi</string>
     <string name="_continue">Tiếp tục</string>
     <string name="recent_manga">Gần đây</string>
@@ -363,7 +363,7 @@
     <string name="sources_reorder_tip">Chạm và giữ các nguồn truyện để sắp xếp chúng</string>
     <string name="settings_apply_restart_required">Vui lòng khởi động lại ứng dụng để áp dụng những thay đổi trên</string>
     <string name="server_address">Địa chỉ server</string>
-    <string name="comics_archive_import_description">Bạn có thể chọn một hoặc nhiều file .cbz hoặc .zip, mỗi file sẽ được nhận dạng như một manga riêng biệt.</string>
+    <string name="comics_archive_import_description">Bạn có thể chọn một hoặc nhiều file .cbz hoặc .zip, mỗi file sẽ được nhận dạng như một manga riêng biệt. CBR (.cbr).</string>
     <string name="cancel_all">Huỷ bỏ tất cả</string>
     <string name="downloads_wifi_only">Chỉ tải xuống qua Wi-Fi</string>
     <string name="downloads_wifi_only_summary">Ngừng tải xuống khi chuyển qua mạng dữ liệu</string>

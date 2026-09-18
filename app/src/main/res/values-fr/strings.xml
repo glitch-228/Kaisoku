@@ -117,7 +117,7 @@
     <string name="text_file_sizes">o|ko|Mo|Go|To</string>
     <string name="clear_pages_cache">Vider le cache de la page</string>
     <string name="no_description">Aucune description</string>
-    <string name="text_file_not_supported">Choisissez un fichier ZIP ou CBZ.</string>
+    <string name="text_file_not_supported">Choisissez un fichier ZIP ou CBZ. (CBZ / ZIP / CBR)</string>
     <string name="operation_not_supported">Cette opération n\'est pas prise en charge</string>
     <string name="delete">Supprimer</string>
     <string name="_import">Importer</string>
@@ -360,7 +360,7 @@
     <string name="got_it">Compris</string>
     <string name="speed">Vitesse</string>
     <string name="folder_with_images_import_description">Vous pouvez sélectionner un répertoire contenant des archives ou des images. Chaque archive (ou sous-répertoire) sera reconnue comme un chapitre.</string>
-    <string name="comics_archive_import_description">Vous pouvez sélectionner un ou plusieurs fichiers .cbz ou .zip, chaque fichier sera reconnu comme un manga séparé.</string>
+    <string name="comics_archive_import_description">Vous pouvez sélectionner un ou plusieurs fichiers .cbz ou .zip, chaque fichier sera reconnu comme un manga séparé. CBR (.cbr).</string>
     <string name="show_on_shelf">Afficher sur l\'étagère</string>
     <string name="sources_reorder_tip">Appuyez sur un élément et maintenez-le enfoncé pour le réorganiser</string>
     <string name="find_similar">Trouver des similaires</string>

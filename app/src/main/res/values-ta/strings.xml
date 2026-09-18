@@ -8,7 +8,7 @@
     <string name="_import">இறக்குமதி</string>
     <string name="delete">நீக்கு</string>
     <string name="operation_not_supported">இந்த செயல்பாடு ஆதரிக்கப்படவில்லை</string>
-    <string name="text_file_not_supported">ஒரு சிப் அல்லது சிபிஇசட் கோப்பைத் தேர்ந்தெடுக்கவும்.</string>
+    <string name="text_file_not_supported">ஒரு சிப் அல்லது சிபிஇசட் கோப்பைத் தேர்ந்தெடுக்கவும். (CBZ / ZIP / CBR)</string>
     <string name="no_description">விளக்கம் இல்லை</string>
     <string name="clear_pages_cache">பக்க கேச் அழிக்கவும்</string>
     <string name="text_file_sizes">b | kb | Mb | g | tb</string>
@@ -439,7 +439,7 @@
     <string name="download_started">பதிவிறக்கம் தொடங்கியது</string>
     <string name="got_it">கிடைத்தது</string>
     <string name="sources_reorder_tip">அவற்றை மறுவரிசைப்படுத்த ஒரு பொருளைத் தட்டவும் பிடிக்கவும்</string>
-    <string name="comics_archive_import_description">நீங்கள் ஒன்று அல்லது அதற்கு மேற்பட்ட .CBZ அல்லது .ZIP கோப்புகளைத் தேர்ந்தெடுக்கலாம், ஒவ்வொரு கோப்பும் ஒரு தனி மங்காவாக அங்கீகரிக்கப்படும்.</string>
+    <string name="comics_archive_import_description">நீங்கள் ஒன்று அல்லது அதற்கு மேற்பட்ட .CBZ அல்லது .ZIP கோப்புகளைத் தேர்ந்தெடுக்கலாம், ஒவ்வொரு கோப்பும் ஒரு தனி மங்காவாக அங்கீகரிக்கப்படும். CBR (.cbr).</string>
     <string name="folder_with_images_import_description">காப்பகங்கள் அல்லது படங்களுடன் ஒரு கோப்பகத்தை நீங்கள் தேர்ந்தெடுக்கலாம். ஒவ்வொரு காப்பகமும் (அல்லது துணை அடைவு) ஒரு அத்தியாயமாக அங்கீகரிக்கப்படும்.</string>
     <string name="speed">வேகம்</string>
     <string name="sync_settings">ஒத்திசைவு அமைப்புகள்</string>

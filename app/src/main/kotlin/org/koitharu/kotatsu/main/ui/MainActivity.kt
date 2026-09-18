@@ -76,6 +76,7 @@ import org.koitharu.kotatsu.local.ui.LocalIndexUpdateService
 import org.koitharu.kotatsu.local.ui.LocalStorageCleanupWorker
 import org.koitharu.kotatsu.main.ui.owners.AppBarOwner
 import org.koitharu.kotatsu.main.ui.owners.BottomNavOwner
+import org.koitharu.kotatsu.main.ui.owners.ListCheckpointOwner
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.remotelist.ui.MangaSearchMenuProvider
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionItemCallback
@@ -90,6 +91,7 @@ import com.google.android.material.R as materialR
 
 @AndroidEntryPoint
 class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNavOwner,
+	ListCheckpointOwner,
 	View.OnClickListener,
 	SearchSuggestionItemCallback.SuggestionItemListener,
 	MainNavigationDelegate.OnFragmentChangedListener,
@@ -117,6 +119,11 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 
 	override val bottomNav: SlidingBottomNavigationView?
 		get() = viewBinding.bottomNav
+
+	override val listCheckpointButton: View?
+		get() = viewBinding.buttonCheckpoint.root
+
+	private var lastBottomInset = 0
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -248,6 +255,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 			bottomMargin = barsInsets.bottom
 		}
 		updateContainerBottomMargin()
+		updateCheckpointMargin(barsInsets.bottom)
 		return insets.consume(v, typeMask, start = viewBinding.navRail != null).also {
 			handleSearchSuggestionsInsets(it)
 		}
@@ -266,6 +274,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 	) {
 		if (top != oldTop || bottom != oldBottom) {
 			updateContainerBottomMargin()
+			updateCheckpointMargin()
 		}
 	}
 
@@ -505,6 +514,25 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 				params.bottomMargin = newMargin
 				layoutParams = params
 			}
+		}
+	}
+
+	/**
+	 * Lifts the "jump back" pill clear of the floating navigation bar. The bar's own bottom margin is
+	 * what keeps it off the system bars in floating mode, so the pill has to clear the margin as well
+	 * as the bar itself.
+	 */
+	private fun updateCheckpointMargin(bottomInset: Int = lastBottomInset) {
+		lastBottomInset = bottomInset
+		val gap = resources.getDimensionPixelOffset(R.dimen.margin_small)
+		val bottomNav = viewBinding.bottomNav
+		val navHeight = if (bottomNav != null) {
+			bottomNav.height + ((bottomNav.layoutParams as? MarginLayoutParams)?.bottomMargin ?: 0)
+		} else {
+			0
+		}
+		viewBinding.buttonCheckpoint.root.updateLayoutParams<MarginLayoutParams> {
+			bottomMargin = bottomInset + navHeight + gap
 		}
 	}
 

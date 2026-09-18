@@ -16,13 +16,12 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.koitharu.kotatsu.core.network.MangaHttpClient
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.parsers.util.await
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.net.URLEncoder
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.ceil
@@ -38,6 +37,7 @@ class GoogleLensTranslator @Inject constructor(
 	@MangaHttpClient private val okHttpClient: OkHttpClient,
 	private val settings: AppSettings,
 ) : PageTranslator {
+	private val textClient by lazy { okHttpClient.newBuilder().callTimeout(90, TimeUnit.SECONDS).build() }
 
 	override suspend fun translate(
 		bitmap: Bitmap,
@@ -154,32 +154,20 @@ class GoogleLensTranslator @Inject constructor(
 		}
 	}
 
-	private suspend fun translateText(text: String, sourceLang: String, targetLang: String): String {
+	internal suspend fun translateText(text: String, sourceLang: String, targetLang: String): String {
 		if (text.isBlank()) return ""
-		val q = URLEncoder.encode(text, "UTF-8")
-		val url = "$TRANSLATE_ENDPOINT?client=gtx&dt=t&sl=$sourceLang&tl=$targetLang&q=$q"
+		val url = GoogleTextTranslation.url(text, sourceLang, targetLang)
 		val request = Request.Builder().url(url).header("User-Agent", CHROME_UA).build()
 		val response = try {
-			okHttpClient.newCall(request).await()
+			textClient.newCall(request).await()
 		} catch (e: IOException) {
 			throw TranslateException.Network(e)
 		}
 		return response.use {
 			val body = it.body?.string().orEmpty()
 			if (!it.isSuccessful) throw TranslateException.Http(it.code, body)
-			parseTranslateResponse(body)
+			GoogleTextTranslation.response(body)
 		}
-	}
-
-	/** translate_a/single shape: `[[[translated, original, ...], ...], ...]` — concat all segments. */
-	private fun parseTranslateResponse(body: String): String {
-		val root = runCatching { JSONArray(body) }.getOrNull() ?: throw TranslateException.Parse("translate: not JSON")
-		val segments = root.optJSONArray(0) ?: return ""
-		val sb = StringBuilder()
-		for (i in 0 until segments.length()) {
-			sb.append(segments.optJSONArray(i)?.optString(0).orEmpty())
-		}
-		return sb.toString()
 	}
 
 	private data class Tile(val y0: Int, val y1: Int)
@@ -249,7 +237,6 @@ class GoogleLensTranslator @Inject constructor(
 		// Chrome's public Lens frontend key (well-known, baked into Chromium). Split so automated
 		// secret scanners don't flag it as a leaked private credential — it isn't one.
 		private const val LENS_API_KEY = "AIzaSyDr2UxVnv_U85Abh" + "hY8XSHSIavUW0DC-sY"
-		private const val TRANSLATE_ENDPOINT = "https://translate.googleapis.com/translate_a/single"
 		private const val TARGET_WIDTH = 1080
 		private const val MAX_TILE_HEIGHT = 1600f
 		private const val TILE_OVERLAP = 0.04f

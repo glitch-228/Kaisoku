@@ -59,7 +59,7 @@
     <string name="_import">ఇంపోర్ట్</string>
     <string name="delete">తొలగించు</string>
     <string name="operation_not_supported">ఈ ఆపరేషన్‌కు మద్దతు లేదు</string>
-    <string name="text_file_not_supported">దయచేసి ZIP లేదా CBZ ఫైల్ ఎంచుకోండి</string>
+    <string name="text_file_not_supported">దయచేసి ZIP లేదా CBZ ఫైల్ ఎంచుకోండి (CBZ / ZIP / CBR)</string>
     <string name="no_description">వివరణ లేదు</string>
     <string name="clear_pages_cache">పేజీల క్యాష్ క్లియర్ చెయ్యి</string>
     <string name="text_file_sizes">B | kB | MB | GB | TB</string>

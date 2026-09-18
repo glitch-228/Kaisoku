@@ -52,7 +52,9 @@ import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.exceptions.resolve.DialogErrorObserver
 import org.koitharu.kotatsu.core.exceptions.resolve.SnackbarErrorObserver
 import org.koitharu.kotatsu.core.nav.AppRouter
+import org.koitharu.kotatsu.core.nav.ReaderIntent
 import org.koitharu.kotatsu.core.nav.router
+import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.ReaderMode
 import org.koitharu.kotatsu.core.ui.BaseFullscreenActivity
@@ -62,6 +64,7 @@ import org.koitharu.kotatsu.core.ui.util.MenuInvalidator
 import org.koitharu.kotatsu.core.ui.widgets.ZoomControl
 import org.koitharu.kotatsu.core.util.IdlingDetector
 import org.koitharu.kotatsu.core.util.ext.copyToClipboard
+import org.koitharu.kotatsu.core.util.ext.getParcelableExtraCompat
 import org.koitharu.kotatsu.core.util.ext.getThemeDimensionPixelOffset
 import org.koitharu.kotatsu.core.util.ext.hasGlobalPoint
 import org.koitharu.kotatsu.core.util.ext.isAnimationsEnabled
@@ -76,7 +79,9 @@ import org.koitharu.kotatsu.parsers.model.MangaChapter
 import org.koitharu.kotatsu.reader.data.TapGridSettings
 import org.koitharu.kotatsu.reader.domain.TapGridArea
 import org.koitharu.kotatsu.reader.domain.UpscaleEffect
+import org.koitharu.kotatsu.reader.ui.ReaderState
 import org.koitharu.kotatsu.reader.ui.config.ReaderConfigSheet
+import org.koitharu.kotatsu.reader.ui.novel.NovelReaderActivity
 import org.koitharu.kotatsu.reader.ui.pager.ReaderPage
 import org.koitharu.kotatsu.reader.ui.pager.ReaderUiState
 import org.koitharu.kotatsu.reader.ui.tapgrid.TapGridDispatcher
@@ -227,6 +232,18 @@ class ReaderActivity :
         )
         viewModel.onShowOcrSheet.observeEvent(this) {
             org.koitharu.kotatsu.reader.translate.OcrBottomSheet.show(supportFragmentManager)
+        }
+        viewModel.onOpenNovelReader.observeEvent(this) { manga ->
+            // The standard reader cannot render novel chapters; hand over to the novel reader.
+            // This activity never loaded any content, so finishing is enough — history was not touched.
+            val novelIntent = Intent(this, NovelReaderActivity::class.java)
+                .putExtra(AppRouter.KEY_MANGA, ParcelableManga(manga))
+                .putExtra(NovelReaderActivity.EXTRA_INCOGNITO, viewModel.isIncognitoMode.value)
+            intent.getParcelableExtraCompat<ReaderState>(ReaderIntent.EXTRA_STATE)?.let { state ->
+                novelIntent.putExtra(NovelReaderActivity.EXTRA_STATE, state)
+            }
+            startActivity(novelIntent)
+            finish()
         }
         viewModel.onTranslateConfigMissing.observeEvent(this) {
             Snackbar.make(viewBinding.container, R.string.translate_setup_required, Snackbar.LENGTH_LONG).show()
@@ -646,6 +663,14 @@ class ReaderActivity :
 
     override fun onBookmarkClick() {
         viewModel.toggleBookmark()
+    }
+
+    override fun showChaptersSheet(defaultTab: Int?) {
+        if (defaultTab != null) {
+            router.showChapterPagesSheet(defaultTab)
+        } else {
+            router.showChapterPagesSheet()
+        }
     }
 
     override fun onSavePageClick() {

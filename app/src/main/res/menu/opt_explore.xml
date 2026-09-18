@@ -8,6 +8,11 @@
 		android:titleCondensed="@string/add" />
 
 	<item
+		android:id="@+id/action_add_lnreader_sources"
+		android:title="@string/add_lnreader_sources"
+		android:titleCondensed="@string/add" />
+
+	<item
 		android:id="@+id/action_add_browser_source"
 		android:title="@string/add_browser_source"
 		android:titleCondensed="@string/add_source_label" />

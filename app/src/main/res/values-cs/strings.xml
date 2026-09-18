@@ -39,7 +39,7 @@
     <string name="share_image">Sdílet obrázek</string>
     <string name="_import">Importovat</string>
     <string name="delete">Smazat</string>
-    <string name="text_file_not_supported">Vyberte soubor ZIP či CBZ.</string>
+    <string name="text_file_not_supported">Vyberte soubor ZIP či CBZ. (CBZ / ZIP / CBR)</string>
     <string name="clear_pages_cache">Vyčistit mezipaměť stran</string>
     <string name="text_file_sizes">B|kB|MB|GB|TB</string>
     <string name="standard">Standardní</string>
@@ -294,7 +294,7 @@
     <string name="sources_reorder_tip">Klikněte a přidržte na předmětu pro přeskupení</string>
     <string name="user_agent">Záhlaví UserAgent</string>
     <string name="settings_apply_restart_required">Prosíme restartujte aplikaci pro aplikování těchto změn</string>
-    <string name="comics_archive_import_description">Můžete vybrat jeden či více .cbz nebo .zip souborů, každý soubor bude brán jako samostatná manga.</string>
+    <string name="comics_archive_import_description">Můžete vybrat jeden či více .cbz nebo .zip souborů, každý soubor bude brán jako samostatná manga. CBR (.cbr).</string>
     <string name="show_on_shelf">Zobrazovat na poličce</string>
     <string name="sync_auth_hint">Můžete se přihlásit do již existujícího účtu nebo vytvořit nový</string>
     <string name="find_similar">Najít podobné</string>

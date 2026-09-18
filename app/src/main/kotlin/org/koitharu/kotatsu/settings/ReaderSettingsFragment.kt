@@ -113,6 +113,11 @@ class ReaderSettingsFragment :
 
 	override fun onPreferenceTreeClick(preference: Preference): Boolean {
 		return when (preference.key) {
+			AppSettings.KEY_READER_UPSCALE -> {
+				org.koitharu.kotatsu.reader.ui.upscale.UpscaleSettingsDialog().show(parentFragmentManager, "upscaleSettings")
+				true
+			}
+
 			AppSettings.KEY_READER_TAP_ACTIONS -> {
 				router.openReaderTapGridSettings()
 				true
@@ -140,14 +145,14 @@ class ReaderSettingsFragment :
 	}
 
 	/**
-	 * Gate every translation sub-setting on the master beta toggle, and hide the BYOK
-	 * endpoint/key/model/headers fields when the keyless Google Lens provider is selected.
+	 * Provider/language settings also serve manual novel translation, independently of image overlays.
+	 * Hide credentials when the keyless Google provider is selected.
 	 */
 	private fun updateTranslateDependencies() {
 		val enabled = settings.isPageTranslationEnabled
 		val isLens = settings.translateProvider == TranslateProvider.GOOGLE_LENS
 		for (key in TRANSLATE_CONFIG_KEYS) {
-			findPreference<Preference>(key)?.isEnabled = enabled
+			findPreference<Preference>(key)?.isEnabled = enabled || key !in TRANSLATE_IMAGE_KEYS
 		}
 		for (key in TRANSLATE_BYOK_KEYS) {
 			findPreference<Preference>(key)?.isVisible = !isLens
@@ -182,7 +187,14 @@ class ReaderSettingsFragment :
 			AppSettings.KEY_TRANSLATE_CUSTOM_HEADERS,
 		)
 
-		// Everything under the category, disabled when the master toggle is off.
+		private val TRANSLATE_IMAGE_KEYS = setOf(
+			AppSettings.KEY_TRANSLATE_TRIGGER_MODE,
+			AppSettings.KEY_TRANSLATE_OVERLAY_BG,
+			AppSettings.KEY_TRANSLATE_CONCURRENCY,
+			AppSettings.KEY_TRANSLATE_CLEAR_CACHE,
+		)
+
+		// Shared text/image configuration remains editable with image translation off.
 		private val TRANSLATE_CONFIG_KEYS = arrayOf(
 			AppSettings.KEY_TRANSLATE_PROVIDER,
 			AppSettings.KEY_TRANSLATE_ENDPOINT,

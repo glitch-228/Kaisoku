@@ -59,7 +59,7 @@
     <string name="theme">テーマ</string>
     <string name="network_error">ネットワークエラー</string>
     <string name="updated">更新</string>
-    <string name="text_file_not_supported">ZIP ファイルまたは CBZ ファイルを選択してください。</string>
+    <string name="text_file_not_supported">ZIP ファイルまたは CBZ ファイルを選択してください。 (CBZ / ZIP / CBR)</string>
     <string name="standard">標準</string>
     <string name="webtoon">ウェブトゥーン</string>
     <string name="read_mode">読み取りモード</string>
@@ -358,7 +358,7 @@
     <string name="theme_name_sakura">さくら</string>
     <string name="settings_apply_restart_required">この変更を適用するには、アプリケーションを再起動してください</string>
     <string name="sources_reorder_tip">項目をタップ＆ホールドして並び替えをすることができます</string>
-    <string name="comics_archive_import_description">.cbzまたは.zipファイルを1つ以上選択することができ、各ファイルは別のマンガとして認識されます。</string>
+    <string name="comics_archive_import_description">.cbzまたは.zipファイルを1つ以上選択することができ、各ファイルは別のマンガとして認識されます。 CBR (.cbr).</string>
     <string name="got_it">了解</string>
     <string name="show_on_shelf">棚に表示</string>
     <string name="invert_colors">色を反転させる</string>

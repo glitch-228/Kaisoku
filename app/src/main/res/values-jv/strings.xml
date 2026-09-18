@@ -64,5 +64,5 @@
     <string name="_import">Pundhut barang jawi</string>
     <string name="delete">Busek</string>
     <string name="operation_not_supported">tindakan menika mboten dipunsengkuyung</string>
-    <string name="text_file_not_supported">Milih antawis berkas zip utawi cbz.</string>
+    <string name="text_file_not_supported">Milih antawis berkas zip utawi cbz. (CBZ / ZIP / CBR)</string>
 </resources>

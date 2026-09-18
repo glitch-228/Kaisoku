@@ -371,12 +371,7 @@ class MihonMangaRepository(
 			rawUrl.startsWith("//")
 	}
 
-	private fun stableId(rawValue: String): Long {
-		var hash = LONG_HASH_SEED
-		source.name.forEach { hash = 31 * hash + it.code }
-		rawValue.forEach { hash = 31 * hash + it.code }
-		return hash
-	}
+	private fun stableId(rawValue: String): Long = mihonStableId(source.name, rawValue)
 
 	private suspend fun loadChapters(seed: SManga, details: SManga): List<SChapter> {
 		val candidates = buildList {
@@ -470,7 +465,6 @@ class MihonMangaRepository(
 		private const val RESOLVE_SCHEME = "mihon-resolve"
 		private const val DIRECT_PAGE_HOST = "mihon.invalid"
 		private const val DIRECT_PAGE_PATH = "page"
-		private const val LONG_HASH_SEED = 1125899906842597L
 	}
 }
 

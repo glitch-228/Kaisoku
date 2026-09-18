@@ -55,7 +55,7 @@ class ImportService : CoroutineIntentService() {
 		startForeground(this)
 		powerManager.withPartialWakeLock(TAG) {
 			val result = runCatchingCancellable {
-				importer.import(uri).manga
+				importer.import(uri).map { it.manga }
 			}
 			if (applicationContext.checkNotificationPermission(CHANNEL_ID)) {
 				val notification = buildNotification(startId, result)
@@ -102,13 +102,26 @@ class ImportService : CoroutineIntentService() {
 		)
 	}
 
-	private suspend fun buildNotification(startId: Int, result: Result<Manga>): Notification {
+	private suspend fun buildNotification(startId: Int, result: Result<List<Manga>>): Notification {
 		val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
 			.setPriority(NotificationCompat.PRIORITY_DEFAULT)
 			.setDefaults(0)
 			.setSilent(true)
 			.setAutoCancel(true)
-		result.onSuccess { manga ->
+		result.onSuccess { imported ->
+			val manga = imported.singleOrNull()
+			if (manga == null) {
+				notification.setContentTitle(applicationContext.getString(R.string.import_completed))
+					.setContentText(
+						applicationContext.resources.getQuantityString(
+							R.plurals.imported_titles,
+							imported.size,
+							imported.size,
+						),
+					)
+					.setSmallIcon(R.drawable.ic_stat_done)
+				return@onSuccess
+			}
 			notification.setLargeIcon(
 				coil.execute(
 					ImageRequest.Builder(applicationContext)

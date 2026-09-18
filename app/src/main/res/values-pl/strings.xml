@@ -240,7 +240,7 @@
     <string name="reader_info_pattern">Rozdz. %1$d/%2$d Str. %3$d/%4$d</string>
     <string name="network_unavailable_hint">Włącz Wi-Fi lub sieć komórkową, aby czytać mangę online</string>
     <string name="_import">Importuj</string>
-    <string name="text_file_not_supported">Wybierz plik ZIP lub CBZ.</string>
+    <string name="text_file_not_supported">Wybierz plik ZIP lub CBZ. (CBZ / ZIP / CBR)</string>
     <string name="clear_search_history">Wyczyść historię wyszukiwania</string>
     <string name="operation_not_supported">Ta operacja nie jest obsługiwana</string>
     <string name="sort_order">Tryb sortowania</string>
@@ -346,7 +346,7 @@
     <string name="settings_apply_restart_required">Uruchom ponownie aplikację by wprowadzić te zmiany</string>
     <string name="speed">Prędkość</string>
     <string name="sources_reorder_tip">Stuknij i przytrzymaj element, aby zmienić jego kolejność</string>
-    <string name="comics_archive_import_description">Możesz wybrać jeden lub więcej plików .cbz lub .zip, każdy plik zostanie rozpoznany jako osobna manga.</string>
+    <string name="comics_archive_import_description">Możesz wybrać jeden lub więcej plików .cbz lub .zip, każdy plik zostanie rozpoznany jako osobna manga. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Możesz wybrać katalog z archiwami lub obrazami. Każde archiwum (lub podkatalog) zostanie rozpoznane jako rozdział.</string>
     <string name="enable">Włączać</string>
     <string name="prefetch_content">Wstępne ładowanie treści</string>

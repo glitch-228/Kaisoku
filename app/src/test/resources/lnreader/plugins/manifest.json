@@ -1,0 +1,26 @@
+[
+  {
+    "id": "webnovel",
+    "version": "1.0.3",
+    "url": "https://raw.githubusercontent.com/lnreader/lnreader-plugins/plugins/v3.0.0/.js/src/plugins/english/webnovel.js",
+    "sha256": "f5bdabcbd5fd881d80b849ad95e5d4a87e3cc5c197784f4eaa5fe09adc758e48"
+  },
+  {
+    "id": "jaomix.ru",
+    "version": "1.0.3",
+    "url": "https://raw.githubusercontent.com/lnreader/lnreader-plugins/plugins/v3.0.0/.js/src/plugins/russian/jaomix.js",
+    "sha256": "592d40e24712088637c350896229966f8be4cdd1b39643e60679d817b234f4f1"
+  },
+  {
+    "id": "RLIB",
+    "version": "2.2.6",
+    "url": "https://raw.githubusercontent.com/lnreader/lnreader-plugins/plugins/v3.0.0/.js/src/plugins/russian/ranobelib.js",
+    "sha256": "4d888856cefcdcc087091714755dc3fa1d5cdcae42725f0c866e40b6b765316b"
+  },
+  {
+    "id": "rulate-api",
+    "version": "1.0.1",
+    "url": "https://raw.githubusercontent.com/lnreader/lnreader-plugins/plugins/v3.0.0/.js/src/plugins/russian/Rulate[rulate].js",
+    "sha256": "eaca70363cf4e979bfe89ca3597505c33e8d62af0a6b8f3988038ce92135bf5e"
+  }
+]

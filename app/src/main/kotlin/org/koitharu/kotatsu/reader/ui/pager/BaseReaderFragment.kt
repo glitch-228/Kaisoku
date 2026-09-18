@@ -38,7 +38,7 @@ abstract class BaseReaderFragment<B : ViewBinding> : BaseFragment<B>(), ZoomCont
 				readerAdapter?.indexOf(state.chapterId, state.page)
 			} ?: -1
 			val currentNewPosition = currentState?.let { state ->
-				it.pages.indexOfFirst { page ->
+				adapterPages(it.pages).indexOfFirst { page ->
 					page.chapterId == state.chapterId && page.index == state.page
 				}
 			} ?: -1
@@ -129,6 +129,9 @@ abstract class BaseReaderFragment<B : ViewBinding> : BaseFragment<B>(), ZoomCont
 		state = getModeSwitchState(),
 		contentGeneration = adapterContentGeneration,
 	)
+
+	/** The exact ordering/padding submitted to the adapter, also used for anchor comparisons. */
+	protected open fun adapterPages(pages: List<ReaderPage>): List<ReaderPage> = pages
 
 	protected abstract fun onCreateAdapter(): BaseReaderAdapter<*>
 

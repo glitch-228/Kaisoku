@@ -28,11 +28,16 @@ abstract class MangaListQuickFilter(
 	var isStateFilterEnabled = true
 
 	override fun setFilterOption(option: ListFilterOption, isApplied: Boolean) {
-		appliedFilter.value = ArraySet(appliedFilter.value).also {
-			if (isApplied) {
-				it.addNoConflicts(option)
+		appliedFilter.value = ArraySet(appliedFilter.value).also { options ->
+			if (option is ListFilterOption.State) {
+				options.removeIf { it is ListFilterOption.State }
+				if (isApplied && option.state != null) {
+					options.add(option)
+				}
+			} else if (isApplied) {
+				options.addNoConflicts(option)
 			} else {
-				it.remove(option)
+				options.remove(option)
 			}
 		}
 	}
@@ -83,6 +88,7 @@ abstract class MangaListQuickFilter(
 			titleResId = current?.state?.titleResId ?: R.string.publication_status,
 			icon = current?.state?.iconResId ?: R.drawable.ic_filter_menu,
 			isChecked = current != null,
+			isDropdown = true,
 			data = current ?: ListFilterOption.State(null),
 		)
 	}

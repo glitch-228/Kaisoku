@@ -17,6 +17,7 @@ import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
 import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.util.ext.toFileOrNull
 import org.koitharu.kotatsu.core.util.ext.toUriOrNull
+import org.koitharu.kotatsu.community.data.CommunityRepository
 import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
 import org.koitharu.kotatsu.explore.domain.ExploreRepository
 import org.koitharu.kotatsu.filter.ui.FilterCoordinator
@@ -49,6 +50,7 @@ class LocalListViewModel @Inject constructor(
 	private val localStorageManager: LocalStorageManager,
 	sourcesRepository: MangaSourcesRepository,
 	mangaDataRepository: MangaDataRepository,
+	community: CommunityRepository,
 ) : RemoteListViewModel(
 	savedStateHandle = savedStateHandle,
 	mangaRepositoryFactory = mangaRepositoryFactory,
@@ -58,7 +60,8 @@ class LocalListViewModel @Inject constructor(
 	exploreRepository = exploreRepository,
 	sourcesRepository = sourcesRepository,
 	mangaDataRepository = mangaDataRepository,
-	localStorageChanges = localStorageChanges,
+		localStorageChanges = localStorageChanges,
+		community = community,
 ), SharedPreferences.OnSharedPreferenceChangeListener, QuickFilterListener {
 
 	val onMangaRemoved = MutableEventFlow<Unit>()

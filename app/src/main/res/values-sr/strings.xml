@@ -105,7 +105,7 @@
     <string name="remove">Уклони</string>
     <string name="save_page">Сачувај страницу</string>
     <string name="share_image">Подели слику</string>
-    <string name="text_file_not_supported">Изаберите ZIP датотеку или CBZ датотеку.</string>
+    <string name="text_file_not_supported">Изаберите ZIP датотеку или CBZ датотеку. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Нема описа</string>
     <string name="reader_settings">Подешавања читача</string>
     <string name="notifications">Обавештења</string>
@@ -309,7 +309,7 @@
     <string name="show_suspicious_content">Прикажи сумњив садржај</string>
     <string name="sync_title">Синхронизуј своје податке</string>
     <string name="appwidget_shelf_description">Манга из ваших Омиљених</string>
-    <string name="comics_archive_import_description">Можеш да изабереш једну или више .cbz или .zip датотека, свака датотека ће бити препозната као засебна манга.</string>
+    <string name="comics_archive_import_description">Можеш да изабереш једну или више .cbz или .zip датотека, свака датотека ће бити препозната као засебна манга. CBR (.cbr).</string>
     <string name="downloads_paused">Преузимања су заустављена</string>
     <string name="too_many_requests_message">Превише захтева. Покушај поново касније</string>
     <string name="downloads_wifi_only">Преузми само преко Ви-Фи мреже</string>

@@ -56,7 +56,7 @@
     <string name="_import">Імпарт</string>
     <string name="delete">Выдаліць</string>
     <string name="operation_not_supported">Аперацыя не падтрымліваецца</string>
-    <string name="text_file_not_supported">Файл не падтрымліваецца. Падтрымліваюцца толькі ZIP і CBZ.</string>
+    <string name="text_file_not_supported">Файл не падтрымліваецца. Падтрымліваюцца толькі ZIP і CBZ. (CBZ / ZIP / CBR)</string>
     <string name="no_description">Няма апісання</string>
     <string name="clear_pages_cache">Ачысціць кэш старонак</string>
     <string name="text_file_sizes">Б|кБ|МБ|ГБ|ТБ</string>
@@ -359,7 +359,7 @@
     <string name="settings_apply_restart_required">Калі ласка, перазапусціце праграму каб прымяніць змены</string>
     <string name="got_it">Зразумеў</string>
     <string name="sources_reorder_tip">Націсніце і ўтрымлівайце элемент, каб змяніць іх парадак</string>
-    <string name="comics_archive_import_description">Вы можаце выбраць адзін або некалькі файлаў .cbz або .zip, кожны файл будзе распазнаны як асобная манга.</string>
+    <string name="comics_archive_import_description">Вы можаце выбраць адзін або некалькі файлаў .cbz або .zip, кожны файл будзе распазнаны як асобная манга. CBR (.cbr).</string>
     <string name="folder_with_images_import_description">Вы можаце выбраць каталог з архівамі або відарысамі. Кожны архіў (або падкаталог) будзе прызнаны раздзелам.</string>
     <string name="speed">Хуткасць</string>
     <string name="show_on_shelf">Паказаць на паліцы</string>

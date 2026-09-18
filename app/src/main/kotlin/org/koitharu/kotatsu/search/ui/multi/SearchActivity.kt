@@ -191,7 +191,7 @@ class SearchActivity :
 		viewModel.retry()
 	}
 
-	override fun onFilterOptionClick(option: ListFilterOption) = Unit
+	override fun onFilterOptionClick(view: View, option: ListFilterOption) = Unit
 
 	override fun onFilterClick(view: View?) = Unit
 
