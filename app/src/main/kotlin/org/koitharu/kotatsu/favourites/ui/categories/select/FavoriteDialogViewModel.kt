@@ -26,6 +26,7 @@ import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
 import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.util.ext.require
 import org.koitharu.kotatsu.favourites.domain.FavouritesRepository
+import org.koitharu.kotatsu.favourites.domain.findFavoriteDuplicate
 import org.koitharu.kotatsu.favourites.ui.categories.select.model.MangaCategoryItem
 import org.koitharu.kotatsu.list.ui.model.EmptyState
 import org.koitharu.kotatsu.list.ui.model.ListModel
@@ -68,18 +69,13 @@ class FavoriteDialogViewModel @Inject constructor(
 		launchJob(Dispatchers.Default) {
 			if (isChecked && !force) {
 				manga.firstOrNull()?.let { m ->
-					val names = m.altTitles + m.title
 					val favourites = favouritesRepository.getAllManga()
 					val trackerDuplicateId = database.getScrobblingDao()
 						.findForManga(m.id)
 						.firstNotNullOfOrNull { tracker ->
 							database.getScrobblingDao().findMangaId(tracker.scrobbler, tracker.targetId, m.id)
 						}
-					val duplicate = favourites.firstOrNull { it.id == trackerDuplicateId }
-						?: favourites.firstOrNull { f ->
-							f.id != m.id &&
-								(f.altTitles + f.title).any { a -> names.any { b -> a.equals(b, true) } }
-						}
+					val duplicate = findFavoriteDuplicate(m, favourites, trackerDuplicateId)
 					duplicate?.let { dup -> return@launchJob onDuplicate.call(dup to categoryId) }
 				}
 			}
