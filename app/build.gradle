@@ -308,6 +308,9 @@ dependencies {
 	implementation libs.okhttp.brotli
 	implementation libs.okhttp.tls
 	implementation libs.okhttp.dnsoverhttps
+	// Mihon extensions may use OkHttp's zstd response-body support. Keep the optional
+	// module in the host APK because extension OkHttp classes are delegated to this classloader.
+	implementation libs.okhttp.zstd
 	implementation libs.okio
 	implementation libs.kotlinx.serialization.json
 	implementation libs.kotlinx.serialization.json.okio
