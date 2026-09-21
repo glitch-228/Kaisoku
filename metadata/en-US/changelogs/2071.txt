@@ -1,0 +1,3 @@
+- Fixed a crash when managing Mihon sources.
+- Fixed incorrect duplicate-favourite warnings.
+- Fixed Atsu.moe and Atsumaru image loading.
