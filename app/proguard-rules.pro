@@ -95,7 +95,6 @@
 -keep class com.squareup.zstd.** { *; }
 -keep interface com.squareup.zstd.** { *; }
 -keeppackagenames com.squareup.zstd.**
--dontwarn com.squareup.zstd.**
 
 # Kotlin runtime used by hosted Mihon extensions.
 # Release builds must keep these host classes available because extensions
