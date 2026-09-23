@@ -46,6 +46,7 @@ import org.koitharu.kotatsu.local.ui.LocalListFragment
 import org.koitharu.kotatsu.suggestions.ui.SuggestionsFragment
 import org.koitharu.kotatsu.tracker.ui.feed.FeedFragment
 import org.koitharu.kotatsu.tracker.ui.updates.UpdatesFragment
+import org.koitharu.kotatsu.scrobbling.anilist.ui.AniListLibraryFragment
 import java.util.LinkedList
 import com.google.android.material.R as materialR
 
@@ -195,6 +196,7 @@ class MainNavigationDelegate(
 			R.id.nav_suggestions -> SuggestionsFragment::class.java
 			R.id.nav_bookmarks -> AllBookmarksFragment::class.java
 			R.id.nav_updated -> UpdatesFragment::class.java
+			R.id.nav_anilist -> AniListLibraryFragment::class.java
 			else -> return false
 		}
 		if (!setPrimaryFragment(newFragment)) {
@@ -213,6 +215,7 @@ class MainNavigationDelegate(
 		is SuggestionsFragment -> R.id.nav_suggestions
 		is AllBookmarksFragment -> R.id.nav_bookmarks
 		is UpdatesFragment -> R.id.nav_updated
+		is AniListLibraryFragment -> R.id.nav_anilist
 		else -> 0
 	}
 

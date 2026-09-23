@@ -31,6 +31,8 @@ import org.koitharu.kotatsu.local.domain.MangaLock
 import org.koitharu.kotatsu.local.domain.model.LocalManga
 import org.koitharu.kotatsu.local.ui.LocalStorageCleanupWorker
 import org.koitharu.kotatsu.suggestions.domain.SuggestionRepository
+import org.koitharu.kotatsu.scrobbling.anilist.data.AniListRepository
+import org.koitharu.kotatsu.scrobbling.anilist.work.AniListProgressWorker
 import org.koitharu.kotatsu.suggestions.ui.SuggestionsWorker
 import org.koitharu.kotatsu.sync.drive.GoogleDriveSyncRepository
 import org.koitharu.kotatsu.sync.drive.GoogleDriveWorker
@@ -73,6 +75,7 @@ class AppWorkerFactory @Inject constructor(
 	private val sourcesRepository: Provider<MangaSourcesRepository>,
 	private val googleDriveSyncRepository: Provider<GoogleDriveSyncRepository>,
 	private val syncBackendSettings: Provider<SyncBackendSettings>,
+	private val aniListRepository: Provider<AniListRepository>,
 ) : WorkerFactory() {
 
 	override fun createWorker(
@@ -139,6 +142,12 @@ class AppWorkerFactory @Inject constructor(
 			params = workerParameters,
 			repository = googleDriveSyncRepository.get(),
 			settings = syncBackendSettings.get(),
+		)
+
+		AniListProgressWorker::class.java.name -> AniListProgressWorker(
+			context = appContext,
+			params = workerParameters,
+			repository = aniListRepository.get(),
 		)
 
 		else -> null

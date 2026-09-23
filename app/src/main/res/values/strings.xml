@@ -214,6 +214,24 @@
     <string name="rotate_screen">Rotate screen</string>
     <string name="update">Update</string>
     <string name="refresh_extensions">Refresh extensions</string>
+	<string name="anilist_library">AniList</string>
+	<string name="anilist_all">All</string>
+	<string name="connect_anilist">Connect AniList</string>
+	<string name="sort_title">Title</string>
+	<string name="sort_recently_updated">Recently updated</string>
+	<string name="anilist_score">Score: %1$.1f</string>
+	<string name="anilist_status_count">%1$s (%2$d)</string>
+	<string name="open_in_library">Open in Kaisoku</string>
+	<string name="search_sources_for_title">Search manga sources</string>
+	<string name="cover">Cover</string>
+	<string name="anilist_refresh_error">Could not refresh AniList; showing saved library: %1$s</string>
+	<string name="use_android_installed_extensions">Use Android-installed extensions</string>
+	<string name="use_android_installed_extensions_summary">Include extensions installed by Android/Mihon. Disable to use only app-private extensions.</string>
+	<string name="mihon_extension_errors">Extension loading errors</string>
+	<string name="mihon_extension_errors_summary">Show why an installed extension could not be loaded</string>
+	<string name="no_mihon_extension_errors">No extension loading errors were found.</string>
+	<string name="migrate_to_keiyoushi">Add Keiyoushi repository</string>
+	<string name="keiyoushi_repo_added">Keiyoushi repository added</string>
     <string name="feed_will_update_soon">Feed update will start soon</string>
     <string name="track_sources">Look for updates</string>
     <string name="dont_check">Don\'t check</string>
@@ -1368,4 +1386,8 @@
 	<string name="community_nickname_saved">Nickname saved</string>
     <string name="community_show_spoiler">Spoiler — tap to reveal</string>
     <string name="community_load_more">Load more comments</string>
+    <string name="apply_network_settings">Apply DNS and image proxy settings</string>
+    <string name="apply_network_settings_summary">Save the selected options and reconnect idle network connections.</string>
+    <string name="reset_dns_image_proxy">Reset DNS and image proxy</string>
+    <string name="reset_dns_image_proxy_summary">Disable DNS over HTTPS and image optimization proxy.</string>
 </resources>

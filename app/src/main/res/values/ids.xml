@@ -18,5 +18,6 @@
 	<item name="nav_updated" type="id" />
 	<item name="nav_suggestions" type="id" />
 	<item name="nav_bookmarks" type="id" />
+	<item name="nav_anilist" type="id" />
 	<item name="action_languages" type="id" />
 </resources>

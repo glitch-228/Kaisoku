@@ -904,4 +904,26 @@
 	<string name="upscale_threshold_value">Применять при увеличении более %1$s×</string>
 	<string name="upscale_power_save">Обработка приостановлена в режиме энергосбережжения.</string>
 	<string name="upscale_activation_help">Применяется при увеличении страницы выше выбранного порога. Сила 0 отключает обработку.</string>
+    <string name="apply_network_settings">Применить настройки DNS и прокси изображений</string>
+    <string name="apply_network_settings_summary">Сохранить выбранные настройки и переподключить неактивные сетевые соединения.</string>
+    <string name="reset_dns_image_proxy">Сбросить DNS и прокси изображений</string>
+    <string name="reset_dns_image_proxy_summary">Отключить DNS поверх HTTPS и прокси для оптимизации изображений.</string>
+	<string name="use_android_installed_extensions">Использовать расширения, установленные Android</string>
+	<string name="use_android_installed_extensions_summary">Учитывать расширения, установленные Android/Mihon. Отключите, чтобы использовать только расширения приложения.</string>
+	<string name="mihon_extension_errors">Ошибки загрузки расширений</string>
+	<string name="mihon_extension_errors_summary">Узнать, почему установленное расширение не загрузилось</string>
+	<string name="no_mihon_extension_errors">Ошибок загрузки расширений не обнаружено.</string>
+	<string name="migrate_to_keiyoushi">Добавить репозиторий Keiyoushi</string>
+	<string name="keiyoushi_repo_added">Репозиторий Keiyoushi добавлен</string>
+	<string name="anilist_library">AniList</string>
+	<string name="anilist_all">Все</string>
+	<string name="connect_anilist">Подключить AniList</string>
+	<string name="sort_title">По названию</string>
+	<string name="sort_recently_updated">Недавно обновлённые</string>
+	<string name="anilist_score">Оценка: %1$.1f</string>
+	<string name="anilist_status_count">%1$s (%2$d)</string>
+	<string name="open_in_library">Открыть в Kaisoku</string>
+	<string name="search_sources_for_title">Искать в источниках манги</string>
+	<string name="cover">Обложка</string>
+	<string name="anilist_refresh_error">Не удалось обновить AniList; показываем сохранённую библиотеку: %1$s</string>
 </resources>
