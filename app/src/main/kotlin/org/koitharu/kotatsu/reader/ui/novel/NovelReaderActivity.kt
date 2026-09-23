@@ -405,7 +405,6 @@ class NovelReaderActivity :
 			return
 		}
 		val chapterId = viewModel.chapters.value.getOrNull(anchor.first)?.id ?: return
-		val generation = chapterLoadGeneration
 		translationJob = lifecycleScope.launch {
 			val message = Snackbar.make(viewBinding.root, R.string.novel_translating, Snackbar.LENGTH_INDEFINITE)
 				.setAction(R.string.cancel) { translationJob?.cancel() }
@@ -416,8 +415,11 @@ class NovelReaderActivity :
 				}
 				ensureActive()
 				val current = visibleAnchor()
-				if (generation == chapterLoadGeneration && current != null &&
-					viewModel.chapters.value.getOrNull(current.first)?.id == chapterId) {
+				val translatedIsLoaded = isScrollMode && continuousAdapter?.getItems()?.any {
+					viewModel.chapters.value.getOrNull(it.chapterIndex)?.id == chapterId
+				} == true
+				if (current != null && (translatedIsLoaded ||
+					viewModel.chapters.value.getOrNull(current.first)?.id == chapterId)) {
 					saveCurrentProgress()
 					viewBinding.readerView.clearChapterBoundaryPreviews()
 					viewModel.navigateTo(current.first, current.second)

@@ -1,5 +1,11 @@
 package org.koitharu.kotatsu.reader.translate
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -39,6 +45,44 @@ internal object NovelTextTranslation {
 		}
 		addText(text.substring(offset))
 		return result
+	}
+
+	/** Translate paragraphs separately so auto-detection does not skip a minority language in a mixed chapter. */
+	suspend fun translateGoogle(
+		text: String,
+		onProgress: (Int, Int) -> Unit,
+		translate: suspend (String) -> String,
+	): String = coroutineScope {
+		val chunks = ArrayList<Part>()
+		var offset = 0
+		for (separator in Regex("[\\r\\n]+").findAll(text)) {
+			chunks += parts(text.substring(offset, separator.range.first))
+			chunks += Part(separator.value, false)
+			offset = separator.range.last + 1
+		}
+		chunks += parts(text.substring(offset))
+		val requests = chunks.indices.filter { chunks[it].translate }
+		val results = chunks.map { it.text }.toMutableList()
+		val progressMutex = Mutex()
+		var done = 0
+		onProgress(0, requests.size)
+		// A fixed worker count bounds both network pressure and coroutine allocation for long chapters.
+		val workers = minOf(3, requests.size)
+		(0 until workers).map { worker ->
+			async {
+				for (request in worker until requests.size step workers) {
+					ensureActive()
+					val index = requests[request]
+					val translated = translate(chunks[index].text)
+					if (translated.isBlank()) throw TranslateException.Parse("Google Translate: empty text")
+					results[index] = translated
+					progressMutex.withLock { onProgress(++done, requests.size) }
+				}
+			}
+		}.awaitAll()
+		// Never expose/cache a partial chapter if a worker fails or translation is cancelled.
+		ensureActive()
+		results.joinToString("")
 	}
 
 	fun payload(text: String, source: String, target: String, model: String, gemini: Boolean): JSONObject {

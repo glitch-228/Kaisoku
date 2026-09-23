@@ -45,25 +45,14 @@ class MultimodalTranslator @Inject constructor(
 			.build()
 	}
 
-	/** Reuse provider configuration, headers, retry policy and rate gate for text. */
+	/** Reuse provider configuration for text; the AI rate limit does not throttle Google Translate. */
 	suspend fun translateText(text: String, onProgress: (Int, Int) -> Unit = { _, _ -> }): String = withContext(Dispatchers.IO) {
 		val provider = settings.translateProvider
 		if (provider == TranslateProvider.GOOGLE_LENS) {
 			val source = settings.translateSourceLanguage.ifBlank { "auto" }
 			val target = settings.translateTargetLanguage.ifBlank { "en" }
-			val parts = NovelTextTranslation.parts(text)
-			val total = parts.count { it.translate }
-			var done = 0
-			onProgress(0, total)
-			return@withContext buildString {
-				for (part in parts) {
-					kotlinx.coroutines.currentCoroutineContext().ensureActive()
-					if (part.translate) {
-						rateGate()
-						append(googleTranslate.translateText(part.text, source, target))
-						onProgress(++done, total)
-					} else append(part.text)
-				}
+			return@withContext NovelTextTranslation.translateGoogle(text, onProgress) { part ->
+				googleTranslate.translateText(part, source, target)
 			}
 		}
 		val endpoint = settings.translateEndpoint.trim().ifEmpty { throw TranslateException.NoEndpoint() }
