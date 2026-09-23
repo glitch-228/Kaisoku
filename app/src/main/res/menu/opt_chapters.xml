@@ -28,6 +28,13 @@
 		app:showAsAction="never" />
 
 	<item
+		android:id="@+id/action_sort_by_name"
+		android:checkable="true"
+		android:orderInCategory="25"
+		android:title="@string/sort_chapters_by_name"
+		app:showAsAction="never" />
+
+	<item
 		android:id="@+id/action_grid_view"
 		android:checkable="true"
 		android:orderInCategory="30"

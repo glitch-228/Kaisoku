@@ -107,6 +107,14 @@
 	<string name="closest_chapter_count">Closest chapter count</string>
 	<string name="source_priority">Source priority</string>
     <string name="sort_order">Sorting order</string>
+    <string name="default_browse_sort">Default source list order</string>
+    <string name="default_browse_sort_summary">Choose the initial order for source lists. Automatic keeps the source-specific default.</string>
+    <string name="browse_sort_automatic">Automatic</string>
+    <string name="browse_sort_popular">Popular</string>
+    <string name="browse_sort_latest">Latest</string>
+    <string name="novel_sources_first">Show novel sources first in Explore</string>
+    <string name="novel_sources_first_summary">Moves installed novel sources above manga sources. Off keeps your current source order.</string>
+    <string name="sort_chapters_by_name">Sort chapters by name</string>
     <string name="filter">Filter</string>
     <string name="saved_filters">Saved filters</string>
     <string name="theme">Theme</string>

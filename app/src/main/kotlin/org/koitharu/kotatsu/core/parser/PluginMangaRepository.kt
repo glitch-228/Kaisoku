@@ -7,6 +7,7 @@ import okhttp3.Response
 import org.koitharu.kotatsu.core.cache.MemoryContentCache
 import org.koitharu.kotatsu.core.model.PluginMangaSource
 import org.koitharu.kotatsu.core.prefs.SourceSettings
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.parsers.MangaParserAuthProvider
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.model.Favicons
@@ -23,6 +24,7 @@ class PluginMangaRepository(
 	private val loadedParser: DynamicParserManager.LoadedParser,
 	private val settings: SourceSettings,
 	cache: MemoryContentCache,
+	private val appSettings: AppSettings,
 ) : CachingMangaRepository(cache), Interceptor {
 
 	private val delegate: Any
@@ -42,7 +44,8 @@ class PluginMangaRepository(
 		get() = call("getFilterCapabilities") ?: MangaListFilterCapabilities()
 
 	override var defaultSortOrder: SortOrder
-		get() = settings.defaultSortOrder?.takeIf { it in sortOrders } ?: sortOrders.first()
+		get() = settings.defaultSortOrder?.takeIf { it in sortOrders }
+			?: appSettings.defaultBrowseSortOrder(sortOrders, sortOrders.first())
 		set(value) {
 			settings.defaultSortOrder = value
 		}

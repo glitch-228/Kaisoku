@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import org.koitharu.kotatsu.core.cache.MemoryContentCache
 import org.koitharu.kotatsu.core.parser.CachingMangaRepository
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaChapter
@@ -20,6 +21,7 @@ class ExternalMangaRepository(
 	contentResolver: ContentResolver,
 	override val source: ExternalMangaSource,
 	cache: MemoryContentCache,
+	private val appSettings: AppSettings,
 ) : CachingMangaRepository(cache) {
 
 	private val contentSource = ExternalPluginContentSource(contentResolver, source)
@@ -41,7 +43,10 @@ class ExternalMangaRepository(
 		get() = capabilities?.listFilterCapabilities ?: MangaListFilterCapabilities()
 
 	override var defaultSortOrder: SortOrder
-		get() = capabilities?.availableSortOrders?.firstOrNull() ?: SortOrder.ALPHABETICAL
+		get() = appSettings.defaultBrowseSortOrder(
+			sortOrders,
+			capabilities?.availableSortOrders?.firstOrNull() ?: SortOrder.ALPHABETICAL,
+		)
 		set(value) = Unit
 
 	override suspend fun getFilterOptions(): MangaListFilterOptions = filterOptions.get()

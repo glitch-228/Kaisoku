@@ -8,6 +8,7 @@ import org.koitharu.kotatsu.core.exceptions.CloudFlareProtectedException
 import org.koitharu.kotatsu.core.exceptions.InteractiveActionRequiredException
 import org.koitharu.kotatsu.core.exceptions.ProxyConfigException
 import org.koitharu.kotatsu.core.prefs.SourceSettings
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.parsers.MangaParser
 import org.koitharu.kotatsu.parsers.MangaParserAuthProvider
 import org.koitharu.kotatsu.parsers.config.ConfigKey
@@ -28,6 +29,7 @@ class ParserMangaRepository(
 	private val parser: MangaParser,
 	private val mirrorSwitcher: MirrorSwitcher,
 	cache: MemoryContentCache,
+	private val appSettings: AppSettings,
 ) : CachingMangaRepository(cache), Interceptor {
 
 	private val filterOptionsLazy = suspendLazy(Dispatchers.Default) {
@@ -46,7 +48,8 @@ class ParserMangaRepository(
 		get() = parser.filterCapabilities
 
 	override var defaultSortOrder: SortOrder
-		get() = getConfig().defaultSortOrder ?: sortOrders.first()
+		get() = getConfig().defaultSortOrder
+			?: appSettings.defaultBrowseSortOrder(sortOrders, sortOrders.first())
 		set(value) {
 			getConfig().defaultSortOrder = value
 		}

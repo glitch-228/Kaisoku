@@ -55,6 +55,14 @@
     <string name="newest">Новая</string>
     <string name="by_rating">Рейтинг</string>
     <string name="sort_order">Порядок сортировки</string>
+    <string name="default_browse_sort">Порядок списков источников по умолчанию</string>
+    <string name="default_browse_sort_summary">Выберите начальную сортировку списков. «Автоматически» сохраняет настройку каждого источника.</string>
+    <string name="browse_sort_automatic">Автоматически</string>
+    <string name="browse_sort_popular">Популярные</string>
+    <string name="browse_sort_latest">Новые</string>
+    <string name="novel_sources_first">Сначала новеллы в разделе «Обзор»</string>
+    <string name="novel_sources_first_summary">Перемещает источники новелл выше источников манги. Если выключено, сохраняется текущий порядок.</string>
+    <string name="sort_chapters_by_name">Сортировать главы по названию</string>
     <string name="filter">Фильтр</string>
     <string name="theme">Тема</string>
     <string name="light">Светлая</string>

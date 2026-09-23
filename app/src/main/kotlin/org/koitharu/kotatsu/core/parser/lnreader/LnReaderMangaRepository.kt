@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import org.koitharu.kotatsu.core.db.entity.LnReaderSourceEntity
 import org.koitharu.kotatsu.core.parser.CachingMangaRepository
 import org.koitharu.kotatsu.core.cache.MemoryContentCache
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.util.MultiMutex
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaChapter
@@ -38,13 +39,22 @@ class LnReaderMangaRepository(
 	cache: MemoryContentCache,
 	private val diskCacheDir: File? = null,
 	private val storage: LNReaderStorage = LNReaderStorage(),
+	private val appSettings: AppSettings? = null,
 ) : CachingMangaRepository(cache) {
 
 	override val source: LnReaderMangaSource = entity.toMangaSource()
 
 	override val sortOrders: Set<SortOrder> = setOf(SortOrder.POPULARITY, SortOrder.UPDATED)
 
-	override var defaultSortOrder: SortOrder = SortOrder.POPULARITY
+	private var sourceSelectedSortOrder: SortOrder? = null
+	override var defaultSortOrder: SortOrder
+		get() = sourceSelectedSortOrder
+			?.takeIf { it in sortOrders }
+			?: appSettings?.defaultBrowseSortOrder(sortOrders, SortOrder.POPULARITY)
+			?: SortOrder.POPULARITY
+		set(value) {
+			sourceSelectedSortOrder = value
+		}
 
 	override val filterCapabilities: MangaListFilterCapabilities = MangaListFilterCapabilities(
 		isSearchSupported = true,

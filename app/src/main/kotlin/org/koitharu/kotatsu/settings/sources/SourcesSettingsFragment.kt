@@ -34,6 +34,9 @@ class SourcesSettingsFragment : BasePreferenceFragment(R.string.remote_sources),
 			entries = SourcesSortOrder.entries.map { context.getString(it.titleResId) }.toTypedArray()
 			setDefaultValueCompat(SourcesSortOrder.MANUAL.name)
 		}
+		findPreference<ListPreference>(AppSettings.KEY_DEFAULT_BROWSE_SORT)?.setDefaultValueCompat(
+			AppSettings.BROWSE_SORT_AUTOMATIC,
+		)
         findPreference<ListPreference>(AppSettings.KEY_INCOGNITO_NSFW)?.run {
             entryValues = TriStateOption.entries.names()
             setDefaultValueCompat(TriStateOption.ASK.name)

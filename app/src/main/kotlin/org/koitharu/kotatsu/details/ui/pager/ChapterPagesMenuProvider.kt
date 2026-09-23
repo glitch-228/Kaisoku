@@ -41,6 +41,7 @@ class ChapterPagesMenuProvider(
 				}
 				menu.findItem(R.id.action_search)?.isVisible = viewModel.emptyReason.value == null
 				menu.findItem(R.id.action_reversed)?.isChecked = viewModel.isChaptersReversed.value == true
+				menu.findItem(R.id.action_sort_by_name)?.isChecked = viewModel.isChaptersSortedByName()
 				menu.findItem(R.id.action_grid_view)?.isChecked = viewModel.isChaptersInGridView.value == true
 				menu.findItem(R.id.action_downloaded)?.let { menuItem ->
 					menuItem.isVisible = viewModel.mangaDetails.value?.local != null
@@ -61,6 +62,11 @@ class ChapterPagesMenuProvider(
 	override fun onMenuItemSelected(menuItem: MenuItem): Boolean = when (menuItem.itemId) {
 		R.id.action_reversed -> {
 			viewModel.setChaptersReversed(!menuItem.isChecked)
+			true
+		}
+
+		R.id.action_sort_by_name -> {
+			viewModel.setChaptersSortedByName(!menuItem.isChecked)
 			true
 		}
 

@@ -14,6 +14,7 @@ import org.koitharu.kotatsu.core.model.PluginMangaSource
 import org.koitharu.kotatsu.core.model.TestMangaSource
 import org.koitharu.kotatsu.core.model.UnknownMangaSource
 import org.koitharu.kotatsu.core.prefs.SourceSettings
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.network.CommonHeaders
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaRepository
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
@@ -122,6 +123,7 @@ interface MangaRepository {
 		private val mirrorSwitcher: MirrorSwitcher,
 		private val mihonExtensionManager: MihonExtensionManager,
 		private val lnReaderSourceManager: LnReaderSourceManager,
+		private val appSettings: AppSettings,
 	) {
 
 		private val cache = ArrayMap<MangaSource, WeakReference<MangaRepository>>()
@@ -164,6 +166,7 @@ interface MangaRepository {
 					contentResolver = context.contentResolver,
 					source = source,
 					cache = contentCache,
+					appSettings = appSettings,
 				)
 			} else {
 				EmptyMangaRepository(source)
@@ -173,6 +176,7 @@ interface MangaRepository {
 				MihonMangaRepository(
 					loadedSource = it,
 					cache = contentCache,
+					appSettings = appSettings,
 				)
 			} ?: EmptyMangaRepository(source)
 
@@ -188,6 +192,7 @@ interface MangaRepository {
 						storage = org.koitharu.kotatsu.core.parser.lnreader.LNReaderStorage(
 							context.getSharedPreferences("lnreader_" + android.net.Uri.encode(entity.pluginId), Context.MODE_PRIVATE),
 						),
+						appSettings = appSettings,
 					)
 				}
 			}.getOrNull() ?: EmptyMangaRepository(source)
@@ -205,6 +210,7 @@ interface MangaRepository {
 					parser = loaderContext.newParserInstance(source),
 					cache = contentCache,
 					mirrorSwitcher = mirrorSwitcher,
+					appSettings = appSettings,
 				)
 			}.onFailure { it.printStackTraceDebug() }.getOrNull()
 
@@ -218,6 +224,7 @@ interface MangaRepository {
 					loadedParser = DynamicParserManager.createParser(source, loaderContext, context),
 					settings = SourceSettings(context, source),
 					cache = contentCache,
+					appSettings = appSettings,
 				)
 			}.onFailure { it.printStackTraceDebug() }.getOrNull()
 			val compatiblePlugin = plugin?.let { repository ->

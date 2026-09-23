@@ -9,6 +9,20 @@
         android:title="@string/sort_order"
         app:useSimpleSummaryProvider="true" />
 
+    <ListPreference
+        android:defaultValue="AUTO"
+        android:entries="@array/default_browse_sort_entries"
+        android:entryValues="@array/default_browse_sort_values"
+        android:key="default_browse_sort"
+        android:summary="@string/default_browse_sort_summary"
+        android:title="@string/default_browse_sort" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:key="novel_sources_first"
+        android:summary="@string/novel_sources_first_summary"
+        android:title="@string/novel_sources_first" />
+
     <SwitchPreferenceCompat
         android:defaultValue="true"
         android:key="sources_grid"

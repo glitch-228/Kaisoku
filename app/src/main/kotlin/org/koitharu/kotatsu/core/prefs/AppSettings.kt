@@ -481,6 +481,32 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getEnumValue(KEY_SOURCES_ORDER, SourcesSortOrder.MANUAL)
 		set(value) = prefs.edit { putEnumValue(KEY_SOURCES_ORDER, value) }
 
+	var defaultBrowseSortOrder: SortOrder?
+		get() = prefs.getString(KEY_DEFAULT_BROWSE_SORT, null)
+			?.takeIf { it != BROWSE_SORT_AUTOMATIC }
+			?.let { runCatching { SortOrder.valueOf(it) }.getOrNull() }
+			?.takeIf { it == SortOrder.POPULARITY || it == SortOrder.UPDATED }
+		set(value) = prefs.edit {
+			putString(KEY_DEFAULT_BROWSE_SORT, value?.name ?: BROWSE_SORT_AUTOMATIC)
+		}
+
+	fun defaultBrowseSortOrder(available: Set<SortOrder>, fallback: SortOrder): SortOrder =
+		defaultBrowseSortOrder?.takeIf { it in available } ?: fallback
+
+	var isNovelSourcesFirst: Boolean
+		get() = prefs.getBoolean(KEY_NOVEL_SOURCES_FIRST, false)
+		set(value) = prefs.edit { putBoolean(KEY_NOVEL_SOURCES_FIRST, value) }
+
+	fun isChaptersSortedByName(mangaId: Long): Boolean =
+		prefs.getBoolean(KEY_SORT_CHAPTERS_BY_NAME + mangaId, false)
+
+	fun setChaptersSortedByName(mangaId: Long, value: Boolean) {
+		prefs.edit {
+			if (value) putBoolean(KEY_SORT_CHAPTERS_BY_NAME + mangaId, true)
+			else remove(KEY_SORT_CHAPTERS_BY_NAME + mangaId)
+		}
+	}
+
 	var isSourcesGridMode: Boolean
 		get() = prefs.getBoolean(KEY_SOURCES_GRID, true)
 		set(value) = prefs.edit { putBoolean(KEY_SOURCES_GRID, value) }
@@ -1103,6 +1129,9 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_MAIN_FAB = "main_fab"
 		const val KEY_32BIT_COLOR = "enhanced_colors"
 		const val KEY_SOURCES_ORDER = "sources_sort_order"
+		const val KEY_DEFAULT_BROWSE_SORT = "default_browse_sort"
+		const val KEY_NOVEL_SOURCES_FIRST = "novel_sources_first"
+		const val KEY_SORT_CHAPTERS_BY_NAME = "sort_chapters_by_name_"
 		const val KEY_SOURCES_CATALOG = "sources_catalog"
 		const val KEY_CF_BRIGHTNESS = "cf_brightness"
 		const val KEY_CF_CONTRAST = "cf_contrast"
@@ -1122,6 +1151,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_SOURCES_VERSION = "sources_version"
 		const val KEY_SOURCES_ENABLED_ALL = "sources_enabled_all"
 		const val KEY_SOURCES_HIDE_BROKEN = "sources_hide_broken"
+		const val BROWSE_SORT_AUTOMATIC = "AUTO"
 		const val KEY_QUICK_FILTER = "quick_filter"
 		const val KEY_COLLAPSE_DESCRIPTION = "description_collapse"
 		const val KEY_BACKUP_TG_ENABLED = "backup_periodic_tg_enabled"

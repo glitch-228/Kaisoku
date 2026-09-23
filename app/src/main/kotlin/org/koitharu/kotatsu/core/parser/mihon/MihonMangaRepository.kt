@@ -14,6 +14,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.koitharu.kotatsu.core.cache.MemoryContentCache
 import org.koitharu.kotatsu.core.parser.CachingMangaRepository
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.network.CommonHeaders
 import org.koitharu.kotatsu.parsers.model.ContentRating
 import org.koitharu.kotatsu.parsers.exception.AuthRequiredException
@@ -50,6 +51,7 @@ internal fun List<SChapter>.toKaisokuChapterOrder(): List<OrderedMihonChapter> =
 class MihonMangaRepository(
 	private val loadedSource: MihonExtensionManager.LoadedSource,
 	cache: MemoryContentCache,
+ 	private val appSettings: AppSettings,
 ) : CachingMangaRepository(cache) {
 
 	override val source: MihonMangaSource
@@ -74,7 +76,14 @@ class MihonMangaRepository(
 		isSearchWithFiltersSupported = mihonFilters.isNotEmpty(),
 	)
 
-	override var defaultSortOrder: SortOrder = SortOrder.POPULARITY
+	private var sourceSelectedSortOrder: SortOrder? = null
+	override var defaultSortOrder: SortOrder
+		get() = sourceSelectedSortOrder
+			?.takeIf { it in sortOrders }
+			?: appSettings.defaultBrowseSortOrder(sortOrders, SortOrder.POPULARITY)
+		set(value) {
+			sourceSelectedSortOrder = value
+		}
 
 	override suspend fun getFilterOptions(): MangaListFilterOptions = MangaListFilterOptions()
 

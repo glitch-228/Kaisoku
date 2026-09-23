@@ -21,6 +21,7 @@ import kotlinx.coroutines.plus
 import okio.FileNotFoundException
 import org.koitharu.kotatsu.bookmarks.domain.BookmarksRepository
 import org.koitharu.kotatsu.core.model.toChipModel
+import org.koitharu.kotatsu.core.util.AlphanumComparator
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.observeAsStateFlow
 import org.koitharu.kotatsu.core.ui.BaseViewModel
@@ -48,6 +49,15 @@ import org.koitharu.kotatsu.parsers.model.MangaState
 import org.koitharu.kotatsu.reader.ui.ReaderActivity
 import org.koitharu.kotatsu.reader.ui.ReaderState
 import org.koitharu.kotatsu.reader.ui.ReaderViewModel
+
+internal val CHAPTER_NAME_COMPARATOR: Comparator<ChapterListItem> = Comparator { left, right ->
+	val leftName = left.chapter.title?.takeIf { it.isNotBlank() } ?: left.chapter.number.toString()
+	val rightName = right.chapter.title?.takeIf { it.isNotBlank() } ?: right.chapter.number.toString()
+	AlphanumComparator().compare(leftName, rightName)
+		.takeIf { it != 0 }
+		?: left.chapter.volume.compareTo(right.chapter.volume).takeIf { it != 0 }
+		?: left.chapter.number.compareTo(right.chapter.number)
+}
 
 abstract class ChaptersPagesViewModel(
 	@JvmField protected val settings: AppSettings,
@@ -92,6 +102,8 @@ abstract class ChaptersPagesViewModel(
 		key = AppSettings.KEY_GRID_VIEW_CHAPTERS,
 		valueProducer = { isChaptersGridView },
 	)
+
+	private val sortChaptersByName = MutableStateFlow(false)
 
 	val isDownloadedOnly = MutableStateFlow(false)
 
@@ -145,9 +157,15 @@ abstract class ChaptersPagesViewModel(
 			).orEmpty()
 		},
 		isChaptersReversed,
+		sortChaptersByName,
 		chaptersQuery,
-	) { list, reversed, query ->
-		(if (reversed) list.asReversed() else list).filterSearch(query)
+	) { list, reversed, sortedByName, query ->
+		val ordered = if (sortedByName) {
+			list.sortedWith(CHAPTER_NAME_COMPARATOR)
+		} else {
+			list
+		}
+		(if (reversed) ordered.asReversed() else ordered).filterSearch(query)
 	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptyList())
 
 	val quickFilter = combine(
@@ -169,6 +187,11 @@ abstract class ChaptersPagesViewModel(
 
 	init {
 		launchJob(Dispatchers.Default) {
+			mangaDetails.map { it?.id }.distinctUntilChanged().collect { mangaId ->
+				sortChaptersByName.value = mangaId?.let(settings::isChaptersSortedByName) == true
+			}
+		}
+		launchJob(Dispatchers.Default) {
 			localStorageChanges
 				.collect { onDownloadComplete(it) }
 		}
@@ -180,6 +203,13 @@ abstract class ChaptersPagesViewModel(
 
 	fun setChaptersInGridView(newValue: Boolean) {
 		settings.isChaptersGridView = newValue
+	}
+
+	fun isChaptersSortedByName(): Boolean = sortChaptersByName.value
+
+	fun setChaptersSortedByName(newValue: Boolean) {
+		mangaDetails.value?.id?.let { settings.setChaptersSortedByName(it, newValue) }
+		sortChaptersByName.value = newValue
 	}
 
 	fun setSelectedBranch(branch: String?) {
