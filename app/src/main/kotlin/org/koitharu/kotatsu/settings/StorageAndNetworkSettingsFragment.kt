@@ -31,6 +31,16 @@ class StorageAndNetworkSettingsFragment :
             entryValues = DoHProvider.entries.names()
             setDefaultValueCompat(DoHProvider.NONE.name)
         }
+        findPreference<Preference>("apply_network_settings")?.setOnPreferenceClickListener {
+            persistNetworkSelections()
+            true
+        }
+        findPreference<Preference>("reset_dns_image_proxy")?.setOnPreferenceClickListener {
+            findPreference<ListPreference>(AppSettings.KEY_DOH)?.value = DoHProvider.NONE.name
+            findPreference<ListPreference>(AppSettings.KEY_IMAGES_PROXY)?.value = "-1"
+            persistNetworkSelections()
+            true
+        }
         bindProxySummary()
     }
 
@@ -50,6 +60,7 @@ class StorageAndNetworkSettingsFragment :
 
     override fun onSharedPreferenceChanged(prefs: SharedPreferences?, key: String?) {
         when (key) {
+            AppSettings.KEY_DOH, AppSettings.KEY_IMAGES_PROXY -> viewModel.applyNetworkSettings()
             AppSettings.KEY_SSL_BYPASS -> {
                 Snackbar.make(listView, R.string.settings_apply_restart_required, Snackbar.LENGTH_INDEFINITE).show()
             }
@@ -61,6 +72,20 @@ class StorageAndNetworkSettingsFragment :
                 bindProxySummary()
             }
         }
+    }
+
+    private fun persistNetworkSelections() {
+        findPreference<ListPreference>(AppSettings.KEY_DOH)?.let { preference ->
+            val provider = DoHProvider.entries.firstOrNull { it.name == preference.value } ?: DoHProvider.NONE
+            preference.value = provider.name
+            settings.dnsOverHttps = provider
+        }
+        findPreference<ListPreference>(AppSettings.KEY_IMAGES_PROXY)?.let { preference ->
+            val proxy = preference.value?.toIntOrNull()?.takeIf { it in -1..1 } ?: -1
+            preference.value = proxy.toString()
+            settings.imagesProxy = proxy
+        }
+        viewModel.applyNetworkSettings()
     }
 
     private fun bindProxySummary() {

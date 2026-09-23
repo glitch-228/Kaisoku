@@ -54,6 +54,18 @@
         android:title="@string/images_proxy_title"
         app:useSimpleSummaryProvider="true" />
 
+    <Preference
+        android:key="apply_network_settings"
+        android:persistent="false"
+        android:title="@string/apply_network_settings"
+        android:summary="@string/apply_network_settings_summary" />
+
+    <Preference
+        android:key="reset_dns_image_proxy"
+        android:persistent="false"
+        android:title="@string/reset_dns_image_proxy"
+        android:summary="@string/reset_dns_image_proxy_summary" />
+
     <SwitchPreferenceCompat
         android:key="ssl_bypass"
         android:summary="@string/ignore_ssl_errors_summary"

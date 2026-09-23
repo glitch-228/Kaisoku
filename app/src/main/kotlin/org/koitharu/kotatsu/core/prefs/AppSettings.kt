@@ -144,11 +144,16 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 				raw.mapNotNull { x -> NavItem.entries.find(x) }.ifEmpty { listOf(NavItem.EXPLORE) }
 			}
 		}
+
 		set(value) {
 			prefs.edit {
 				putString(KEY_NAV_MAIN, value.joinToString(",") { it.name })
 			}
 		}
+
+	var useAndroidInstalledExtensions: Boolean
+		get() = prefs.getBoolean(KEY_USE_ANDROID_EXTENSIONS, true)
+		set(value) = prefs.edit { putBoolean(KEY_USE_ANDROID_EXTENSIONS, value) }
 
 	val isNavLabelsVisible: Boolean
 		get() = prefs.getBoolean(KEY_NAV_LABELS, true)
@@ -621,14 +626,22 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 			}
 		}
 
-	val imagesProxy: Int
+	var imagesProxy: Int
 		get() {
 			val raw = prefs.getString(KEY_IMAGES_PROXY, null)?.toIntOrNull()
 			return raw ?: if (prefs.getBoolean(KEY_IMAGES_PROXY_OLD, false)) 0 else -1
 		}
+		set(value) {
+			require(value in -1..1)
+			prefs.edit {
+				putString(KEY_IMAGES_PROXY, value.toString())
+				remove(KEY_IMAGES_PROXY_OLD)
+			}
+		}
 
-	val dnsOverHttps: DoHProvider
+	var dnsOverHttps: DoHProvider
 		get() = prefs.getEnumValue(KEY_DOH, DoHProvider.NONE)
+		set(value) = prefs.edit { putEnumValue(KEY_DOH, value) }
 
 	var isSSLBypassEnabled: Boolean
 		get() = prefs.getBoolean(KEY_SSL_BYPASS, false)
@@ -976,6 +989,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_TRACKER_UNSTUCK_MIGRATION_DONE = "tracker_unstuck_migration_done"
 		const val KEY_TRACKER_PROGRESS_REFRESH_DONE = "tracker_progress_refresh_done"
 		const val KEY_AUTO_PLUGINS = "auto_plugins"
+		const val KEY_USE_ANDROID_EXTENSIONS = "use_android_installed_extensions"
 		const val KEY_LAST_AUTO_PLUGINS = "last_auto_plugins"
 		const val KEY_NOTIFICATIONS_SETTINGS = "notifications_settings"
 		const val KEY_NOTIFICATIONS_SOUND = "notifications_sound"

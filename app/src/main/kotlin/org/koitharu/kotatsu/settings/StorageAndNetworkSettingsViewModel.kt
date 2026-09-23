@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
+import okhttp3.OkHttpClient
+import org.koitharu.kotatsu.core.network.BaseHttpClient
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.local.data.CacheDir
 import org.koitharu.kotatsu.local.data.LocalStorageManager
@@ -17,12 +19,18 @@ import javax.inject.Inject
 @HiltViewModel
 class StorageAndNetworkSettingsViewModel @Inject constructor(
     private val storageManager: LocalStorageManager,
+    @BaseHttpClient private val httpClient: OkHttpClient,
 ) : BaseViewModel() {
 
     val storageUsage: StateFlow<StorageUsage?> = flow {
         emit(loadStorageUsage())
     }.withErrorHandling()
         .stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(1000), null)
+
+    fun applyNetworkSettings() {
+        // New connections resolve DNS with the selected provider. Active downloads keep running.
+        httpClient.connectionPool.evictAll()
+    }
 
     private suspend fun loadStorageUsage(): StorageUsage {
         val pagesCacheSize = storageManager.computeCacheSize(CacheDir.PAGES)

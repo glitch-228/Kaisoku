@@ -3,6 +3,15 @@ package org.koitharu.kotatsu.settings
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
+import androidx.preference.PreferenceManager
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.koitharu.kotatsu.core.network.DoHProvider
+import org.koitharu.kotatsu.core.network.imageproxy.RealImageProxyInterceptor
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
 import org.junit.Test
@@ -12,6 +21,44 @@ import org.koitharu.kotatsu.settings.sources.ExtensionLanguageFilter
 import java.util.UUID
 
 class RepairPreferencesTest {
+    @Test fun disabledNetworkChoicesPersistAndOverrideLegacyProxy() = isolated { context ->
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        prefs.edit().putBoolean("images_proxy", true).commit()
+        val settings = AppSettings(context)
+        assertEquals(0, settings.imagesProxy)
+        settings.dnsOverHttps = DoHProvider.GOOGLE
+        settings.imagesProxy = 0
+        settings.dnsOverHttps = DoHProvider.NONE
+        settings.imagesProxy = -1
+        val reopened = AppSettings(context)
+        assertEquals(DoHProvider.NONE, reopened.dnsOverHttps)
+        assertEquals(-1, reopened.imagesProxy)
+        assertEquals("NONE", prefs.getString(AppSettings.KEY_DOH, null))
+        assertEquals("-1", prefs.getString(AppSettings.KEY_IMAGES_PROXY, null))
+        assertFalse(prefs.contains("images_proxy"))
+    }
+
+    @Test fun imageProxyChangesApplyToTheVeryNextRequestIncludingReset() = isolated { context ->
+        runBlocking {
+            val settings = AppSettings(context)
+            val proxy = RealImageProxyInterceptor(settings)
+            val client = OkHttpClient.Builder().addInterceptor { chain ->
+                Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+                    .code(200).message("OK").body("image".toResponseBody()).build()
+            }.build()
+            val request = Request.Builder().url("https://example.org/page.jpg").build()
+            settings.imagesProxy = 0
+            proxy.interceptPageRequest(request, client).use { assertEquals("wsrv.nl", it.request.url.host) }
+            settings.imagesProxy = -1
+            proxy.interceptPageRequest(request, client).use { assertEquals(request.url, it.request.url) }
+            settings.imagesProxy = 0
+            settings.upsertAll(emptyMap<String, Any>())
+            proxy.interceptPageRequest(request, client).use { assertEquals(request.url, it.request.url) }
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        }
+    }
+
     @Test fun novelReadingDirectionPersistsPerSourceAndCanBeReset() = isolated { context ->
         val one = org.koitharu.kotatsu.core.model.MangaSource("lnreader:order-one")
         val two = org.koitharu.kotatsu.core.model.MangaSource("lnreader:order-two")
