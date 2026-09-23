@@ -204,6 +204,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 		// Wait for the initial screen, onboarding sheet, and any permission prompt to settle.
 		lifecycleScope.launch {
 			delay(1_200)
+			if (prefs.getBoolean("keep_android_open_shown", false)) return@launch
 			if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || isFinishing || isDestroyed) return@launch
 			if (navigationDelegate.primaryFragment !is org.koitharu.kotatsu.explore.ui.ExploreFragment) return@launch
 			if (viewBinding.searchView.isShowing || supportFragmentManager.isStateSaved ||
