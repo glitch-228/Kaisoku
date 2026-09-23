@@ -196,13 +196,7 @@ class MangaSourcesRepository @Inject constructor(
 		val entries = snapshot ?: getParserSourcesSnapshot()
 		val coroutineContext = currentCoroutineContext()
 		val hideBrokenSources = settings.isBrokenSourcesHidden
-		val enabledNames = if (isDisabledOnly && !settings.isAllSourcesEnabled) {
-			entries.asSequence()
-				.filter { it.isEnabled }
-				.mapTo(HashSet(entries.size)) { it.source.name }
-		} else {
-			emptySet()
-		}
+		val excludeEnabledSources = isDisabledOnly && !settings.isAllSourcesEnabled
 		val effectiveQuery = query?.takeIf { it.isNotBlank() }
 		val hasSourceKindIncludes = includeMihon || includePlugins || includeNovel
 		val sources = ArrayList<MangaSource>(entries.size)
@@ -216,7 +210,7 @@ class MangaSourcesRepository @Inject constructor(
 			if (hideBrokenSources && entry.isBroken) {
 				continue
 			}
-			if (isDisabledOnly && !settings.isAllSourcesEnabled && entry.source.name in enabledNames) {
+			if (excludeEnabledSources && entry.isEnabled) {
 				continue
 			}
 			if (isNewOnly && entry.addedIn != BuildConfig.VERSION_CODE) {
