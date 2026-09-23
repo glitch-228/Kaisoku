@@ -66,6 +66,7 @@ class SourcesSettingsFragment : BasePreferenceFragment(R.string.remote_sources),
 			}
 		}
 		viewModel.onBrokenSourcesLoaded.observeEvent(viewLifecycleOwner, ::showBrokenSources)
+		viewModel.onExtensionErrorsLoaded.observeEvent(viewLifecycleOwner, ::showExtensionErrors)
 		viewModel.onRepairIdsLoaded.observeEvent(viewLifecycleOwner) { ids ->
 			router.openSourceReplacement(ids.asList())
 		}
@@ -94,12 +95,18 @@ class SourcesSettingsFragment : BasePreferenceFragment(R.string.remote_sources),
 			true
 		}
 
+		KEY_EXTENSION_ERRORS -> {
+			viewModel.loadExtensionErrors()
+			true
+		}
+
 		else -> super.onPreferenceTreeClick(preference)
 	}
 
 	override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
 		when (key) {
 			AppSettings.KEY_SOURCES_ENABLED_ALL -> updateEnableAllDependencies()
+			AppSettings.KEY_USE_ANDROID_EXTENSIONS -> viewModel.refreshInstalledSources()
 		}
 	}
 
@@ -136,7 +143,16 @@ class SourcesSettingsFragment : BasePreferenceFragment(R.string.remote_sources),
 			.show()
 	}
 
+	private fun showExtensionErrors(errors: List<String>) {
+		MaterialAlertDialogBuilder(requireContext())
+			.setTitle(R.string.mihon_extension_errors)
+			.setMessage(errors.takeIf { it.isNotEmpty() }?.joinToString("\n\n") ?: getString(R.string.no_mihon_extension_errors))
+			.setPositiveButton(android.R.string.ok, null)
+			.show()
+	}
+
 	private companion object {
 		const val KEY_REPAIR_BROKEN_SOURCES = "repair_broken_sources"
+		const val KEY_EXTENSION_ERRORS = "mihon_extension_errors"
 	}
 }

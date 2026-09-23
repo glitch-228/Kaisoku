@@ -44,6 +44,7 @@ class MihonRepoExtensionsViewModel @Inject constructor(
 	private val searchQuery = MutableStateFlow<String?>(null)
 
 	val onMessage = MutableEventFlow<String>()
+	val onOpenMigrationRepo = MutableEventFlow<String>()
 
 	val screenTitle = MutableStateFlow(
 		repoRepository.findRepo(baseUrl)?.name
@@ -92,6 +93,24 @@ class MihonRepoExtensionsViewModel @Inject constructor(
 	}
 
 	fun onExtensionClick(descriptor: MihonRepoExtensionDescriptor) {
+		if (descriptor.extension.name.startsWith("Please migrate to Keiyoushi", ignoreCase = true)) {
+			launchLoadingJob(Dispatchers.IO) {
+				when (val result = repoRepository.addRepo(MihonExtensionReposViewModel.SUGGESTED_REPO_URL)) {
+					is MihonExtensionRepoRepository.AddRepoResult.Success -> {
+						onMessage.call(context.getString(R.string.keiyoushi_repo_added))
+						onOpenMigrationRepo.call(result.repo.baseUrl)
+					}
+					MihonExtensionRepoRepository.AddRepoResult.RepoAlreadyExists -> {
+						onOpenMigrationRepo.call(MihonExtensionReposViewModel.SUGGESTED_REPO_URL.removeSuffix("/index.json"))
+					}
+					is MihonExtensionRepoRepository.AddRepoResult.DuplicateFingerprint -> {
+						onMessage.call(context.getString(R.string.duplicate_extension_repo_signature))
+					}
+					else -> onMessage.call(context.getString(R.string.invalid_extension_repo))
+				}
+			}
+			return
+		}
 		launchLoadingJob(Dispatchers.IO) {
 			when {
 				descriptor.hasUpdate || (!descriptor.isInstalledPrivately && !descriptor.isInstalledExternally) -> {

@@ -1,6 +1,6 @@
 package org.koitharu.kotatsu.core.parser.mihon.repo
 
-import eu.kanade.tachiyomi.network.awaitSuccess
+import eu.kanade.tachiyomi.network.await
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromByteArray
@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.koitharu.kotatsu.core.network.MangaHttpClient
 import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionPackageUtil
+import java.io.IOException
 import java.util.zip.GZIPInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -62,7 +63,7 @@ class MihonExtensionRepoService @Inject constructor(
 			OPEN_BRACKET -> {
 				// Legacy flat index.min.json array.
 				val entries = json.decodeFromString<List<MihonExtensionIndexEntryDto>>(bytes.decodeToString())
-				if (entries.isTombstone()) {
+				if (entries.isLegacyOutdatedPlaceholderIndex()) {
 					// The repo's legacy URL was replaced with an "Outdated App" marker; follow its
 					// repo.json -> index_v2 pointer instead of presenting the placeholder rows.
 					followLegacyPointer(repo, url, depth)
@@ -80,16 +81,16 @@ class MihonExtensionRepoService @Inject constructor(
 				if (store != null && store.extensionList?.extensions?.isNotEmpty() == true) {
 					store.toEntries(repo)
 				} else if (store != null && !store.extensionListUrl.isNullOrBlank()) {
-					loadEntries(repo, store.extensionListUrl, depth + 1)
+					loadEntries(repo, resolveRepoIndexUrl(repo, store.extensionListUrl), depth + 1)
 				} else {
 					val explicit = runCatching {
 						json.decodeFromString<MihonStoreIndexPointer>(text)
 					}.getOrNull()?.indexV2
 					if (explicit != null) {
-						loadEntries(repo, explicit, depth + 1)
+						loadEntries(repo, resolveRepoIndexUrl(repo, explicit), depth + 1)
 					} else if (pointer != null) {
 						// A bare repo.json was requested as the index: locate its index file by convention.
-						loadEntries(repo, defaultIndexCandidates(url), depth + 1)
+						loadFirstAvailableIndex(repo, legacyModernIndexCandidates(repo.baseUrl), depth + 1)
 					} else {
 						emptyList()
 					}
@@ -100,8 +101,8 @@ class MihonExtensionRepoService @Inject constructor(
 
 			else -> {
 				// Protobuf (`index.pb`) — same store shape, binary-encoded.
-				val store = runCatching { protoBuf.decodeFromByteArray<NetworkExtensionStore>(bytes) }.getOrNull()
-					?: return emptyList()
+				val store = runCatching { protoBuf.decodeFromByteArray<NetworkExtensionStore>(bytes) }
+					.getOrElse { throw IOException("Could not decode extension repository index", it) }
 				when {
 					store.extensionList != null -> store.extensionList.extensions.mapNotNull {
 						it.toAvailableExtension(repo)
@@ -115,49 +116,52 @@ class MihonExtensionRepoService @Inject constructor(
 	}
 
 	private suspend fun followLegacyPointer(repo: MihonExtensionRepo, url: String, depth: Int): List<MihonAvailableExtension> {
-		// repo.baseUrl already ends with the repo root; attempt repo.json -> index_v2 hop.
-		val repoJsonUrl = "${repo.baseUrl}/repo.json"
-		val repoJsonBytes = fetchBytes(repoJsonUrl) ?: return emptyList()
-		val pointer = runCatching {
-			json.decodeFromString<MihonStoreIndexPointer>(repoJsonBytes.decodeToString())
-		}.getOrNull() ?: return emptyList()
-		val next = pointer.indexV2 ?: "${repo.baseUrl}/index.min.json"
-		if (next == url) {
-			return emptyList() // cycle guard
+		// Some legacy repositories publish a pointer, while others only expose the new index
+		// files. A missing repo.json must not hide a valid index.json or index.pb.
+		val pointer = fetchBytes("${repo.baseUrl}/repo.json")?.let { bytes ->
+			runCatching { json.decodeFromString<MihonStoreIndexPointer>(bytes.decodeToString()).indexV2 }
+				.getOrNull()
 		}
-		return loadEntries(repo, next, depth + 1)
+		val candidates = legacyModernIndexCandidates(repo.baseUrl, pointer)
+			.map { resolveRepoIndexUrl(repo, it) }
+			.filterNot { it == url }
+		return loadFirstAvailableIndex(repo, candidates, depth + 1)
 	}
 
-	private fun defaultIndexCandidates(baseUrl: String): String {
-		val root = baseUrl.removeSuffix("/repo.json")
-		return "$root/index.json"
+	private suspend fun loadFirstAvailableIndex(
+		repo: MihonExtensionRepo,
+		candidates: List<String>,
+		depth: Int,
+	): List<MihonAvailableExtension> {
+		for (candidate in candidates) {
+			val result = loadEntries(repo, candidate, depth)
+			if (result.isNotEmpty()) return result
+		}
+		return emptyList()
+	}
+
+	private fun resolveRepoIndexUrl(repo: MihonExtensionRepo, value: String): String {
+		return resolveRepoIndexUrlFromBase(repo.baseUrl, value)
 	}
 
 	private suspend fun fetchBytes(url: String): ByteArray? = withContext(Dispatchers.IO) {
-		runCatching {
-			httpClient.newCall(
-				Request.Builder()
-					.url(url)
-					.build(),
-			).awaitSuccess().use { response ->
-				response.body.bytes().gunzipIfNeeded()
-			}
-		}.getOrNull()?.takeIf { it.isNotEmpty() }
+		httpClient.newCall(
+			Request.Builder()
+				.url(url)
+				.build(),
+		).await().use { response ->
+			if (response.code == 404) return@withContext null
+			if (!response.isSuccessful) throw IOException("Repository request failed with HTTP ${response.code}: $url")
+			response.body.bytes().gunzipIfNeeded().takeIf { it.isNotEmpty() }
+		}
 	}
 
 	private fun ByteArray.gunzipIfNeeded(): ByteArray {
 		return if (size >= 2 && this[0] == GZIP_MAGIC_0 && this[1] == GZIP_MAGIC_1) {
-			runCatching { GZIPInputStream(inputStream()).use { it.readBytes() } }.getOrDefault(this)
+			runCatching { GZIPInputStream(inputStream()).use { it.readBytes() } }
+				.getOrElse { throw IOException("Could not decompress extension repository index", it) }
 		} else {
 			this
-		}
-	}
-
-	private fun List<MihonExtensionIndexEntryDto>.isTombstone(): Boolean {
-		// The keiyoushi 2026-07-28 legacy index flip leaves exactly two placeholder rows
-		// ("Outdated App", "Update to Mihon 0.20.1+") whose packages are the stub extensions.
-		return size <= 2 && all { dto ->
-			dto.pkg == TOMBSTONE_KEIYOUSHI_PKG || dto.pkg == TOMBSTONE_MIHON_PKG
 		}
 	}
 
@@ -230,4 +234,27 @@ class MihonExtensionRepoService @Inject constructor(
 		const val GZIP_MAGIC_0: Byte = 0x1f.toByte()
 		const val GZIP_MAGIC_1: Byte = 0x8b.toByte()
 	}
+}
+
+internal fun List<MihonExtensionIndexEntryDto>.isLegacyOutdatedPlaceholderIndex(): Boolean {
+	// The keiyoushi legacy index flip leaves at most two placeholder rows whose packages
+	// are the migration stubs rather than real extensions.
+	return isNotEmpty() && size <= 2 && all { dto ->
+		dto.pkg == "eu.kanade.tachiyomi.extension.all.keiyoushi" ||
+			dto.pkg == "eu.kanade.tachiyomi.extension.all.mihon"
+	}
+}
+
+internal fun legacyModernIndexCandidates(repoBaseUrl: String, pointer: String? = null): List<String> {
+	val root = repoBaseUrl.trimEnd('/')
+	return buildList {
+		pointer?.takeIf(String::isNotBlank)?.let(::add)
+		add("$root/index.json")
+		add("$root/index.pb")
+	}.distinct()
+}
+
+internal fun resolveRepoIndexUrlFromBase(repoBaseUrl: String, value: String): String {
+	val base = repoBaseUrl.trimEnd('/') + "/"
+	return base.toHttpUrlOrNull()?.resolve(value)?.toString() ?: value
 }

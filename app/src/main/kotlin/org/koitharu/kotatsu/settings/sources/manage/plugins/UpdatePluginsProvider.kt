@@ -67,7 +67,7 @@ class UpdatePluginsProvider @Inject constructor(
 						}
 					}
 				}
-				updateInstalledMihonExtensions()
+				updateInstalledMihonExtensions(settings.useAndroidInstalledExtensions)
 			}
 		} finally {
 			mutex.unlock()
@@ -79,7 +79,7 @@ class UpdatePluginsProvider @Inject constructor(
 	 * its index and install any entry whose version is newer than what is already on the device.
 	 * Repos and individual extensions that fail are skipped rather than aborting the run.
 	 */
-	private suspend fun updateInstalledMihonExtensions() {
+	private suspend fun updateInstalledMihonExtensions(includeAndroidInstalled: Boolean) {
 		if (!mihonRepoRepository.getRepos().any()) {
 			return
 		}
@@ -88,6 +88,7 @@ class UpdatePluginsProvider @Inject constructor(
 				mihonRepoRepository.getExtensions(repo.baseUrl)
 			}.getOrNull().orEmpty()
 				.filter { it.isInstalledExternally || it.isInstalledPrivately }
+				.filter { it.isInstalledPrivately || includeAndroidInstalled }
 				.filter { it.hasUpdate }
 				.forEach { descriptor ->
 					runCatchingCancellable {

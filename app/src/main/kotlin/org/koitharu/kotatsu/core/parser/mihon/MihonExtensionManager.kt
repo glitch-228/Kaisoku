@@ -10,6 +10,7 @@ import eu.kanade.tachiyomi.source.SourceFactory
 import eu.kanade.tachiyomi.source.online.HttpSource
 import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.core.parser.mihon.repo.MihonPrivateExtensionStore
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,6 +19,7 @@ class MihonExtensionManager @Inject constructor(
 	@ApplicationContext private val context: Context,
 	private val injektBridge: dagger.Lazy<MihonInjektBridge>,
 	private val privateExtensionStore: MihonPrivateExtensionStore,
+	private val settings: AppSettings,
 ) {
 
 	data class LoadedSource(
@@ -27,12 +29,16 @@ class MihonExtensionManager @Inject constructor(
 
 	@Volatile
 	private var cachedSources: List<LoadedSource>? = null
+	@Volatile
+	private var cachedFailures: List<String> = emptyList()
 
 	fun invalidate() {
 		cachedSources = null
 	}
 
 	fun getInstalledSources(): List<MihonMangaSource> = ensureLoaded().map { it.wrapper }
+
+	fun getLoadFailures(): List<String> = cachedFailures
 
 	fun resolve(source: MihonMangaSource): LoadedSource? {
 		return ensureLoaded().firstOrNull { it.wrapper.matches(source) }
@@ -53,10 +59,15 @@ class MihonExtensionManager @Inject constructor(
 
 	private fun loadInstalledSources(): List<LoadedSource> {
 		val pm = context.packageManager
-		val extensionPackages = (
+		val sharedPackages = if (settings.useAndroidInstalledExtensions) {
 			MihonExtensionPackageUtil.getInstalledPackages(pm)
 				.asSequence()
-				.map { MihonInstalledExtensionPackage(it, isPrivate = false) } +
+				.map { MihonInstalledExtensionPackage(it, isPrivate = false) }
+		} else {
+			emptySequence()
+		}
+		val extensionPackages = (
+			sharedPackages +
 			privateExtensionStore.listInstalledPackages()
 				.asSequence()
 				.map { MihonInstalledExtensionPackage(it, isPrivate = true) }
@@ -85,32 +96,40 @@ class MihonExtensionManager @Inject constructor(
 			}
 			.toList()
 		Log.w(TAG, "Scanning ${extensionPackages.size} Mihon extension packages")
-		return extensionPackages
+		val failures = ArrayList<String>()
+		val sources = extensionPackages
 			.asSequence()
-			.flatMap { loadSourcesFromPackage(pm, it).asSequence() }
+			.flatMap { loadSourcesFromPackage(pm, it, failures).asSequence() }
 			.sortedBy { it.wrapper.displayName?.lowercase() ?: it.wrapper.packageName.lowercase() }
 			.toList()
+		cachedFailures = failures
+		return sources
 	}
 
 	private fun loadSourcesFromPackage(
 		pm: PackageManager,
 		extensionPackage: MihonInstalledExtensionPackage,
+		failures: MutableList<String>,
 	): List<LoadedSource> {
 		val completeInfo = if (extensionPackage.isPrivate) {
 			extensionPackage.packageInfo
 		} else {
 			MihonExtensionPackageUtil.refreshPackageInfoIfNeeded(pm, extensionPackage.packageInfo)
 		}
-		val appInfo = completeInfo.applicationInfo ?: return emptyList()
-		val metaData = appInfo.metaData ?: return emptyList()
+		fun reportFailure(reason: String): List<LoadedSource> {
+			failures += "${completeInfo.packageName} ${completeInfo.versionName ?: "unknown version"}: $reason"
+			return emptyList()
+		}
+		val appInfo = completeInfo.applicationInfo ?: return reportFailure("package metadata is unavailable")
+		val metaData = appInfo.metaData ?: return reportFailure("extension metadata is missing")
 		val sourceClassName = metaData.getString(MihonExtensionPackageUtil.METADATA_SOURCE_CLASS)
 			?: metaData.getString(MihonExtensionPackageUtil.METADATA_SOURCE_FACTORY)
-			?: return emptyList()
-		val apkPath = appInfo.sourceDir ?: return emptyList()
+			?: return reportFailure("extension source entry class is missing")
+		val apkPath = appInfo.sourceDir ?: return reportFailure("APK path is unavailable")
 		val libVersion = MihonExtensionPackageUtil.readLibVersion(metaData, completeInfo.versionName)
 		if (libVersion != null && !MihonExtensionPackageUtil.isSupportedLibVersion(libVersion)) {
 			Log.i(TAG, "Skipping ${completeInfo.packageName}: unsupported lib version $libVersion")
-			return emptyList()
+			return reportFailure("unsupported extension library $libVersion")
 		}
 		return runCatching {
 			Log.w(
@@ -145,7 +164,7 @@ class MihonExtensionManager @Inject constructor(
 					listOf(loadedClass.getDeclaredConstructor().newInstance() as Source)
 				}
 
-				else -> emptyList()
+				else -> throw IllegalStateException("entry class is neither a source nor a source factory")
 			}
 			if (BuildConfig.DEBUG) {
 				Log.d(
@@ -158,7 +177,7 @@ class MihonExtensionManager @Inject constructor(
 				TAG,
 				"Created ${sourceInstances.size} source instances for ${completeInfo.packageName}",
 			)
-			sourceInstances.mapNotNull { source ->
+			val loadedSources = sourceInstances.mapNotNull { source ->
 				val catalogueSource = source as? CatalogueSource ?: run {
 					Log.w(TAG, "Ignoring non-catalogue Mihon source ${source.javaClass.name}")
 					return@mapNotNull null
@@ -183,8 +202,15 @@ class MihonExtensionManager @Inject constructor(
 					catalogueSource = catalogueSource,
 				)
 			}
+			if (loadedSources.isEmpty()) {
+				failures += "${completeInfo.packageName} ${completeInfo.versionName ?: "unknown version"}: " +
+					"extension loaded but did not expose catalogue sources"
+			}
+			loadedSources
 		}.onFailure {
 			Log.w(TAG, "Failed to load ${completeInfo.packageName}", it)
+			failures += "${completeInfo.packageName} ${completeInfo.versionName ?: "unknown version"}: " +
+				(it.message ?: it.javaClass.simpleName)
 		}.getOrDefault(emptyList())
 	}
 

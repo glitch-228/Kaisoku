@@ -20,6 +20,7 @@ class MihonExtensionRepoRepository @Inject constructor(
 	private val repoStore: MihonExtensionRepoStore,
 	private val repoService: MihonExtensionRepoService,
 	private val privateExtensionStore: MihonPrivateExtensionStore,
+	private val settings: org.koitharu.kotatsu.core.prefs.AppSettings,
 	@MangaHttpClient private val httpClient: OkHttpClient,
 ) {
 
@@ -100,9 +101,13 @@ class MihonExtensionRepoRepository @Inject constructor(
 		val privatePkg = privateExtensionStore.findInstalledPackage(pkgName)?.let {
 			MihonInstalledExtensionPackage(it, isPrivate = true)
 		}
-		val sharedPkg = MihonExtensionPackageUtil.getPackageInfoOrNull(pm, pkgName)
+		val sharedPkg = if (settings.useAndroidInstalledExtensions) {
+			MihonExtensionPackageUtil.getPackageInfoOrNull(pm, pkgName)
 			?.takeIf(MihonExtensionPackageUtil::isMihonExtension)
 			?.let { MihonInstalledExtensionPackage(it, isPrivate = false) }
+		} else {
+			null
+		}
 		return MihonExtensionPackageUtil.selectPreferred(sharedPkg, privatePkg)
 	}
 

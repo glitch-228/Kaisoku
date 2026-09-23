@@ -150,6 +150,12 @@ private fun buildRepoExtensionSummary(
 
 private fun MihonRepoExtensionDescriptor.toAction(): RepoExtensionAction {
 	return when {
+		extension.name.startsWith("Please migrate to Keiyoushi", ignoreCase = true) -> RepoExtensionAction(
+			icon = R.drawable.ic_open_external,
+			label = R.string.migrate_to_keiyoushi,
+			isEnabled = true,
+		)
+
 		hasUpdate -> RepoExtensionAction(
 			icon = R.drawable.ic_updated,
 			label = R.string.update,

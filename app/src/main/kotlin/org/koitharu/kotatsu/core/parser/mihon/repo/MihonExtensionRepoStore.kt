@@ -40,7 +40,10 @@ class MihonExtensionRepoStore @Inject constructor(
 		if (all.any { it.baseUrl == repo.baseUrl }) {
 			return AddResult.RepoAlreadyExists
 		}
-		val fingerprintConflict = all.firstOrNull { it.signingKeyFingerprint == repo.signingKeyFingerprint }
+		val isKeiyoushiMigration = repo.baseUrl.contains("keiyoushi/extensions", ignoreCase = true)
+		val fingerprintConflict = all.firstOrNull {
+			it.signingKeyFingerprint == repo.signingKeyFingerprint
+		}?.takeUnless { isKeiyoushiMigration }
 		if (fingerprintConflict != null) {
 			return AddResult.DuplicateFingerprint(fingerprintConflict)
 		}

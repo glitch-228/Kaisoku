@@ -19,6 +19,7 @@ import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
 import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
+import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
 import javax.inject.Inject
 
 @HiltViewModel
@@ -26,10 +27,12 @@ class SourcesSettingsViewModel @Inject constructor(
 	private val sourcesRepository: MangaSourcesRepository,
 	private val database: MangaDatabase,
 	@ApplicationContext private val context: Context,
+	private val extensionManager: MihonExtensionManager,
 ) : BaseViewModel() {
 
 	val onBrokenSourcesLoaded = MutableEventFlow<List<BrokenSourceItem>>()
 	val onRepairIdsLoaded = MutableEventFlow<LongArray>()
+	val onExtensionErrorsLoaded = MutableEventFlow<List<String>>()
 
 	private val linksHandlerActivity = ComponentName(context, "org.koitharu.kotatsu.details.ui.DetailsByLinkActivity")
 
@@ -50,6 +53,19 @@ class SourcesSettingsViewModel @Inject constructor(
 			PackageManager.DONT_KILL_APP,
 		)
 		isLinksEnabled.value = isLinksEnabled()
+	}
+
+	fun refreshInstalledSources() {
+		launchLoadingJob(Dispatchers.IO) {
+			sourcesRepository.refreshInstalledMihonSources()
+		}
+	}
+
+	fun loadExtensionErrors() {
+		launchLoadingJob(Dispatchers.IO) {
+			sourcesRepository.refreshInstalledMihonSources()
+			onExtensionErrorsLoaded.call(extensionManager.getLoadFailures())
+		}
 	}
 
 	fun loadBrokenSources() {

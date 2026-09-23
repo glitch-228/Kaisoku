@@ -17,6 +17,7 @@ import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.exceptions.resolve.SnackbarErrorObserver
+import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.ui.BaseActivity
 import org.koitharu.kotatsu.core.ui.list.OnListItemClickListener
 import org.koitharu.kotatsu.core.ui.util.FadingAppbarMediator
@@ -58,6 +59,9 @@ class MihonRepoExtensionsActivity : BaseActivity<ActivitySourcesCatalogBinding>(
 			supportActionBar?.title = it
 		}
 		viewModel.onMessage.observeEvent(this, ::showMessage)
+		viewModel.onOpenMigrationRepo.observeEvent(this) { baseUrl ->
+			router.openMihonRepoExtensions(baseUrl, getString(R.string.extensions))
+		}
 		viewModel.onError.observeEvent(this, SnackbarErrorObserver(viewBinding.recyclerView, null))
 		addMenuProvider(object : MenuProvider {
 			override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {

@@ -33,6 +33,18 @@
         android:title="@string/auto_update_plugins" />
 
     <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="use_android_installed_extensions"
+        android:summary="@string/use_android_installed_extensions_summary"
+        android:title="@string/use_android_installed_extensions" />
+
+    <Preference
+        android:key="mihon_extension_errors"
+        android:persistent="false"
+        android:summary="@string/mihon_extension_errors_summary"
+        android:title="@string/mihon_extension_errors" />
+
+    <SwitchPreferenceCompat
         android:defaultValue="false"
         android:key="sources_enabled_all"
         android:summary="@string/enable_all_sources_summary"

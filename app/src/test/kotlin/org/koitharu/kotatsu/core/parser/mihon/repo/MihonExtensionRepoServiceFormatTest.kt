@@ -238,11 +238,7 @@ class MihonExtensionRepoServiceFormatTest {
                 nsfw = 0,
             ),
         )
-        val isTombstone = rows.size <= 2 && rows.all {
-            it.pkg == "eu.kanade.tachiyomi.extension.all.keiyoushi" ||
-                it.pkg == "eu.kanade.tachiyomi.extension.all.mihon"
-        }
-        assertTrue(isTombstone)
+        assertTrue(rows.isLegacyOutdatedPlaceholderIndex())
 
         val real = rows + MihonExtensionIndexEntryDto(
             name = "Tachiyomi: M",
@@ -253,10 +249,41 @@ class MihonExtensionRepoServiceFormatTest {
             version = "1.4.1",
             nsfw = 0,
         )
-        val isTombstoneReal = real.size <= 2 && real.all {
-            it.pkg == "eu.kanade.tachiyomi.extension.all.keiyoushi" ||
-                it.pkg == "eu.kanade.tachiyomi.extension.all.mihon"
-        }
-        assertFalse(isTombstoneReal)
+        assertFalse(real.isLegacyOutdatedPlaceholderIndex())
+        assertFalse(emptyList<MihonExtensionIndexEntryDto>().isLegacyOutdatedPlaceholderIndex())
+    }
+
+    @Test
+    fun legacyRetirementFallsBackToModernJsonAndProtobufIndexesWithoutPointer() {
+        assertEquals(
+            listOf("https://repo.example/extensions/index.json", "https://repo.example/extensions/index.pb"),
+            legacyModernIndexCandidates("https://repo.example/extensions"),
+        )
+    }
+
+    @Test
+    fun explicitMigrationPointerIsTriedBeforeModernIndexConventions() {
+        assertEquals(
+            listOf(
+                "https://repo.example/extensions/index-v2.json",
+                "https://repo.example/extensions/index.json",
+                "https://repo.example/extensions/index.pb",
+            ),
+            legacyModernIndexCandidates(
+                "https://repo.example/extensions/",
+                "https://repo.example/extensions/index-v2.json",
+            ),
+        )
+    }
+
+    @Test
+    fun relativeIndexPointersResolveInsideRepositoryRootWithoutTrailingSlash() {
+        assertEquals(
+            "https://repo.example/extensions/index-v2/index.pb",
+            resolveRepoIndexUrlFromBase(
+                "https://repo.example/extensions",
+                "index-v2/index.pb",
+            ),
+        )
     }
 }
