@@ -29,6 +29,12 @@ sealed class TranslateException(message: String, cause: Throwable? = null) : Exc
 sealed interface PageTranslationState {
 	data object Idle : PageTranslationState
 	data object Loading : PageTranslationState
-	data class Done(val rendered: Bitmap, val blocks: List<TranslatedBlock>, val isPartial: Boolean = false) : PageTranslationState
+	data class Done(
+		val rendered: Bitmap,
+		val blocks: List<TranslatedBlock>,
+		val overflow: List<TranslationOverflow> = emptyList(),
+		val isPartial: Boolean = false,
+		val preRendered: Boolean = false,
+	) : PageTranslationState
 	data class Failed(val error: Throwable) : PageTranslationState
 }

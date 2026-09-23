@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="keep_android_open_title">Сохраним Android открытым</string>
+    <string name="keep_android_open_message">Поддержите свободу устанавливать приложения и расширения из выбранных вами источников.</string>
+    <string name="learn_more">Подробнее</string>
+    <string name="dismiss">Закрыть</string>
+    <string name="keep_android_open">Кампания «Сохраним Android открытым»</string>
+    <string name="translated_text">Переведённый текст</string>
+    <string name="translated_text_count">Переведённый текст (%1$d)</string>
+    <string name="community_retry_in">Запросы к сообществу ограничены. Повтор через %1$d сек…</string>
+    <string name="community_refresh_failed">Не удалось обновить данные сообщества. Показана последняя сохранённая сводка.</string>
     <string name="novel_reader_settings">Настройки чтения новелл (Бета)</string>
     <string name="novel_reader_beta">Чтение новелл · Бета</string>
     <string name="lnreader_repositories_summary">Поиск и установка источников новелл. Чтение новелл — бета-функция.</string>

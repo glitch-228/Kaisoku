@@ -56,9 +56,11 @@
 				android:id="@+id/textView_result"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:fontFamily="monospace"
+				android:fontFamily="sans"
 				android:textAppearance="?attr/textAppearanceBodyMedium"
 				android:textIsSelectable="true"
+				android:lineSpacingMultiplier="1.1"
+				android:padding="@dimen/margin_normal"
 				tools:text="サンプルテキスト\nLine two" />
 
 		</ScrollView>

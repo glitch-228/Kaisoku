@@ -15,6 +15,12 @@
 		app:doubleTapZoomStyle="center"
 		app:restoreStrategy="deferred" />
 
+	<org.koitharu.kotatsu.reader.ui.pager.TranslationMarkerOverlay
+		android:id="@+id/translation_markers"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:visibility="gone" />
+
 	<org.koitharu.kotatsu.core.image.CoilImageView
 		android:id="@+id/animatedView"
 		android:layout_width="match_parent"

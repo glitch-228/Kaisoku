@@ -89,7 +89,16 @@ class TranslationCoordinator @Inject constructor(
 					val key = cache.keyFor(page.id, settings)
 					if (!force) {
 						cache.get(key)?.let { hit ->
-							state.value = PageTranslationState.Done(hit.bitmap, hit.blocks)
+							if (hit.preRendered) {
+								state.value = PageTranslationState.Done(hit.bitmap, hit.blocks, hit.overflow, preRendered = true)
+							} else {
+								val source = loadSourceBitmap(page)
+								val layout = runInterruptible { renderer.render(source, hit.blocks, settings.translateOverlayBackground) }
+								if (layout.bitmap !== source) source.recycle()
+								if (!hit.bitmap.isRecycled) hit.bitmap.recycle()
+								cache.put(key, layout.bitmap, hit.blocks, layout.overflow)
+								state.value = PageTranslationState.Done(layout.bitmap, hit.blocks, layout.overflow)
+							}
 							return@withPermit
 						}
 					}
@@ -117,26 +126,31 @@ class TranslationCoordinator @Inject constructor(
 					}
 					val blocks: List<TranslatedBlock>
 					val rendered: android.graphics.Bitmap
+					var overflow = emptyList<TranslationOverflow>()
+					var preRendered = false
 					when (result) {
 						is PageTranslationResult.Blocks -> {
 							blocks = mergeOverlappingBlocks(result.blocks)
-							rendered = try {
+							val layout = try {
 								runInterruptible { renderer.render(bitmap, blocks, settings.translateOverlayBackground) }
 							} catch (e: Throwable) {
 								bitmap.recycle()
 								throw e
 							}
+							rendered = layout.bitmap
+							overflow = layout.overflow
 							if (rendered !== bitmap) bitmap.recycle()
 						}
 						is PageTranslationResult.Image -> {
 							// Backend already rendered the page; the source bitmap is no longer needed.
 							blocks = result.blocks
 							rendered = result.rendered
+							preRendered = true
 							bitmap.recycle()
 						}
 					}
-					cache.put(key, rendered, blocks)
-					state.value = PageTranslationState.Done(rendered, blocks, isPartial = failedTiles > 0)
+					cache.put(key, rendered, blocks, overflow, preRendered)
+					state.value = PageTranslationState.Done(rendered, blocks, overflow, isPartial = failedTiles > 0, preRendered = preRendered)
 					if (failedTiles > 0) {
 						_errors.tryEmit(TranslateException.Partial(failedTiles))
 					}
@@ -199,7 +213,12 @@ class TranslationCoordinator @Inject constructor(
 	 */
 	private fun mergeOverlappingBlocks(blocks: List<TranslatedBlock>): List<TranslatedBlock> {
 		if (blocks.size <= 1) return blocks
-		val remaining = blocks.sortedByDescending { it.rect.areaNorm() }.toMutableList()
+		val remaining = blocks.mapNotNull { block ->
+			val r = block.rect
+			if (!r.left.isFinite() || !r.top.isFinite() || !r.right.isFinite() || !r.bottom.isFinite()) return@mapNotNull null
+			val rect = android.graphics.RectF(r.left.coerceIn(0f, 1f), r.top.coerceIn(0f, 1f), r.right.coerceIn(0f, 1f), r.bottom.coerceIn(0f, 1f))
+			if (rect.width() <= 0.001f || rect.height() <= 0.001f) null else block.copy(rect = rect)
+		}.sortedByDescending { it.rect.areaNorm() }.toMutableList()
 		val out = mutableListOf<TranslatedBlock>()
 		while (remaining.isNotEmpty()) {
 			val pivot = remaining.removeAt(0)
@@ -207,7 +226,7 @@ class TranslationCoordinator @Inject constructor(
 			val it = remaining.iterator()
 			while (it.hasNext()) {
 				val other = it.next()
-				if (shouldMerge(merged.rect, other.rect)) {
+				if (shouldMerge(merged.rect, other.rect) && isDuplicateText(merged.translatedText, other.translatedText)) {
 					merged = mergeTwo(merged, other)
 					it.remove()
 				}
@@ -281,6 +300,28 @@ class TranslationCoordinator @Inject constructor(
 		synchronized(statesLock) {
 			jobs.remove(pageId)?.cancel()
 			states.remove(pageId)
+		}
+	}
+
+	/** Rebuilds only the image-space layout after rotation/font scaling, reusing cached translations. */
+	fun rerender(page: MangaPage) {
+		val state = stateFor(page.id) as MutableStateFlow<PageTranslationState>
+		val previous = state.value as? PageTranslationState.Done ?: return
+		if (previous.preRendered || previous.blocks.isEmpty()) return
+		scope.launch {
+			try {
+				val source = loadSourceBitmap(page)
+				val layout = runInterruptible { renderer.render(source, previous.blocks, settings.translateOverlayBackground) }
+				if (layout.bitmap !== source) source.recycle()
+				cache.put(cache.keyFor(page.id, settings), layout.bitmap, previous.blocks, layout.overflow)
+				if (state.value === previous) {
+					state.value = previous.copy(rendered = layout.bitmap, overflow = layout.overflow)
+				}
+			} catch (error: CancellationException) {
+				throw error
+			} catch (error: Throwable) {
+				_errors.tryEmit(error)
+			}
 		}
 	}
 

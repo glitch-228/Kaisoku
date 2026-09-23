@@ -20,6 +20,7 @@ import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.ui.BasePreferenceFragment
 import org.koitharu.kotatsu.core.util.ext.copyToClipboard
 import org.koitharu.kotatsu.core.util.ext.isHttpUrl
+import org.koitharu.kotatsu.core.util.KeepAndroidOpenCampaign
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.observeEvent
 
@@ -76,6 +77,14 @@ class AboutSettingsFragment : BasePreferenceFragment(R.string.about) {
 			AppSettings.KEY_LINK_DISCORD -> {
 				if (getString(R.string.url_discord).isHttpUrl()) {
 					openLink(R.string.url_discord, preference.title)
+				}
+				true
+			}
+
+			"keep_android_open" -> {
+				val url = KeepAndroidOpenCampaign.url(resources.configuration.locales[0].language)
+				if (!router.openExternalBrowser(url, preference.title)) {
+					Snackbar.make(listView, R.string.operation_not_supported, Snackbar.LENGTH_SHORT).show()
 				}
 				true
 			}

@@ -494,6 +494,29 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    fun showTranslatedText(expectedPageId: Long? = null, focusedNumber: Int? = null) {
+        val page = expectedPageId?.let { id -> content.value.pages.firstOrNull { it.id == id }?.toMangaPage() }
+            ?: getCurrentPage() ?: return
+        val done = translationCoordinator.stateFor(page.id).value as? org.koitharu.kotatsu.reader.translate.PageTranslationState.Done ?: return
+        onShowOcrSheet.call(Unit)
+        val text = done.blocks.mapIndexedNotNull { index, block ->
+            block.translatedText.trim().takeIf { it.isNotBlank() }?.let { "${index + 1}. $it" }
+        }.joinToString("\n\n")
+        ocrSheetState.value = org.koitharu.kotatsu.reader.translate.OcrSheetState.Done(
+            text = text,
+            blocks = done.blocks,
+            translated = true,
+            focusedNumber = focusedNumber,
+        )
+    }
+
+    fun currentTranslationState(): kotlinx.coroutines.flow.StateFlow<org.koitharu.kotatsu.reader.translate.PageTranslationState>? =
+        getCurrentPage()?.let { translationCoordinator.stateFor(it.id) }
+
+    fun rerenderTranslationForCurrentPage() {
+        getCurrentPage()?.let(translationCoordinator::rerender)
+    }
+
     fun toggleTranslateCurrentPage() {
         val page = getCurrentPage() ?: return
         if (!isTranslateConfigured()) {

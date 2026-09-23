@@ -55,6 +55,13 @@
                 android:text="@string/extract_text"
                 app:drawableStartCompat="@drawable/ic_text_recognition" />
 
+            <org.koitharu.kotatsu.core.ui.widgets.ListItemTextView
+                android:id="@+id/button_translated_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/translated_text"
+                app:drawableStartCompat="@drawable/ic_translate" />
+
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switch_auto_translate"
                 android:layout_width="match_parent"

@@ -54,11 +54,20 @@ class OcrBottomSheet : BaseAdaptiveSheet<SheetOcrBinding>() {
 			is OcrSheetState.Done -> {
 				binding.groupProgress.isGone = true
 				binding.scrollViewResult.isVisible = true
+				binding.headerBar.title = getString(if (state.translated) R.string.translated_text else R.string.extract_text)
 				if (state.text.isBlank()) {
 					binding.textViewResult.setText(R.string.ocr_no_text)
 					toggleResultButtons(binding, visible = false)
 				} else {
 					binding.textViewResult.text = state.text
+					state.focusedNumber?.let { number ->
+						binding.textViewResult.post {
+							val layout = binding.textViewResult.layout ?: return@post
+							val offset = state.text.indexOf("$number.").takeIf { it >= 0 } ?: return@post
+							val line = layout.getLineForOffset(offset)
+							binding.scrollViewResult.scrollTo(0, layout.getLineTop(line))
+						}
+					}
 					toggleResultButtons(binding, visible = true)
 				}
 			}

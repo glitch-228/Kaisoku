@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="keep_android_open_title">Keep Android Open</string>
+    <string name="keep_android_open_message">Support the freedom to install apps and extensions from the sources you choose.</string>
+    <string name="learn_more">Learn more</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="keep_android_open">Keep Android Open campaign</string>
+    <string name="translated_text">Translated text</string>
+    <string name="translated_text_count">Translated text (%1$d)</string>
+    <string name="community_retry_in">Community data is limited. Retrying in %1$d seconds…</string>
+    <string name="community_refresh_failed">Could not refresh community data; showing the last saved summary.</string>
     <string name="app_name" translatable="false">Kaisoku</string>
     <string name="library">Library</string>
     <string name="feed_tracking_state">Feed tracking state</string>

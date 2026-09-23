@@ -42,6 +42,11 @@
 		android:title="@string/about_app_translation_summary" />
 
 	<Preference
+		android:key="keep_android_open"
+		android:persistent="false"
+		android:title="@string/keep_android_open" />
+
+	<Preference
 		android:key="about_discord"
 		android:persistent="false"
 		android:summary="@string/url_discord"

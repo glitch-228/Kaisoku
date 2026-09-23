@@ -120,7 +120,9 @@ class ReaderActivity :
 
     private val idlingDetector = IdlingDetector(TimeUnit.SECONDS.toMillis(10), this)
 
-    private val viewModel: ReaderViewModel by viewModels()
+	private val viewModel: ReaderViewModel by viewModels()
+
+	fun showTranslatedText(pageId: Long, number: Int) = viewModel.showTranslatedText(pageId, number)
 
     override val readerMode: ReaderMode?
         get() = readerManager.currentMode

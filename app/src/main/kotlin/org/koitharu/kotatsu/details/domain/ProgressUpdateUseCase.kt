@@ -1,5 +1,6 @@
 package org.koitharu.kotatsu.details.domain
 
+import androidx.room.withTransaction
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.model.getPreferredBranch
 import org.koitharu.kotatsu.core.model.isLocal
@@ -65,7 +66,8 @@ class ProgressUpdateUseCase @Inject constructor(
 			calculateReaderPercent(chapterIndex, chaptersCount, history.page, pagesCount)
 		}
 		if (result != history.percent || history.chaptersCount != chaptersCount) {
-			database.getHistoryDao().update(
+			updateHistoryIfUnchanged(
+				history,
 				history.copy(
 					chapterId = chapter.id,
 					percent = result,
@@ -91,8 +93,21 @@ class ProgressUpdateUseCase @Inject constructor(
 		}
 		val estimated = (history.percent * history.chaptersCount / newTotal).coerceIn(0f, 1f)
 		if (estimated != history.percent || history.chaptersCount != newTotal) {
-			database.getHistoryDao().update(history.copy(percent = estimated, chaptersCount = newTotal))
+			updateHistoryIfUnchanged(
+				history,
+				history.copy(percent = estimated, chaptersCount = newTotal),
+			)
 		}
 		return estimated
+	}
+
+	/** Metadata refreshes may finish after a reader has already stored a newer position. */
+	private suspend fun updateHistoryIfUnchanged(expected: HistoryEntity, replacement: HistoryEntity) {
+		database.withTransaction {
+			val historyDao = database.getHistoryDao()
+			if (historyDao.find(expected.mangaId) == expected) {
+				historyDao.update(replacement)
+			}
+		}
 	}
 }

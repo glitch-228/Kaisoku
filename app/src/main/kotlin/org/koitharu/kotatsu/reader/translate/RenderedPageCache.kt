@@ -30,7 +30,12 @@ class RenderedPageCache @Inject constructor(
 	@ApplicationContext private val context: Context,
 ) {
 
-	data class Entry(val bitmap: Bitmap, val blocks: List<TranslatedBlock>)
+	data class Entry(
+		val bitmap: Bitmap,
+		val blocks: List<TranslatedBlock>,
+		val overflow: List<TranslationOverflow>,
+		val preRendered: Boolean,
+	)
 
 	private val mutex = Mutex()
 
@@ -60,12 +65,18 @@ class RenderedPageCache @Inject constructor(
 			jpg.setLastModified(now)
 			json.setLastModified(now)
 			val bitmap = BitmapFactory.decodeFile(jpg.absolutePath) ?: return@runInterruptible null
-			val blocks = runCatching { decodeBlocks(json.readText()) }.getOrDefault(emptyList())
-			Entry(bitmap, blocks)
+			val decoded = runCatching { decodeBlocks(json.readText()) }.getOrDefault(DecodedBlocks(emptyList(), emptyList()))
+			Entry(bitmap, decoded.blocks, decoded.overflow, decoded.preRendered)
 		}
 	}
 
-	suspend fun put(key: String, bitmap: Bitmap, blocks: List<TranslatedBlock>) = mutex.withLock {
+	suspend fun put(
+		key: String,
+		bitmap: Bitmap,
+		blocks: List<TranslatedBlock>,
+		overflow: List<TranslationOverflow>,
+		preRendered: Boolean = false,
+	) = mutex.withLock {
 		runInterruptible(Dispatchers.IO) {
 			val jpgPart = File(rootDir, "$key.jpg.part")
 			FileOutputStream(jpgPart).use { out ->
@@ -73,7 +84,7 @@ class RenderedPageCache @Inject constructor(
 			}
 			jpgPart.renameTo(File(rootDir, "$key.jpg"))
 			val jsonPart = File(rootDir, "$key.json.part")
-			jsonPart.writeText(encodeBlocks(blocks))
+			jsonPart.writeText(encodeBlocks(blocks, overflow, preRendered))
 			jsonPart.renameTo(File(rootDir, "$key.json"))
 			trim()
 		}
@@ -105,7 +116,7 @@ class RenderedPageCache @Inject constructor(
 		}
 	}
 
-	private fun encodeBlocks(blocks: List<TranslatedBlock>): String {
+	private fun encodeBlocks(blocks: List<TranslatedBlock>, overflow: List<TranslationOverflow>, preRendered: Boolean): String {
 		val arr = JSONArray()
 		for (b in blocks) {
 			arr.put(
@@ -118,11 +129,18 @@ class RenderedPageCache @Inject constructor(
 					.put("d", b.rect.bottom.toDouble()),
 			)
 		}
-		return arr.toString()
+		return JSONObject().put("blocks", arr).put("overflow", JSONArray().apply { overflow.forEach { put(it.index) } })
+			.put("pre_rendered", preRendered).toString()
 	}
 
-	private fun decodeBlocks(json: String): List<TranslatedBlock> {
-		val arr = JSONArray(json)
+	private data class DecodedBlocks(
+		val blocks: List<TranslatedBlock>,
+		val overflow: List<TranslationOverflow>,
+		val preRendered: Boolean = false,
+	)
+	private fun decodeBlocks(json: String): DecodedBlocks {
+		val root = runCatching { JSONObject(json) }.getOrNull()
+		val arr = root?.optJSONArray("blocks") ?: JSONArray(json)
 		val out = ArrayList<TranslatedBlock>(arr.length())
 		for (i in 0 until arr.length()) {
 			val o = arr.getJSONObject(i)
@@ -137,7 +155,10 @@ class RenderedPageCache @Inject constructor(
 				),
 			)
 		}
-		return out
+		val overflow = root?.optJSONArray("overflow")?.let { indexes ->
+			(0 until indexes.length()).mapNotNull { indexes.optInt(it).takeIf { idx -> idx in 1..out.size }?.let { idx -> TranslationOverflow(idx, out[idx - 1]) } }
+		}.orEmpty()
+		return DecodedBlocks(out, overflow, root?.optBoolean("pre_rendered") ?: true)
 	}
 
 	private fun sha256(raw: String): String {
@@ -147,7 +168,7 @@ class RenderedPageCache @Inject constructor(
 
 	private companion object {
 		const val ROOT_DIR = "translate-renders"
-		const val CACHE_VERSION = 1
+		const val CACHE_VERSION = 2
 		const val MAX_BYTES = 200L * 1024L * 1024L
 	}
 }

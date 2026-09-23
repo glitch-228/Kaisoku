@@ -115,6 +115,17 @@ class ReaderConfigSheet :
         binding.buttonBookmark.setOnClickListener(this)
         binding.buttonTranslate.setOnClickListener(this)
         binding.buttonOcr.setOnClickListener(this)
+        binding.buttonTranslatedText.setOnClickListener(this)
+        binding.buttonTranslatedText.isVisible = false
+        viewModel.currentTranslationState()?.let { translationState ->
+            translationState.onEach { state ->
+                val overflow = (state as? org.koitharu.kotatsu.reader.translate.PageTranslationState.Done)?.overflow.orEmpty()
+                binding.buttonTranslatedText.isVisible = settings.isPageTranslationEnabled && overflow.isNotEmpty()
+                if (overflow.isNotEmpty()) {
+                    binding.buttonTranslatedText.text = getString(R.string.translated_text_count, overflow.size)
+                }
+            }.launchIn(viewLifecycleScope)
+        }
         binding.switchAutoTranslate.isChecked = settings.translateTriggerMode ==
             org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE
         binding.switchAutoTranslate.setOnCheckedChangeListener(this)
@@ -220,6 +231,11 @@ class ReaderConfigSheet :
                 viewModel.requestOcrCurrentPage()
                 dismissAllowingStateLoss()
             }
+
+            R.id.button_translated_text -> {
+                viewModel.showTranslatedText()
+                dismissAllowingStateLoss()
+            }
         }
     }
 
@@ -233,12 +249,14 @@ class ReaderConfigSheet :
                 settings.isReaderDoubleOnLandscape = isChecked
                 viewBinding?.adjustSensitivitySlider(withAnimation = true)
                 findParentCallback(Callback::class.java)?.onDoubleModeChanged(isChecked)
+                viewModel.rerenderTranslationForCurrentPage()
             }
 
             R.id.switch_double_foldable -> {
                 settings.isReaderDoubleOnFoldable = isChecked
                 // Re-evaluate double-page considering foldable state and current manual toggle
                 findParentCallback(Callback::class.java)?.onDoubleModeChanged(settings.isReaderDoubleOnLandscape)
+                viewModel.rerenderTranslationForCurrentPage()
             }
 
             R.id.switch_double_cover_page -> {
@@ -287,6 +305,7 @@ class ReaderConfigSheet :
         }
         findParentCallback(Callback::class.java)?.onReaderModeChanged(newMode) ?: return
         mode = newMode
+        viewModel.rerenderTranslationForCurrentPage()
     }
 
     private fun observeScreenOrientation() {

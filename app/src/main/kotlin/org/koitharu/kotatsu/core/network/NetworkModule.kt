@@ -99,5 +99,16 @@ interface NetworkModule {
 			addInterceptor(commonHeadersInterceptor)
 		}.build()
 
+		@Provides
+		@Singleton
+		@CommunityHttpClient
+		fun provideCommunityHttpClient(
+			@BaseHttpClient baseClient: OkHttpClient,
+		): OkHttpClient = baseClient.newBuilder().apply {
+			// Community APIs return structured cooldown details in 429 bodies. The generic
+			// interceptor consumes that response before the community repository can inspect it.
+			interceptors().removeAll { it is RateLimitInterceptor }
+		}.build()
+
 	}
 }

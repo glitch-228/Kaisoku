@@ -6,187 +6,156 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import dagger.hilt.android.qualifiers.ApplicationContext
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Paints translated text onto a copy of the source page bitmap. Two-pass so
- * later bubbles can't be hidden under earlier ones. v1 is horizontal-only;
- * vertical-text plans + bubble grouping are deferred.
- *
- * The white background is auto-sized to fit the rendered StaticLayout, then
- * centered on the original bbox's center — so Chinese→English (where target
- * is wider than source) doesn't overflow a too-small box.
- */
+data class TranslationOverflow(val index: Int, val block: TranslatedBlock)
+data class TranslationRenderResult(val bitmap: Bitmap, val overflow: List<TranslationOverflow>)
+
+/** Draws text in its source region at a readable size; content which cannot fit stays accessible. */
 @Singleton
 class TranslationRenderer @Inject constructor(
 	@ApplicationContext private val context: Context,
+	private val settings: AppSettings,
 ) {
 
-	fun render(source: Bitmap, blocks: List<TranslatedBlock>, overlayBg: Boolean): Bitmap {
+	fun render(source: Bitmap, blocks: List<TranslatedBlock>, overlayBg: Boolean): TranslationRenderResult {
 		val out = source.copy(Bitmap.Config.ARGB_8888, true) ?: source
-		if (blocks.isEmpty()) return out
+		if (blocks.isEmpty()) return TranslationRenderResult(out, emptyList())
 		val canvas = Canvas(out)
-		val rounded = dp(6f)
-		val padding = dp(4f)
-		val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-			color = Color.WHITE
-			style = Paint.Style.FILL
+		val density = context.resources.displayMetrics
+		// StaticLayout draws into image pixels. Convert the requested scaled-sp size to the
+		// image's fitted display scale so it remains legible on both high- and low-density phones.
+		val config = context.resources.configuration
+		val columns = when {
+			config.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE && settings.isReaderDoubleOnLandscape -> 2f
+			config.smallestScreenWidthDp >= 600 && settings.isReaderDoubleOnFoldable -> 2f
+			else -> 1f
 		}
-		val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-			color = 0x33000000
+		val fitScale = (density.widthPixels / columns / out.width.toFloat()).coerceAtLeast(0.25f)
+		val pxPerSp = density.scaledDensity / fitScale
+		val padding = 4f * density.density / fitScale
+		val minFont = MIN_SP * pxPerSp
+		val maxFont = MAX_SP * pxPerSp
+		val gap = 2f * density.density / fitScale
+		val background = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+		val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+			color = 0x55000000
 			style = Paint.Style.STROKE
-			strokeWidth = dp(0.5f)
+			strokeWidth = max(1f, density.density / fitScale)
 		}
-		val basePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+		val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
 			color = Color.BLACK
-			isAntiAlias = true
+			typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
 		}
-
-		val prepared = blocks.map { block ->
-			val box = denormalize(block.rect, out.width, out.height)
-			val layout = fitLayout(block.translatedText, basePaint, box, padding)
-			val width = layout.maxLineWidth().toFloat() + padding * 2
-			val height = layout.height.toFloat() + padding * 2
-			val cx = box.centerX()
-			val cy = box.centerY()
-			var left = cx - width / 2f
-			var top = cy - height / 2f
-			var right = left + width
-			var bottom = top + height
-			// Clamp to bitmap, shifting if needed
-			if (left < 0f) { right -= left; left = 0f }
-			if (top < 0f) { bottom -= top; top = 0f }
-			if (right > out.width) { left -= right - out.width; right = out.width.toFloat() }
-			if (bottom > out.height) { top -= bottom - out.height; bottom = out.height.toFloat() }
-			Prepared(RectF(left, top, right, bottom), layout, cy)
-		}
-		// Spread overlapping boxes apart vertically so none is buried inside another,
-		// keeping each block in its source vertical order (a higher bubble stays higher).
-		separateOverlaps(prepared, out.height)
-
-		if (overlayBg) {
-			for (p in prepared) {
-				canvas.drawRoundRect(p.rect, rounded, rounded, bgPaint)
-				canvas.drawRoundRect(p.rect, rounded, rounded, strokePaint)
+		val occupied = mutableListOf<RectF>()
+		val sourceRects = blocks.map { denormalize(it.rect, out.width, out.height) }
+		val overflow = mutableListOf<TranslationOverflow>()
+		blocks.forEachIndexed { index, block ->
+			val sourceBox = denormalize(block.rect, out.width, out.height)
+			if (block.translatedText.isBlank() || sourceBox.width() <= 1f || sourceBox.height() <= 1f) {
+				overflow += TranslationOverflow(index + 1, block)
+				return@forEachIndexed
 			}
-		}
-		for (p in prepared) {
-			canvas.save()
-			canvas.translate(p.rect.left + padding, p.rect.top + padding)
-			p.layout.draw(canvas)
-			canvas.restore()
-		}
-		return out
-	}
-
-	private class Prepared(val rect: RectF, val layout: StaticLayout, val anchorY: Float)
-
-	/**
-	 * Resolve overlaps between rendered text boxes by sliding them apart on the Y axis.
-	 * Each box is anchored to [Prepared.anchorY] (its source bubble's vertical centre), so
-	 * when two boxes collide the one whose original text sat higher is pushed up and the
-	 * lower one down — overlaps (and fully-nested boxes) separate without scrambling reading
-	 * order. Runs a few relaxation rounds because clamping a box back on-screen can nudge it
-	 * into a neighbour again. Horizontal placement is left untouched.
-	 */
-	private fun separateOverlaps(items: List<Prepared>, height: Int) {
-		if (items.size < 2) return
-		val gap = dp(2f)
-		val maxY = height.toFloat()
-		repeat(SEPARATE_ROUNDS) {
-			var moved = false
-			for (i in items.indices) {
-				for (j in i + 1 until items.size) {
-					val a = items[i]
-					val b = items[j]
-					if (!RectF.intersects(a.rect, b.rect)) continue
-					val upper = if (a.anchorY <= b.anchorY) a else b
-					val lower = if (upper === a) b else a
-					val overlap = upper.rect.bottom - lower.rect.top + gap
-					if (overlap > 0f) {
-						val shift = overlap / 2f
-						upper.rect.offset(0f, -shift)
-						lower.rect.offset(0f, shift)
-						moved = true
-					}
+			var placement = sourceBox
+			var layout = fitLayout(block.translatedText, textPaint,
+				(sourceBox.width() - padding * 2f).toInt().coerceAtLeast(1), sourceBox.height() - padding * 2f, minFont, maxFont)
+			if (layout == null) {
+				// If unused space surrounds the bubble, try a modest expansion. Never paint over
+				// another source block; the numbered text sheet handles dense layouts safely.
+				val expandedBox = RectF(
+					max(0f, sourceBox.left - sourceBox.width() * 0.22f),
+					max(0f, sourceBox.top - sourceBox.height() * 0.22f),
+					min(out.width.toFloat(), sourceBox.right + sourceBox.width() * 0.22f),
+					min(out.height.toFloat(), sourceBox.bottom + sourceBox.height() * 0.22f),
+				)
+				val clearOfOtherSources = sourceRects.withIndex().none { (otherIndex, other) ->
+					otherIndex != index && RectF.intersects(expandedBox, other)
+				}
+				if (clearOfOtherSources) {
+					placement = expandedBox
+					layout = fitLayout(block.translatedText, textPaint,
+						(placement.width() - padding * 2f).toInt().coerceAtLeast(1), placement.height() - padding * 2f, minFont, maxFont)
 				}
 			}
-			// Keep every box on the bitmap; the next round mops up overlaps this re-introduces.
-			for (p in items) {
-				if (p.rect.top < 0f) p.rect.offset(0f, -p.rect.top)
-				if (p.rect.bottom > maxY) p.rect.offset(0f, maxY - p.rect.bottom)
+			if (layout == null) {
+				overflow += TranslationOverflow(index + 1, block)
+				return@forEachIndexed
 			}
-			if (!moved) return
+			val usedWidth = min(placement.width() - padding * 2f, max(1f, layout.maxLineWidth().toFloat()))
+			val rect = RectF(
+				placement.centerX() - (usedWidth + padding * 2) / 2f,
+				placement.centerY() - (layout.height + padding * 2) / 2f,
+				placement.centerX() + (usedWidth + padding * 2) / 2f,
+				placement.centerY() + (layout.height + padding * 2) / 2f,
+			)
+			if (rect.left < 0 || rect.top < 0 || rect.right > out.width || rect.bottom > out.height ||
+				occupied.any { RectF.intersects(it, expanded(rect, gap)) }
+			) {
+				overflow += TranslationOverflow(index + 1, block)
+				return@forEachIndexed
+			}
+			occupied += rect
+			if (overlayBg) {
+				canvas.drawRoundRect(rect, 6f * density.density / fitScale, 6f * density.density / fitScale, background)
+				canvas.drawRoundRect(rect, 6f * density.density / fitScale, 6f * density.density / fitScale, outline)
+			}
+			canvas.save()
+			canvas.translate(rect.left + padding, rect.top + padding)
+			layout.draw(canvas)
+			canvas.restore()
 		}
+		// Number markers point to the same ordered entries in the translated text sheet.
+		val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xff356b77.toInt() }
+		val markerText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+			color = Color.WHITE
+			textSize = 13f * pxPerSp
+			textAlign = Paint.Align.CENTER
+			typeface = android.graphics.Typeface.DEFAULT_BOLD
+		}
+		for (item in overflow) {
+			val anchor = denormalize(item.block.rect, out.width, out.height)
+			val radius = max(14f * pxPerSp, 20f * density.density / fitScale)
+			val cx = anchor.centerX().coerceIn(radius, out.width - radius)
+			val cy = anchor.centerY().coerceIn(radius, out.height - radius)
+			canvas.drawCircle(cx, cy, radius, markerPaint)
+			val label = item.index.toString()
+			canvas.drawText(label, cx, cy - (markerText.ascent() + markerText.descent()) / 2f, markerText)
+		}
+		return TranslationRenderResult(out, overflow)
 	}
 
-	private fun denormalize(rect: RectF, width: Int, height: Int): RectF =
-		RectF(
-			rect.left * width,
-			rect.top * height,
-			rect.right * width,
-			rect.bottom * height,
-		)
-
-	/**
-	 * Find a layout that fits inside [box] (with padding) — preferring to use the
-	 * original box height but allowing the layout to grow up to 1.75× the box
-	 * height if the translation is significantly longer than the source text
-	 * (typical when CJK→Latin expansion). Falls back to shrinking the text down
-	 * to [MIN_SIZE_DP] if no font size fits.
-	 */
-	private fun fitLayout(text: String, base: TextPaint, box: RectF, padding: Float): StaticLayout {
-		val width = max((box.width() - padding * 2).toInt(), dp(80f).toInt())
-		val targetHeight = max((box.height() - padding * 2), dp(20f))
-		val maxHeight = targetHeight * 1.75f
-		val minSize = dp(MIN_SIZE_DP)
-		val maxSize = dp(MAX_SIZE_DP)
-		// Start near the target height; binary search would be faster but unnecessary at this scale.
-		var size = max(minSize, min(maxSize, targetHeight * 0.30f))
-		var layout = makeLayout(text, base, width, size)
-		while (layout.height > maxHeight && size > minSize) {
-			size = max(minSize, size - dp(0.5f))
-			layout = makeLayout(text, base, width, size)
+	private fun fitLayout(text: String, base: TextPaint, width: Int, height: Float, minSize: Float, maxSize: Float): StaticLayout? {
+		var size = maxSize
+		while (size >= minSize) {
+			val paint = TextPaint(base).apply { textSize = size }
+			val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
+				.setAlignment(Layout.Alignment.ALIGN_CENTER)
+				.setIncludePad(false)
+				.setLineSpacing(0f, 1.1f)
+				.build()
+			if (layout.height <= height) return layout
+			size -= max(0.5f, minSize / 12f)
 		}
-		// Cosmetic: if we have lots of vertical headroom but the text is small, scale up a touch
-		while (size < maxSize && layout.height < targetHeight * 0.6f) {
-			val next = size + dp(0.5f)
-			val candidate = makeLayout(text, base, width, next)
-			if (candidate.height > targetHeight) break
-			size = next
-			layout = candidate
-		}
-		return layout
+		return null
 	}
 
-	private fun makeLayout(text: String, base: TextPaint, width: Int, size: Float): StaticLayout {
-		val paint = TextPaint(base).apply { textSize = size }
-		return StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
-			.setIncludePad(false)
-			.setLineSpacing(0f, 1.05f)
-			.build()
-	}
+	private fun expanded(rect: RectF, amount: Float) = RectF(rect).apply { inset(-amount, -amount) }
 
-	private fun StaticLayout.maxLineWidth(): Int {
-		var max = 0
-		for (i in 0 until lineCount) {
-			val w = getLineWidth(i).toInt()
-			if (w > max) max = w
-		}
-		return max
-	}
+	private fun denormalize(rect: RectF, width: Int, height: Int) =
+		RectF(rect.left * width, rect.top * height, rect.right * width, rect.bottom * height)
 
-	private fun dp(value: Float): Float = value * context.resources.displayMetrics.density
+	private fun StaticLayout.maxLineWidth(): Int = (0 until lineCount).maxOfOrNull { getLineWidth(it).toInt() } ?: 0
 
 	private companion object {
-		const val MIN_SIZE_DP = 9f
-		const val MAX_SIZE_DP = 22f
-		const val SEPARATE_ROUNDS = 8
+		const val MIN_SP = 12f
+		const val MAX_SP = 14f
 	}
 }

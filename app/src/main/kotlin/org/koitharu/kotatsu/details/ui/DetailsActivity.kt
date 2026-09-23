@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.bookmarks.domain.Bookmark
@@ -158,6 +159,10 @@ class DetailsActivity :
 	private val viewModel: DetailsViewModel by viewModels()
 	private lateinit var menuProvider: DetailsMenuProvider
 	private lateinit var infoBinding: LayoutDetailsTableBinding
+	private var communitySummaryJob: Job? = null
+	private var communityRetryJob: Job? = null
+	private var communitySummaryKey: String? = null
+	private var communityRetriedKey: String? = null
 
 	override val bottomSheet: View?
 		get() = viewBinding.containerBottomSheet
@@ -598,27 +603,67 @@ class DetailsActivity :
 		viewBinding.textViewCommunityTitle?.isVisible = true
 		viewBinding.textViewCommunitySummary?.isVisible = true
 		viewBinding.buttonCommunity?.isVisible = true
-		viewBinding.textViewCommunitySummary?.text = getString(R.string.loading_)
-		lifecycleScope.launch {
+		val key = "${manga.source.name}\u0000${manga.url.ifBlank { manga.publicUrl }}"
+		val cachedSummary = community.cachedSummary(manga)
+		cachedSummary?.let { cached -> showCommunitySummary(cached.rating, cached.comments) }
+			?: run { viewBinding.textViewCommunitySummary?.text = getString(R.string.loading_) }
+		if (communitySummaryKey == key && (communitySummaryJob?.isActive == true || communityRetryJob?.isActive == true || community.isSummaryCachedFresh(manga))) return
+		communitySummaryJob?.cancel()
+		if (communitySummaryKey != key) {
+			communityRetryJob?.cancel()
+			communityRetriedKey = null
+		}
+		communitySummaryKey = key
+		communitySummaryJob = lifecycleScope.launch {
 			try {
 				val result = withContext(Dispatchers.IO) {
 					community.ensureIdentity()
-					community.getRating(manga) to community.getCommentsPage(manga, limit = 1)
+					community.getSummary(manga)
 				}
-				val rating = result.first
-				viewBinding.textViewCommunitySummary?.text = if (rating.count > 0) {
-					getString(R.string.community_rating) + ": %.1f/5 · ".format(rating.average) +
-						getString(R.string.community_comments_count, result.second.total)
-				} else {
-					getString(R.string.community_comments_count, result.second.total)
-				}
+				if (communitySummaryKey == key && !isFinishing) showCommunitySummary(result.rating, result.comments)
 			} catch (error: Throwable) {
-				viewBinding.textViewCommunitySummary?.text = getString(
-					R.string.community_load_failed,
-					error.getDisplayMessage(resources),
-				)
+				if (error is kotlinx.coroutines.CancellationException) throw error
+				if (communitySummaryKey == key && !isFinishing) {
+					val waitSeconds = when (error) {
+						is org.koitharu.kotatsu.community.data.CommunityApiException.RateLimited -> error.retryAfterSeconds
+						is org.koitharu.kotatsu.community.data.CommunityApiException.Overloaded -> error.retryAfterSeconds
+						else -> null
+					}
+					val cached = community.cachedSummary(manga)
+					viewBinding.textViewCommunitySummary?.text = if (cached != null) {
+						showCommunitySummary(cached.rating, cached.comments)
+						"${viewBinding.textViewCommunitySummary?.text}\n${getString(R.string.community_refresh_failed)}"
+					} else if (waitSeconds != null) {
+						getString(R.string.community_retry_in, waitSeconds)
+					} else getString(R.string.community_load_failed, error.getDisplayMessage(resources))
+					if (waitSeconds != null && waitSeconds in 1..60 && communityRetriedKey != key) {
+						communityRetriedKey = key
+						communityRetryJob = lifecycleScope.launch {
+							kotlinx.coroutines.delay(waitSeconds * 1000L)
+							if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) ||
+								communitySummaryKey != key || isFinishing
+							) return@launch
+							try {
+								val refreshed = withContext(Dispatchers.IO) { community.getSummary(manga) }
+								if (communitySummaryKey == key) showCommunitySummary(refreshed.rating, refreshed.comments)
+							} catch (retryError: kotlinx.coroutines.CancellationException) {
+								throw retryError
+							} catch (retryError: Throwable) {
+								if (communitySummaryKey == key) {
+									viewBinding.textViewCommunitySummary?.text = getString(R.string.community_load_failed, retryError.getDisplayMessage(resources))
+								}
+							}
+						}
+					}
+				}
 			}
 		}
+	}
+
+	private fun showCommunitySummary(rating: org.koitharu.kotatsu.community.data.CommunityRating, comments: Int) {
+		viewBinding.textViewCommunitySummary?.text = if (rating.count > 0) {
+			getString(R.string.community_rating) + ": %.1f/5 · ".format(rating.average) + getString(R.string.community_comments_count, comments)
+		} else getString(R.string.community_comments_count, comments)
 	}
 
 	private fun onMangaRemoved(manga: Manga) {

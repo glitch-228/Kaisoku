@@ -20,8 +20,8 @@ import okio.ByteString.Companion.encodeUtf8
 import org.json.JSONArray
 import org.json.JSONObject
 import org.koitharu.kotatsu.core.network.BaseHttpClient
+import org.koitharu.kotatsu.core.network.CommunityHttpClient
 import org.koitharu.kotatsu.core.prefs.AppSettings
-import org.koitharu.kotatsu.core.util.ext.parseJsonOrNull
 import org.koitharu.kotatsu.core.util.ext.processLifecycleScope
 import org.koitharu.kotatsu.parsers.model.ContentRating
 import org.koitharu.kotatsu.parsers.model.Manga
@@ -43,13 +43,16 @@ import javax.inject.Singleton
 @Singleton
 class CommunityRepository @Inject constructor(
 	@ApplicationContext context: Context,
-	@BaseHttpClient private val client: OkHttpClient,
+	@CommunityHttpClient private val client: OkHttpClient,
 	private val settings: AppSettings,
 ) {
 	private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 	private val jsonType = "application/json; charset=utf-8".toMediaType()
 	private val identityMutex = Mutex()
+	private val workMutex = Mutex()
 	private val scoreCache = CommunityScoreCache()
+	private val summaryMutex = Mutex()
+	private val summaryCache = mutableMapOf<String, CachedCommunitySummary>()
 	private val telemetryLock = Any()
 	private val telemetryMutex = Mutex()
 	private val deviceId: String = Settings.Secure.getString(
@@ -81,12 +84,30 @@ class CommunityRepository @Inject constructor(
 	suspend fun ensureIdentity(): CommunityIdentity = withContext(Dispatchers.IO) {
 		identityMutex.withLock {
 			check(isEnabled) { "Community features are disabled" }
-			parseIdentity(request(
+			val secret = prefs.getString(KEY_SECRET, null)
+			if (!secret.isNullOrBlank()) {
+				val marker = identityMarker(secret)
+				if (prefs.getString(KEY_REGISTERED_IDENTITY, null) == marker) {
+					prefs.getString(KEY_REGISTERED_IDENTITY_JSON, null)?.let { cached ->
+						parseIdentity(JSONObject(cached)).let { return@withLock it }
+					}
+				}
+				try {
+					val identity = parseIdentity(request("/v1/identity/me", secret = secret))
+					rememberIdentity(secret, identity)
+					return@withLock identity
+				} catch (error: CommunityApiException.Unauthorized) {
+					// A restored/rotated credential can be validated by the registration endpoint.
+				}
+			}
+			val identity = parseIdentity(request(
 				"/v1/identity/hello",
 				method = "POST",
 				body = JSONObject().put("ssaid", deviceId),
 				secret = getOrCreateSecret(),
 			))
+			rememberIdentity(requireSecret(), identity)
+			identity
 		}
 	}
 
@@ -110,7 +131,8 @@ class CommunityRepository @Inject constructor(
 			// Validate an existing account without replacing the current key or creating a new account.
 			val identity = parseIdentity(request("/v1/identity/me", secret = secret))
 			prefs.edit().putString(KEY_SECRET, secret).remove(KEY_NOTIFICATION_CURSOR)
-				.remove(KEY_TELEMETRY_PENDING).apply()
+				.remove(KEY_TELEMETRY_PENDING).putString(KEY_REGISTERED_IDENTITY, identityMarker(secret))
+				.putString(KEY_REGISTERED_IDENTITY_JSON, identity.toJson().toString()).apply()
 			identity
 		}
 	}
@@ -123,33 +145,36 @@ class CommunityRepository @Inject constructor(
 				request("/v1/identity/me", method = "DELETE", secret = requireSecret())
 			}
 			// Keep the credential on failure so the user can retry deleting their server data.
-			prefs.edit().remove(KEY_SECRET).remove(KEY_NOTIFICATION_CURSOR)
+			prefs.edit().remove(KEY_SECRET).remove(KEY_REGISTERED_IDENTITY).remove(KEY_REGISTERED_IDENTITY_JSON)
+				.remove(KEY_NOTIFICATION_CURSOR)
 				.remove(KEY_TELEMETRY_PENDING).apply()
 		}
 	}
 
 	suspend fun resolveWork(manga: Manga): Long = withContext(Dispatchers.IO) {
 		val cacheKey = "${manga.source.name}\u0000${manga.url.ifBlank { manga.publicUrl }}".encodeUtf8().sha256().hex()
-		prefs.getString(KEY_WORK_PREFIX + cacheKey, null)?.toLongOrNull()?.let { return@withContext it }
-		val fingerprint = JSONObject()
+		workMutex.withLock {
+			prefs.getString(KEY_WORK_PREFIX + cacheKey, null)?.toLongOrNull()?.let { return@withLock it }
+			val fingerprint = JSONObject()
 			.put("source", manga.source.name)
 			.put("key", manga.url.ifBlank { manga.publicUrl })
 			.put("title", manga.title)
 			.put("alt_titles", JSONArray(manga.altTitles.toList()))
 			.put("content_type", "manga")
 			.put("nsfw", manga.contentRating == ContentRating.ADULT)
-		val response = request(
+			val response = request(
 			path = "/v1/works/resolve",
 			method = "POST",
 			body = JSONObject().put("works", JSONArray().put(fingerprint)),
 			secret = requireSecret(),
 		)
-		val resolved = response.optJSONArray("resolved")?.optJSONObject(0)
+			val resolved = response.optJSONArray("resolved")?.optJSONObject(0)
 			?: error("Community server returned no work identity")
-		val workId = resolved.optString("work_id").toLongOrNull()
+			val workId = resolved.optString("work_id").toLongOrNull()
 			?: error("Community server returned an invalid work identity")
-		prefs.edit().putString(KEY_WORK_PREFIX + cacheKey, workId.toString()).apply()
-		workId
+			prefs.edit().putString(KEY_WORK_PREFIX + cacheKey, workId.toString()).apply()
+			workId
+		}
 	}
 
 	suspend fun getRating(manga: Manga): CommunityRating = withContext(Dispatchers.IO) {
@@ -163,6 +188,47 @@ class CommunityRepository @Inject constructor(
 		)
 	}
 
+	data class Summary(val rating: CommunityRating, val comments: Int)
+	private data class CachedCommunitySummary(val value: Summary, val savedAt: Long)
+
+	fun cachedSummary(manga: Manga): Summary? = synchronized(summaryCache) {
+		summaryCache[summaryKey(manga)]?.value
+	}
+
+	fun isSummaryCachedFresh(manga: Manga): Boolean = synchronized(summaryCache) {
+		val cached = summaryCache[summaryKey(manga)] ?: return@synchronized false
+		System.currentTimeMillis() - cached.savedAt <= SUMMARY_TTL_MS
+	}
+
+	suspend fun getSummary(manga: Manga): Summary = withContext(Dispatchers.IO) {
+		if (isSummaryCachedFresh(manga)) cachedSummary(manga)?.let { return@withContext it }
+		summaryMutex.withLock {
+			if (isSummaryCachedFresh(manga)) cachedSummary(manga)?.let { return@withLock it }
+			val workId = resolveWork(manga)
+			val ratingJson = request("/v1/works/$workId/rating", secret = requireSecret())
+			val commentsJson = request("/v1/works/$workId/comments?limit=1", secret = requireSecret())
+			val value = Summary(
+				CommunityRating(
+					workId = workId,
+					count = ratingJson.optInt("count"),
+					average = ratingJson.optDouble("average", 0.0).toFloat(),
+					mine = if (ratingJson.isNull("mine")) null else ratingJson.optDouble("mine").toFloat(),
+				),
+				commentsJson.optInt("total"),
+			)
+			synchronized(summaryCache) { summaryCache[summaryKey(manga)] = CachedCommunitySummary(value, System.currentTimeMillis()) }
+			value
+		}
+	}
+
+	private fun summaryKey(manga: Manga): String {
+		val account = prefs.getString(KEY_SECRET, null).orEmpty().encodeUtf8().sha256().hex()
+		return "$serverUrl|$account|${manga.source.name}|${manga.url.ifBlank { manga.publicUrl }}"
+	}
+
+	private fun invalidateSummary(manga: Manga) = synchronized(summaryCache) { summaryCache.remove(summaryKey(manga)) }
+	private fun invalidateAllSummaries() = synchronized(summaryCache) { summaryCache.clear() }
+
 	suspend fun setRating(manga: Manga, stars: Float): CommunityRating = withContext(Dispatchers.IO) {
 		if (stars <= 0f) return@withContext clearRating(manga)
 		val workId = resolveWork(manga)
@@ -173,12 +239,14 @@ class CommunityRepository @Inject constructor(
 			body = JSONObject().put("value", value),
 			secret = requireSecret(),
 		)
+		invalidateSummary(manga)
 		CommunityRating(workId, response.optInt("count"), response.optDouble("average", 0.0).toFloat(), response.optDouble("mine", stars.toDouble()).toFloat())
 	}
 
 	suspend fun clearRating(manga: Manga): CommunityRating = withContext(Dispatchers.IO) {
 		val workId = resolveWork(manga)
 		val response = request("/v1/works/$workId/rating", method = "DELETE", secret = requireSecret())
+		invalidateSummary(manga)
 		CommunityRating(workId, response.optInt("count"), response.optDouble("average", 0.0).toFloat(), null)
 	}
 
@@ -235,30 +303,36 @@ class CommunityRepository @Inject constructor(
 			.put("is_spoiler", spoiler)
 			.put("lang", java.util.Locale.getDefault().language)
 		val response = request(url.toString(), method = "POST", body = payload, secret = requireSecret())
+		invalidateSummary(manga)
 		response.toComment()
 	}
 
 	suspend fun editComment(commentId: Long, body: String): CommunityComment = withContext(Dispatchers.IO) {
-		request(
+		val response = request(
 			"/v1/comments/$commentId",
 			method = "PATCH",
 			body = JSONObject().put("body", body.trim()).put("lang", Locale.getDefault().language),
 			secret = requireSecret(),
-		).toComment()
+		)
+		invalidateAllSummaries()
+		response.toComment()
 	}
 
 	suspend fun deleteComment(commentId: Long) = withContext(Dispatchers.IO) {
 		request("/v1/comments/$commentId", method = "DELETE", secret = requireSecret())
+		invalidateAllSummaries()
 		Unit
 	}
 
 	suspend fun vote(commentId: Long, value: Int): CommunityComment = withContext(Dispatchers.IO) {
-		request(
+		val response = request(
 			"/v1/comments/$commentId/vote",
 			method = "PUT",
 			body = JSONObject().put("value", value.coerceIn(-1, 1)),
 			secret = requireSecret(),
-		).toComment()
+		)
+		invalidateAllSummaries()
+		response.toComment()
 	}
 
 	suspend fun setNickname(nickname: String): CommunityIdentity = withContext(Dispatchers.IO) {
@@ -415,6 +489,11 @@ class CommunityRepository @Inject constructor(
 		body: JSONObject? = null,
 		secret: String? = null,
 	): JSONObject {
+		val cooldownKey = cooldownKey(path, secret)
+		val cooldownUntil = prefs.getLong(cooldownKey, 0L)
+		if (cooldownUntil > System.currentTimeMillis()) {
+			throw CommunityApiException.RateLimited((cooldownUntil - System.currentTimeMillis() + 999L) / 1000L, pathBucket(path))
+		}
 		val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
 			.header("Accept", "application/json")
 			.header("X-Kaisoku-Client", CLIENT_MARKER)
@@ -429,10 +508,47 @@ class CommunityRepository @Inject constructor(
 				}
 			}
 			.build()
-		return client.newCall(request).await().parseJsonOrNull() ?: JSONObject()
+		return client.newCall(request).await().use { response ->
+			val raw = response.body?.string().orEmpty()
+			val json = runCatching { JSONObject(raw) }.getOrNull()
+			if (!response.isSuccessful) {
+				throwApiError(response.code, response.header("Retry-After"), json)
+			}
+			json ?: throw java.io.IOException("Community server returned malformed JSON")
+		}
 	}
 
+	private fun identityMarker(secret: String): String = "$serverUrl:${secret.encodeUtf8().sha256().hex()}"
+
+	private fun cooldownKey(path: String, secret: String?): String {
+		val account = secret.orEmpty().encodeUtf8().sha256().hex()
+		return KEY_COOLDOWN_PREFIX + ("$serverUrl|$account|${pathBucket(path)}".encodeUtf8().sha256().hex())
+	}
+
+	private fun pathBucket(path: String): String = when {
+		path.contains("/identity/hello") -> "identity"
+		path.contains("/works/resolve") -> "resolve"
+		path.contains("/comments") -> "comments"
+		path.contains("/rating") -> "ratings"
+		path.contains("/telemetry") -> "telemetry"
+		else -> path.substringBefore('?').substringAfterLast('/').ifBlank { "request" }
+	}
+
+	private fun rememberIdentity(secret: String, identity: CommunityIdentity) {
+		prefs.edit().putString(KEY_REGISTERED_IDENTITY, identityMarker(secret))
+			.putString(KEY_REGISTERED_IDENTITY_JSON, identity.toJson().toString()).apply()
+	}
+
+	private fun CommunityIdentity.toJson() = JSONObject()
+		.put("user_id", userId).put("display_name", displayName)
+		.put("nickname", nickname).put("tier", tier)
+
 	private suspend fun requestText(path: String, secret: String? = null): String {
+		val cooldownKey = cooldownKey(path, secret)
+		val cooldownUntil = prefs.getLong(cooldownKey, 0L)
+		if (cooldownUntil > System.currentTimeMillis()) {
+			throw CommunityApiException.RateLimited((cooldownUntil - System.currentTimeMillis() + 999L) / 1000L, pathBucket(path))
+		}
 		val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
 			.header("Accept", "application/json")
 			.header("X-Kaisoku-Client", CLIENT_MARKER)
@@ -442,10 +558,28 @@ class CommunityRepository @Inject constructor(
 			.build()
 		return client.newCall(request).await().use { response ->
 			if (!response.isSuccessful) {
-				throw java.io.IOException("Community server HTTP ${response.code}: ${response.body?.string()?.take(300)}")
+				val raw = response.body?.string().orEmpty()
+				val json = runCatching { JSONObject(raw) }.getOrNull()
+				if (response.code == 429) {
+					val seconds = json?.optLong("retry_after_s", -1L)?.takeIf { it >= 0L }
+						?: response.header("Retry-After")?.toLongOrNull() ?: 60L
+					prefs.edit().putLong(cooldownKey(path, secret), System.currentTimeMillis() + seconds * 1000L).apply()
+				}
+				throwApiError(response.code, response.header("Retry-After"), json)
 			}
 			response.body?.string().orEmpty()
 		}
+	}
+
+	private fun throwApiError(code: Int, retryHeader: String?, json: JSONObject?): Nothing {
+		val retryAfter = json?.optLong("retry_after_s", -1L)?.takeIf { it >= 0L }
+			?: retryHeader?.toLongOrNull()?.takeIf { it >= 0L } ?: 60L
+		val kind = listOf("error", "code", "type", "name").joinToString(" ") { json?.optString(it).orEmpty() }
+		val typed = CommunityHttpErrorPolicy.typedError(code, kind, retryAfter, json?.optString("limit"))
+		if (typed != null) throw typed
+		else throw java.io.IOException(
+				"Community server HTTP $code" + json?.optString("message")?.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(),
+			)
 	}
 
 	private fun parseIdentity(json: JSONObject): CommunityIdentity {
@@ -514,13 +648,17 @@ class CommunityRepository @Inject constructor(
 		const val DEFAULT_SERVER = "https://community.kotatsuredo.app"
 		private const val PREFS = "community_identity"
 		private const val KEY_SECRET = "secret"
+		private const val KEY_REGISTERED_IDENTITY = "registered_identity"
+		private const val KEY_REGISTERED_IDENTITY_JSON = "registered_identity_json"
 		private const val KEY_SERVER = "server"
 		private const val KEY_WORK_PREFIX = "work_"
+		private const val KEY_COOLDOWN_PREFIX = "cooldown_"
 		private const val KEY_TELEMETRY_PENDING = "telemetry_pending"
 		private const val KEY_TELEMETRY_SENT_AT = "telemetry_sent_at"
 		private const val KEY_NOTIFICATION_CURSOR = "notification_cursor"
 		private const val SECRET_BYTES = 32
 		private const val TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000L
+		private const val SUMMARY_TTL_MS = 5 * 60 * 1000L
 		private const val CLIENT_MARKER = "kaisoku"
 		private val CLIENT_USER_AGENT = "Kaisoku/${BuildConfig.VERSION_NAME} (Kotatsu-Redo community client)"
 		private val TELEMETRY_OPERATIONS = setOf("SEARCH", "DETAILS", "PAGES")

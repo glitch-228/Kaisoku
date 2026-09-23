@@ -27,10 +27,12 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withResumed
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.recyclerview.widget.ItemTouchHelper
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.AppBarLayout.LayoutParams.SCROLL_FLAG_ENTER_ALWAYS
@@ -49,6 +51,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.backups.ui.periodical.PeriodicalBackupService
@@ -67,6 +70,7 @@ import org.koitharu.kotatsu.core.util.ext.end
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.observeEvent
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
+import org.koitharu.kotatsu.core.util.KeepAndroidOpenCampaign
 import org.koitharu.kotatsu.core.util.ext.start
 import org.koitharu.kotatsu.databinding.ActivityMainBinding
 import org.koitharu.kotatsu.details.service.MangaPrefetchService
@@ -187,10 +191,40 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 
 	override fun onResume() {
 		super.onResume()
+		maybeShowKeepAndroidOpenNotice()
 		lifecycleScope.launch(Dispatchers.Default) {
 			updatePluginsProvider.runAutoUpdate(settings)
 		}
 	}
+
+	private fun maybeShowKeepAndroidOpenNotice() {
+		if (isFinishing || isDestroyed || supportFragmentManager.isStateSaved) return
+		val prefs = getSharedPreferences("campaign_notice", MODE_PRIVATE)
+		if (prefs.getBoolean("keep_android_open_shown", false)) return
+		// Wait for the initial screen, onboarding sheet, and any permission prompt to settle.
+		lifecycleScope.launch {
+			delay(1_200)
+			if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || isFinishing || isDestroyed) return@launch
+			if (navigationDelegate.primaryFragment !is org.koitharu.kotatsu.explore.ui.ExploreFragment) return@launch
+			if (viewBinding.searchView.isShowing || supportFragmentManager.isStateSaved ||
+				supportFragmentManager.fragments.any { it is DialogFragment && it.dialog?.isShowing == true }
+			) return@launch
+			val url = KeepAndroidOpenCampaign.url(resources.configuration.locales[0].language)
+			val dialog = MaterialAlertDialogBuilder(this@MainActivity)
+				.setTitle(R.string.keep_android_open_title)
+				.setMessage(R.string.keep_android_open_message)
+				.setPositiveButton(R.string.learn_more) { _, _ ->
+					if (!router.openExternalBrowser(url, getString(R.string.keep_android_open_title))) {
+						com.google.android.material.snackbar.Snackbar.make(viewBinding.container, R.string.operation_not_supported, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+					}
+				}
+				.setNegativeButton(R.string.dismiss, null)
+				.create()
+			dialog.setOnShowListener { prefs.edit().putBoolean("keep_android_open_shown", true).apply() }
+			dialog.show()
+		}
+	}
+
 
 	override fun onFragmentChanged(fragment: Fragment, fromUser: Boolean) {
 		adjustFabVisibility(topFragment = fragment)

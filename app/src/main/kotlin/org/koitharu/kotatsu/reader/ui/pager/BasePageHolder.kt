@@ -92,6 +92,7 @@ abstract class BasePageHolder<B : ViewBinding>(
 	}
 	private var translationJob: Job? = null
 	private var translationOverlayActive = false
+	private val translationMarkers by lazy { itemView.findViewById<TranslationMarkerOverlay>(R.id.translation_markers) }
 
 	init {
 		lifecycleScope.launch(Dispatchers.Main) {
@@ -173,6 +174,10 @@ abstract class BasePageHolder<B : ViewBinding>(
 				when (state) {
 					is org.koitharu.kotatsu.reader.translate.PageTranslationState.Done -> {
 						translationOverlayActive = true
+						translationMarkers?.showMarkers(ssiv, state.overflow) { number ->
+							(context.findActivity() as? org.koitharu.kotatsu.reader.ui.ReaderActivity)
+								?.showTranslatedText(page.id, number)
+						}
 						// Keep the current pan/zoom: the translated bitmap has the same dimensions,
 						// so reusing the view state stops the page from jumping on overlay swap.
 						val viewState = ssiv.getState()
@@ -187,12 +192,17 @@ abstract class BasePageHolder<B : ViewBinding>(
 					is org.koitharu.kotatsu.reader.translate.PageTranslationState.Failed -> {
 						if (translationOverlayActive) {
 							translationOverlayActive = false
+							translationMarkers?.showMarkers(ssiv, emptyList()) {}
 							reloadImage(preserveState = true)
 						}
 					}
 					org.koitharu.kotatsu.reader.translate.PageTranslationState.Loading -> Unit
 				}
 			}
+		}
+		ssiv.setOnTouchListener { _, _ ->
+			translationMarkers?.invalidate()
+			false
 		}
 		if (appSettings.translateTriggerMode == org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE &&
 			appSettings.isPageTranslationEnabled &&
@@ -254,7 +264,9 @@ abstract class BasePageHolder<B : ViewBinding>(
 		// TODO
 	}
 
-	override fun onConfigurationChanged(newConfig: Configuration) = Unit
+	override fun onConfigurationChanged(newConfig: Configuration) {
+		boundData?.let { translateEntryPoint.translationCoordinator().rerender(it.toMangaPage()) }
+	}
 
 	@Deprecated("Deprecated in Java")
 	final override fun onLowMemory() = onTrimMemory(TRIM_MEMORY_COMPLETE)
