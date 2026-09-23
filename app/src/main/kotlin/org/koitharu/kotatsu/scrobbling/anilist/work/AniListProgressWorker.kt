@@ -21,8 +21,11 @@ class AniListProgressWorker @AssistedInject constructor(
 		val rateId = inputData.getInt(KEY_RATE_ID, 0)
 		if (userId <= 0 || targetId <= 0 || mangaId == 0L || rateId <= 0) return Result.failure()
 		return try {
-			repository.retryPendingProgress(userId, targetId, mangaId, rateId)
-			Result.success()
+			if (repository.retryPendingProgress(userId, targetId, mangaId, rateId)) {
+				Result.success()
+			} else {
+				Result.retry()
+			}
 		} catch (error: CancellationException) {
 			throw error
 		} catch (_: Throwable) {

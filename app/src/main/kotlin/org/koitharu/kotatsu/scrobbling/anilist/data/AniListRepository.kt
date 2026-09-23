@@ -144,14 +144,19 @@ class AniListRepository @Inject constructor(
 		storage.clear()
 	}
 
-	suspend fun cachedLibrary(userId: Long): List<AniListLibraryEntry> = syncLinkedEntries(readCachedLibrary(userId))
+	suspend fun cachedLibrary(userId: Long): List<AniListLibraryEntry> {
+		val dao = db.getScrobblingDao()
+		// Cached snapshots are for display only: tracker edits may be newer than this snapshot.
+		return readCachedLibrary(userId).map { entry ->
+			entry.copy(localMangaId = dao.findMangaIdByTarget(ScrobblerService.ANILIST.id, entry.mediaId))
+		}
+	}
 
 	suspend fun refreshLibrary(userId: Long, force: Boolean = false): List<AniListLibraryEntry> {
 		val key = cacheKey(userId)
-		val cached = readCachedLibrary(userId)
 		val fetchedAt = libraryPrefs.getLong(cacheTimestampKey(userId), 0L)
 		if (!force && isAniListLibraryCacheFresh(libraryPrefs.contains(key), fetchedAt, System.currentTimeMillis(), LIBRARY_CACHE_TTL)) {
-			return syncLinkedEntries(cached)
+			return cachedLibrary(userId)
 		}
 		val result = ArrayList<AniListLibraryEntry>()
 		var page = 1
@@ -376,11 +381,12 @@ class AniListRepository @Inject constructor(
 	suspend fun retryPendingProgress(userId: Long, targetId: Long, mangaId: Long, rateId: Int): Boolean {
 		if (!isAuthorized || storage.user?.id != userId) return true
 		val key = pendingPrefix(userId) + targetId
-		val chapter = libraryPrefs.getInt(key, 0)
-		if (chapter <= 0) return true
-		pushProgress(rateId, mangaId, chapter)
-		libraryPrefs.edit { remove(key) }
-		return true
+		return retryAniListProgress(
+			mutex = pendingProgressMutex,
+			readPending = { libraryPrefs.getInt(key, 0) },
+			clearPending = { libraryPrefs.edit { remove(key) } },
+			push = { chapter -> pushProgress(rateId, mangaId, chapter) },
+		)
 	}
 
 	override suspend fun updateRate(

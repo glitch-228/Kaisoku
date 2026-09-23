@@ -644,13 +644,22 @@ class DetailsActivity :
 								communitySummaryKey != key || isFinishing
 							) return@launch
 							try {
-								val refreshed = withContext(Dispatchers.IO) { community.getSummary(manga) }
+								val refreshed = withContext(Dispatchers.IO) {
+									community.ensureIdentity()
+									community.getSummary(manga)
+								}
 								if (communitySummaryKey == key) showCommunitySummary(refreshed.rating, refreshed.comments)
 							} catch (retryError: kotlinx.coroutines.CancellationException) {
 								throw retryError
 							} catch (retryError: Throwable) {
 								if (communitySummaryKey == key) {
-									viewBinding.textViewCommunitySummary?.text = getString(R.string.community_load_failed, retryError.getDisplayMessage(resources))
+									val retained = community.cachedSummary(manga)
+									if (retained != null) {
+										showCommunitySummary(retained.rating, retained.comments)
+										viewBinding.textViewCommunitySummary?.append("\n${getString(R.string.community_refresh_failed)}")
+									} else {
+										viewBinding.textViewCommunitySummary?.text = getString(R.string.community_load_failed, retryError.getDisplayMessage(resources))
+									}
 								}
 							}
 						}
