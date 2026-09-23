@@ -159,6 +159,8 @@ abstract class BasePageHolder<B : ViewBinding>(
 		animatedView?.isVisible = false
 		animatedView?.disposeImage()
 		translationOverlayActive = false
+		translationMarkers?.showMarkers(ssiv, emptyList()) {}
+		ssiv.setOnTouchListener(null)
 		viewModel.onBind(data.toMangaPage())
 		onBind(data)
 		observeTranslationState(data)
@@ -178,6 +180,15 @@ abstract class BasePageHolder<B : ViewBinding>(
 							(context.findActivity() as? org.koitharu.kotatsu.reader.ui.ReaderActivity)
 								?.showTranslatedText(page.id, number)
 						}
+						// Marker tracking requires touch invalidation only when there is actually an
+						// overflow marker to draw. Avoid putting every page swipe/drag through an extra
+						// touch listener in ordinary (untranslated) reading.
+						ssiv.setOnTouchListener(
+							if (state.overflow.isEmpty()) null else View.OnTouchListener { _, _ ->
+								translationMarkers?.invalidate()
+								false
+							},
+						)
 						// Keep the current pan/zoom: the translated bitmap has the same dimensions,
 						// so reusing the view state stops the page from jumping on overlay swap.
 						val viewState = ssiv.getState()
@@ -193,16 +204,13 @@ abstract class BasePageHolder<B : ViewBinding>(
 						if (translationOverlayActive) {
 							translationOverlayActive = false
 							translationMarkers?.showMarkers(ssiv, emptyList()) {}
+							ssiv.setOnTouchListener(null)
 							reloadImage(preserveState = true)
 						}
 					}
 					org.koitharu.kotatsu.reader.translate.PageTranslationState.Loading -> Unit
 				}
 			}
-		}
-		ssiv.setOnTouchListener { _, _ ->
-			translationMarkers?.invalidate()
-			false
 		}
 		if (appSettings.translateTriggerMode == org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.AUTO_ON_PAGE &&
 			appSettings.isPageTranslationEnabled &&
