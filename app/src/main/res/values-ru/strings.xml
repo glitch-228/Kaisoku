@@ -884,6 +884,11 @@
     <string name="reading_s">Чтение %s</string>
     <string name="read_on_s">Читать дальше %s</string>
     <string name="rpc_skip_nsfw_summary">Не использовать RPC для контента для взрослых</string>
+    <string name="discord_rpc_status">Статус Discord</string>
+    <string name="discord_status_online">В сети</string>
+    <string name="discord_status_idle">Неактивен</string>
+    <string name="discord_status_dnd">Не беспокоить</string>
+    <string name="discord_status_invisible">Невидимый</string>
     <string name="invalid_token">Недействительный токен: %s</string>
     <string name="show_floating_control_button">Показать плавающую кнопку управления</string>
     <string name="unavailable">Недоступно</string>

@@ -36,8 +36,8 @@ import java.io.File
 import java.util.Collections
 import javax.inject.Inject
 
-private const val STATUS_ONLINE = "online"
-private const val STATUS_IDLE = "idle"
+private const val STATUS_ONLINE = AppSettings.DISCORD_STATUS_ONLINE
+private const val STATUS_IDLE = AppSettings.DISCORD_STATUS_IDLE
 private const val BUTTON_TEXT_LIMIT = 32
 private const val DEBOUNCE_TIMEOUT = 3_000L // 3 sec
 private const val PRESENCE_SCOPE = "sdk.social_layer_presence"
@@ -72,6 +72,9 @@ class DiscordOauthRpc @Inject constructor(
 	@Volatile
 	private var lastPresence: RichPresence? = null
 
+	@Volatile
+	private var isIdle = false
+
 	fun close() {
 		clearRpc()
 		if (apiInstance.isInitialized()) {
@@ -88,6 +91,14 @@ class DiscordOauthRpc @Inject constructor(
 	fun setIdle() {
 		lastPresence?.let { presence ->
 			updateRpcAsync(presence, idle = true, isNsfw = false)
+		}
+	}
+
+	/** Re-send the last presence, e.g. after invisible mode was toggled. */
+	fun refreshPresence() {
+		if (rpc == null) return
+		lastPresence?.let { presence ->
+			updateRpcAsync(presence, idle = isIdle, isNsfw = false)
 		}
 	}
 
@@ -125,6 +136,7 @@ class DiscordOauthRpc @Inject constructor(
 	}
 
 	private fun updateRpcAsync(presence: RichPresence, idle: Boolean, isNsfw: Boolean) {
+		isIdle = idle
 		val prevJob = rpcUpdateJob
 		rpcUpdateJob = coroutineScope.launch {
 			prevJob?.cancelAndJoin()
@@ -137,9 +149,15 @@ class DiscordOauthRpc @Inject constructor(
 			presence.setAssetsSmallImage(presence.assets["smallImage"]?.toMediaProxyUrl(false))
 			lastPresence = presence
 			getRpc()?.let { client ->
+				// While invisible, the activity is withheld but kept in lastPresence with its
+				// start timestamp, so it comes back with the original elapsed time.
+				val invisible = settings.isDiscordRpcInvisible
 				val data = mutableMapOf<String, Any?>(
-					"activities" to listOf(presence.toJSON()),
-					"status" to if (idle) STATUS_IDLE else STATUS_ONLINE,
+					"activities" to if (invisible) emptyList<Any?>() else listOf(presence.toJSON()),
+					"status" to when (val status = settings.discordRpcStatus) {
+						STATUS_ONLINE -> if (idle) STATUS_IDLE else STATUS_ONLINE
+						else -> status
+					},
 					"since" to (presence.timestamps?.get("start") ?: System.currentTimeMillis()),
 					"afk" to idle,
 				)

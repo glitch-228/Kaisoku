@@ -33,6 +33,14 @@
 		android:summary="@string/discord_oauth_browser_summary"
 		android:title="@string/discord_oauth_browser" />
 
+	<ListPreference
+		android:dependency="discord_rpc"
+		android:entries="@array/discord_rpc_status_entries"
+		android:entryValues="@array/discord_rpc_status_values"
+		android:key="discord_rpc_status"
+		android:summary="%s"
+		android:title="@string/discord_rpc_status" />
+
 	<SwitchPreferenceCompat
 		android:dependency="discord_rpc"
 		android:key="discord_rpc_skip_nsfw"

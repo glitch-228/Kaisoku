@@ -10,6 +10,18 @@
         <item>POPULARITY</item>
         <item>UPDATED</item>
     </string-array>
+	<string-array name="discord_rpc_status_entries">
+		<item>@string/discord_status_online</item>
+		<item>@string/discord_status_idle</item>
+		<item>@string/discord_status_dnd</item>
+		<item>@string/discord_status_invisible</item>
+	</string-array>
+	<string-array name="discord_rpc_status_values" translatable="false">
+		<item>online</item>
+		<item>idle</item>
+		<item>dnd</item>
+		<item>invisible</item>
+	</string-array>
 	<string-array name="sync_backends">
 		<item>@string/sync_disabled</item>
 		<item>@string/kaisoku_server</item>

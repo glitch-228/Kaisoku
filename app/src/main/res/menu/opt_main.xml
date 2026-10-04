@@ -20,6 +20,13 @@
 		app:showAsAction="ifRoom" />
 
 	<item
+		android:id="@+id/action_discord_status"
+		android:orderInCategory="89"
+		android:title="@string/discord_rpc_status"
+		android:visible="false"
+		app:showAsAction="never" />
+
+	<item
 		android:id="@+id/action_incognito"
 		android:checkable="true"
 		android:orderInCategory="90"

@@ -8,6 +8,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.viewModels
 import androidx.preference.EditTextPreference
 import androidx.preference.EditTextPreferenceDialogFragmentCompat
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
 import dagger.hilt.android.AndroidEntryPoint
@@ -41,6 +42,13 @@ class DiscordSettingsFragment : BasePreferenceFragment(R.string.discord) {
 		findPreference<Preference>(AppSettings.KEY_DISCORD_OAUTH_SIGNIN)?.setOnPreferenceClickListener {
 			startActivity(Intent(context, DiscordOauthActivity::class.java))
 			true
+		}
+		findPreference<ListPreference>(AppSettings.KEY_DISCORD_RPC_STATUS)?.let { pref ->
+			// Show the effective status (online unless changed) instead of an empty choice.
+			// Not a defaultValue in XML, so a status migrated from the old invisible switch is kept.
+			if (pref.value == null) {
+				pref.value = settings.discordRpcStatus
+			}
 		}
 		findPreference<SwitchPreferenceCompat>(AppSettings.KEY_DISCORD_RPC_OAUTH)?.let { pref ->
 			updateAuthMethodVisibility(pref.isChecked)

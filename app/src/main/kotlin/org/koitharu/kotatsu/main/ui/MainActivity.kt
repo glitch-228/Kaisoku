@@ -150,7 +150,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 			navigationDelegate.observeTitle().observe(this) { tv.text = it }
 		}
 
-		addMenuProvider(MainMenuProvider(router, viewModel))
+		addMenuProvider(MainMenuProvider(this, settings, router, viewModel))
 
 		val exitCallback = ExitCallback(this, viewBinding.container)
 		onBackPressedDispatcher.addCallback(exitCallback)

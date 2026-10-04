@@ -8,7 +8,9 @@ import com.my.kizzyrpc.KizzyRPC
 import com.my.kizzyrpc.entities.presence.Activity
 import com.my.kizzyrpc.entities.presence.Assets
 import com.my.kizzyrpc.entities.presence.Metadata
+import com.my.kizzyrpc.entities.presence.Presence
 import com.my.kizzyrpc.entities.presence.Timestamps
+import com.my.kizzyrpc.websocket.DiscordWebSocket
 import dagger.Lazy
 import dagger.hilt.android.ViewModelLifecycle
 import dagger.hilt.android.lifecycle.RetainedLifecycle
@@ -18,6 +20,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import okio.utf8Size
@@ -36,8 +41,9 @@ import org.koitharu.kotatsu.scrobbling.discord.data.DiscordRepository
 import java.util.Collections
 import javax.inject.Inject
 
-private const val STATUS_ONLINE = "online"
-private const val STATUS_IDLE = "idle"
+private const val STATUS_ONLINE = AppSettings.DISCORD_STATUS_ONLINE
+private const val STATUS_IDLE = AppSettings.DISCORD_STATUS_IDLE
+private const val STATUS_INVISIBLE = AppSettings.DISCORD_STATUS_INVISIBLE
 private const val BUTTON_TEXT_LIMIT = 32
 private const val DEBOUNCE_TIMEOUT = 16_000L // 16 sec
 private const val WSRV_PREFIX = "https://wsrv.nl/?url="
@@ -68,8 +74,29 @@ class DiscordRpc @Inject constructor(
 	@Volatile
 	private var lastActivity: Activity? = null
 
+	@Volatile
+	private var isIdle = false
+
 	init {
 		lifecycle.addOnClearedListener(this)
+		// Invisible is a per-session status, so it has to be re-sent over our own gateway
+		// connection as soon as it is toggled. The activity (and its start timestamp) stays in
+		// memory, so turning invisible off brings the activity back with the original elapsed time.
+		settings.observe(AppSettings.KEY_DISCORD_RPC_STATUS)
+			.drop(1)
+			.onEach { refreshPresence() }
+			.launchIn(coroutineScope)
+	}
+
+	private fun refreshPresence() {
+		if (settings.isDiscordRpcOauth) {
+			if (oauthConstructed) {
+				oauthRpc.get().refreshPresence()
+			}
+			return
+		}
+		val activity = lastActivity ?: return
+		rpc?.updateRpcAsync(activity, idle = isIdle)
 	}
 
 	override fun onCleared() {
@@ -186,6 +213,7 @@ class DiscordRpc @Inject constructor(
 	}
 
 	private fun KizzyRPC.updateRpcAsync(activity: Activity, idle: Boolean) {
+		isIdle = idle
 		val prevJob = rpcUpdateJob
 		rpcUpdateJob = coroutineScope.launch {
 			prevJob?.cancelAndJoin()
@@ -210,13 +238,57 @@ class DiscordRpc @Inject constructor(
 				metadata = activity.metadata.takeUnless { hideButtons },
 			)
 			lastActivity = mappedActivity
-			updateRPC(
-				activity = mappedActivity,
-				status = if (idle) STATUS_IDLE else STATUS_ONLINE,
-				since = activity.timestamps?.start ?: System.currentTimeMillis(),
-			)
+			val since = activity.timestamps?.start ?: System.currentTimeMillis()
+			val isInvisible = settings.isDiscordRpcInvisible
+			// While invisible, withhold the activity but keep it in lastActivity with its start
+			// timestamp, so it comes back with the original elapsed time.
+			if (!isInvisible || !sendInvisible(since)) {
+				updateRPC(
+					activity = mappedActivity,
+					status = resolveStatus(idle),
+					since = since,
+				)
+				if (isInvisible) {
+					// the socket was just opened by updateRPC, now drop the activity
+					sendInvisible(since)
+				}
+			}
 			lastUpdate = SystemClock.elapsedRealtime()
 		}
+	}
+
+	/** The status picked in settings wins; "online" still turns into idle when the reader is left. */
+	private fun resolveStatus(idle: Boolean): String = when (val status = settings.discordRpcStatus) {
+		STATUS_ONLINE -> if (idle) STATUS_IDLE else STATUS_ONLINE
+		else -> status
+	}
+
+	/**
+	 * KizzyRPC.updateRPC always attaches an activity, so send the invisible presence with no
+	 * activities straight over its gateway socket. Returns false when that is not possible
+	 * (socket not connected yet, or the field could not be found).
+	 */
+	private suspend fun KizzyRPC.sendInvisible(since: Long): Boolean {
+		if (!isRpcRunning()) {
+			return false
+		}
+		val socket = runCatching {
+			KizzyRPC::class.java.declaredFields
+				.first { DiscordWebSocket::class.java.isAssignableFrom(it.type) }
+				.apply { isAccessible = true }
+				.get(this) as DiscordWebSocket
+		}.onFailure {
+			it.printStackTraceDebug()
+		}.getOrNull() ?: return false
+		socket.sendActivity(
+			Presence(
+				activities = emptyList(),
+				afk = true,
+				since = since,
+				status = STATUS_INVISIBLE,
+			),
+		)
+		return true
 	}
 
 	suspend fun String.toMediaProxyUrl(): String? {

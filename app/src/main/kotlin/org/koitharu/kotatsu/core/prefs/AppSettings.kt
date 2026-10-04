@@ -824,6 +824,19 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val isDiscordRpcSkipNsfw: Boolean
 		get() = prefs.getBoolean(KEY_DISCORD_RPC_SKIP_NSFW, false)
 
+	/** One of [DISCORD_STATUS_ONLINE], [DISCORD_STATUS_IDLE], [DISCORD_STATUS_DND], [DISCORD_STATUS_INVISIBLE] */
+	var discordRpcStatus: String
+		get() = prefs.getString(KEY_DISCORD_RPC_STATUS, null)
+			?: if (prefs.getBoolean(KEY_DISCORD_RPC_INVISIBLE_LEGACY, false)) {
+				DISCORD_STATUS_INVISIBLE
+			} else {
+				DISCORD_STATUS_ONLINE
+			}
+		set(value) = prefs.edit { putString(KEY_DISCORD_RPC_STATUS, value) }
+
+	val isDiscordRpcInvisible: Boolean
+		get() = discordRpcStatus == DISCORD_STATUS_INVISIBLE
+
 	var discordToken: String?
 		get() = prefs.getString(KEY_DISCORD_TOKEN, null)?.trim()?.nullIfEmpty()
 		set(value) = prefs.edit { putString(KEY_DISCORD_TOKEN, value?.nullIfEmpty()) }
@@ -1205,6 +1218,12 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_MANGA_LIST_BADGES = "manga_list_badges"
 		const val KEY_DISCORD_RPC = "discord_rpc"
 		const val KEY_DISCORD_RPC_SKIP_NSFW = "discord_rpc_skip_nsfw"
+		const val KEY_DISCORD_RPC_STATUS = "discord_rpc_status"
+		private const val KEY_DISCORD_RPC_INVISIBLE_LEGACY = "discord_rpc_invisible"
+		const val DISCORD_STATUS_ONLINE = "online"
+		const val DISCORD_STATUS_IDLE = "idle"
+		const val DISCORD_STATUS_DND = "dnd"
+		const val DISCORD_STATUS_INVISIBLE = "invisible"
 		const val KEY_DISCORD_TOKEN = "discord_token"
 		const val KEY_DISCORD_RPC_OAUTH = "discord_rpc_oauth"
 		const val KEY_DISCORD_OAUTH_BROWSER = "discord_oauth_browser"
