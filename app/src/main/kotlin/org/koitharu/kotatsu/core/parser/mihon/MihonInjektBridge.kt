@@ -49,7 +49,7 @@ class MihonInjektBridge @Inject constructor(
 			// deliberately issues the fetch and ignores the response (Kagane's getIntegrityToken et
 			// al.). Match Mihon's loader semantics: skip `CloudFlareInterceptor` + the synthetic-
 			// header-rich `CommonHeadersInterceptor` (X-Requested-With/Origin, both Cloudflare trip
-			// signals) — everything else (GZip, RateLimit, etc.) passes through unchanged.
+			// signals). MihonNetworkHelper also leaves HTTP 429 readable for extension retry logic.
 			.apply {
 				val filtered = httpClient.interceptors.filterNot {
 					val name = it.javaClass.simpleName
