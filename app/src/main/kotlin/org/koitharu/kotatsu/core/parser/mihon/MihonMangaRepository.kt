@@ -61,6 +61,7 @@ class MihonMangaRepository(
 		get() = loadedSource.wrapper
 
 	private val mihonSource = loadedSource.catalogueSource
+    private val mangaUpdates = MihonMangaUpdates(mihonSource, ::mapHostedFailure)
     private val chapterCache = MihonChapterCache()
 	private var mihonFilters = mihonSource.getFilterList()
 	private val defaultFilterState = mihonFilters.stateFingerprint()
@@ -133,28 +134,9 @@ class MihonMangaRepository(
     }
 
     private suspend fun loadDetailsAndChapters(manga: Manga): Pair<SManga, List<SChapter>> {
-		val seed = manga.toSManga()
-		val details = runCatchingCancellable { mihonSource.getMangaDetails(seed) }.getOrElse { error ->
-			when (val mapped = mapHostedFailure(error)) {
-				is AuthRequiredException -> throw mapped
-				else -> seed
-			}
-		}
-		val seedUrl = seed.safeUrl()
-		val seedTitle = seed.safeTitle()
-		val seedThumbnail = seed.safeThumbnailUrl()
-		if (details.safeUrl().isBlank() && seedUrl.isNotBlank()) {
-			details.url = seedUrl
-		}
-		if (details.safeTitle().isBlank() && seedTitle.isNotBlank()) {
-			details.title = seedTitle
-		}
-		if (details.safeThumbnailUrl().isNullOrBlank() && !seedThumbnail.isNullOrBlank()) {
-			details.thumbnail_url = seedThumbnail
-		}
-        val originalChapters = loadChapters(seed, details)
-        chapterCache.put(manga.url, originalChapters)
-        return details to originalChapters
+        val update = mangaUpdates.load(manga.toSManga())
+        chapterCache.put(manga.url, update.chapters)
+        return update.manga to update.chapters
     }
 
 	override suspend fun getPagesImpl(chapter: MangaChapter): List<MangaPage> = withContext(Dispatchers.IO) {
@@ -402,33 +384,6 @@ class MihonMangaRepository(
 	}
 
 	private fun stableId(rawValue: String): Long = mihonStableId(source.name, rawValue)
-
-	private suspend fun loadChapters(seed: SManga, details: SManga): List<SChapter> {
-		val candidates = buildList {
-			if (details !== seed) {
-				add(details)
-			}
-			add(seed)
-		}
-		var hadSuccessfulLoad = false
-		var lastError: Throwable? = null
-		for (candidate in candidates) {
-			val result = runCatchingCancellable { mihonSource.getChapterList(candidate) }
-			val chapters = result.getOrNull()
-			if (chapters != null) {
-				hadSuccessfulLoad = true
-				if (chapters.isNotEmpty()) {
-					return chapters
-				}
-			} else {
-				lastError = result.exceptionOrNull()
-			}
-		}
-		if (hadSuccessfulLoad) {
-			return emptyList()
-		}
-		throw mapHostedFailure(lastError ?: IllegalStateException("Unable to load chapters"))
-	}
 
 	private fun mapHostedFailure(error: Throwable): Throwable {
 		if (error is AuthRequiredException) {
