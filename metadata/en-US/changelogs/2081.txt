@@ -1,0 +1,3 @@
+Fix Mihon source loading.
+Fix details and chapters in newer extensions.
+Restore extension rate-limit handling.
