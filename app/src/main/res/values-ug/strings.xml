@@ -1,3 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="keep_android_open_title">ئاندروئىدنى ئوچۇق تۇتۇڭ</string>
+    <string name="keep_android_open_message">ئۆزىڭىز تاللىغان مەنبەلەردىن ئەپلەر ۋە كېڭەيتىلمىلەرنى ئورنىتىش ئەركىنلىكىنى قوللاڭ.</string>
+    <string name="learn_more">تېخىمۇ كۆپ بىلىۋېلىڭ</string>
+    <string name="dismiss">رەت قىلىش</string>
+    <string name="keep_android_open">«ئاندروئىدنى ئوچۇق تۇتۇڭ» ھەرىكىتى</string>
+    <string name="translated_text">تەرجىمە قىلىنغان تېكىست</string>
+    <string name="translated_text_count">تەرجىمە قىلىنغان تېكىست (%1$d)</string>
+    <string name="community_retry_in">جامائەتچىلىك ئۇچۇرلىرى چەكلىك. %1$d سېكۇنتتىن كېيىن قايتا سىنايدۇ…</string>
 </resources>
