@@ -45,6 +45,15 @@ class SourceSettingsFragment : BasePreferenceFragment(0), Preference.OnPreferenc
         preferenceManager.sharedPreferencesName = SourceSettings.prefsName(viewModel.source)
         addPreferencesFromResource(R.xml.pref_source)
         addPreferencesFromRepository(viewModel.repository)
+        preferenceScreen.addPreference(Preference(requireContext()).apply {
+            setTitle(R.string.source_prompt_settings)
+            setSummary(R.string.source_prompt_settings_summary)
+            isPersistent = false
+            setOnPreferenceClickListener {
+                org.koitharu.kotatsu.reader.ui.SourceSwitchMuteDialog.show(parentFragmentManager, viewModel.source.name)
+                true
+            }
+        })
         (viewModel.source as? MihonMangaSource)?.resolved()?.takeIf { it.isConfigurable }?.let { source ->
             preferenceScreen.addPreference(Preference(requireContext()).apply {
                 setTitle(R.string.mihon_source_preferences)

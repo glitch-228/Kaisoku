@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="source_prompt_mute">Mute prompts…</string>
+    <string name="source_prompt_settings">Source-switch prompts · Beta</string>
+    <string name="source_prompt_settings_summary">Pause slow-loading hints or all automatic source-switch prompts</string>
+    <string name="source_prompt_target">Apply to</string>
+    <string name="source_prompt_all_sources">All sources</string>
+    <string name="source_prompt_scope">Prompts to mute</string>
+    <string name="source_prompt_slow_only">Slow-loading hints only</string>
+    <string name="source_prompt_all">All automatic source-switch prompts</string>
+    <string name="source_prompt_duration">Mute for</string>
+    <string name="source_prompt_hours">Hours</string>
+    <string name="source_prompt_days">Days</string>
+    <string name="source_prompt_custom_amount">Duration</string>
+    <string name="source_prompt_custom_error">Enter 1–720 hours or 1–30 days</string>
+    <string name="source_prompt_scope_help">Loading errors remain visible. A source rule cannot override a mute for all sources. Temporary mutes stay on this device.</string>
+    <string name="source_prompt_active">Active mutes</string>
+    <string name="source_prompt_none">No active mutes</string>
+    <string name="source_prompt_rule">%1$s\n%2$s\n%3$s</string>
+    <string name="source_prompt_indefinitely">Indefinitely</string>
+    <string name="source_prompt_resume">Resume now</string>
+    <string name="source_prompt_apply">Mute</string>
+    <string name="source_prompt_saved">Prompt mute saved</string>
+    <string name="source_prompt_save_failed">Could not save this mute. Remove an old rule and try again.</string>
+    <string-array name="source_prompt_durations">
+        <item>1 hour</item><item>6 hours</item><item>12 hours</item>
+        <item>1 day</item><item>3 days</item><item>7 days</item>
+        <item>Custom…</item><item>Indefinitely</item>
+    </string-array>
+</resources>

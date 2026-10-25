@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="source_prompt_mute">Отключить подсказки…</string>
+    <string name="source_prompt_settings">Подсказки смены источника · Бета</string>
+    <string name="source_prompt_settings_summary">Приостановить подсказки о медленной загрузке или все предложения смены источника</string>
+    <string name="source_prompt_target">Применить к</string>
+    <string name="source_prompt_all_sources">Всем источникам</string>
+    <string name="source_prompt_scope">Какие подсказки отключить</string>
+    <string name="source_prompt_slow_only">Только о медленной загрузке</string>
+    <string name="source_prompt_all">Все предложения смены источника</string>
+    <string name="source_prompt_duration">Отключить на</string>
+    <string name="source_prompt_hours">Часов</string>
+    <string name="source_prompt_days">Дней</string>
+    <string name="source_prompt_custom_amount">Длительность</string>
+    <string name="source_prompt_custom_error">Введите 1–720 часов или 1–30 дней</string>
+    <string name="source_prompt_scope_help">Ошибки загрузки останутся видны. Настройка источника не отменяет общее отключение. Временные настройки действуют только на этом устройстве.</string>
+    <string name="source_prompt_active">Действующие отключения</string>
+    <string name="source_prompt_none">Нет действующих отключений</string>
+    <string name="source_prompt_rule">%1$s\n%2$s\n%3$s</string>
+    <string name="source_prompt_indefinitely">Бессрочно</string>
+    <string name="source_prompt_resume">Включить сейчас</string>
+    <string name="source_prompt_apply">Отключить</string>
+    <string name="source_prompt_saved">Подсказки отключены</string>
+    <string name="source_prompt_save_failed">Не удалось сохранить настройку. Удалите старое правило и повторите попытку.</string>
+    <string-array name="source_prompt_durations">
+        <item>1 час</item><item>6 часов</item><item>12 часов</item>
+        <item>1 день</item><item>3 дня</item><item>7 дней</item>
+        <item>Другое время…</item><item>Бессрочно</item>
+    </string-array>
+</resources>

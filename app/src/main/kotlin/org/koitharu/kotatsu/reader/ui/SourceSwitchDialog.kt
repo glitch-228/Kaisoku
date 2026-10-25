@@ -3,6 +3,7 @@ package org.koitharu.kotatsu.reader.ui
 import android.content.Context
 import androidx.annotation.UiContext
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.appcompat.app.AlertDialog
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.alternatives.domain.SourceSwitchCandidate
 import org.koitharu.kotatsu.core.model.getTitle
@@ -17,7 +18,7 @@ object SourceSwitchDialog {
 		onSwitch: (SourceSwitchCandidate) -> Unit,
 		onAlternatives: () -> Unit,
 		onMute: () -> Unit,
-	) {
+	): AlertDialog {
 		val actions = ArrayList<Pair<CharSequence, () -> Unit>>()
 		suggestion.candidates.forEach { candidate ->
 			actions += context.candidateLabel(candidate) to { onSwitch(candidate) }
@@ -25,9 +26,9 @@ object SourceSwitchDialog {
 		if (suggestion.offerAlternatives) {
 			actions += context.getString(R.string.manga_unavailable_search_alternatives) to onAlternatives
 		}
-		actions += context.getString(R.string.source_switch_mute) to onMute
+		actions += context.getString(R.string.source_prompt_mute) to onMute
 		val sourceTitle = suggestion.manga.source.getTitle(context)
-		MaterialAlertDialogBuilder(context)
+		return MaterialAlertDialogBuilder(context)
 			.setTitle(
 				context.getString(
 					if (suggestion.trigger == SourceHealthMonitor.Trigger.SLOW) {
