@@ -53,7 +53,12 @@ internal class InlineChaptersController(
         stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT
     }
     private val menuProvider = ChapterPagesMenuProvider(viewModel, settings,
-        currentTab = { ChaptersPagesSheet.TAB_CHAPTERS })
+        currentTab = { ChaptersPagesSheet.TAB_CHAPTERS },
+        showExactCompletion = {
+            viewModel.getMangaOrNull()?.id?.let {
+                org.koitharu.kotatsu.details.ui.pager.ExactCompletionDialog.show(activity.supportFragmentManager, it)
+            }
+        })
     private var gridMode: Boolean? = null
     var isSelectionActive = false
         private set
@@ -122,6 +127,7 @@ internal class InlineChaptersController(
         viewModel.isReadingOrderReversed.observe(activity) { updateMenu() }
         viewModel.isGlobalChaptersReversed.observe(activity) { updateMenu() }
         viewModel.isChaptersSortedByName.observe(activity) { updateMenu() }
+        viewModel.isChaptersSortedByDate.observe(activity) { updateMenu() }
         viewModel.isDownloadedOnly.observe(activity) { updateMenu() }
         viewModel.quickFilter.observe(activity) {
             controls.chipsInlineBranches.setChips(it)

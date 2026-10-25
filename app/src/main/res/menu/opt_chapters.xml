@@ -4,6 +4,8 @@
 	xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <item android:id="@+id/action_exact_completion" android:title="@string/exact_completion" app:showAsAction="never" />
+
 	<item
 		android:id="@+id/action_search"
 		android:icon="?actionModeWebSearchDrawable"
@@ -43,9 +45,16 @@
 
 	<item
 		android:id="@+id/action_grid_view"
+        android:orderInCategory="30"
+        android:checkable="true"
+        android:title="@string/chapters_grid_view"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_sort_by_date"
 		android:checkable="true"
-		android:orderInCategory="30"
-		android:title="@string/chapters_grid_view"
+		android:orderInCategory="26"
+		android:title="@string/sort_chapters_by_date"
 		app:showAsAction="never" />
 
 </menu>

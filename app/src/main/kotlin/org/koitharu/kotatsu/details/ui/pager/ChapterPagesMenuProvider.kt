@@ -29,6 +29,7 @@ class ChapterPagesMenuProvider(
     private val expandHost: () -> Unit = {},
     private val unlockHost: () -> Unit = {},
     private val reverseReadingOrder: (Boolean) -> Unit = viewModel::setReadingOrderReversed,
+    private val showExactCompletion: () -> Unit = {},
 ) : OnBackPressedCallback(false), MenuProvider, SearchView.OnQueryTextListener, MenuItem.OnActionExpandListener,
     Slider.OnChangeListener {
 
@@ -46,6 +47,9 @@ class ChapterPagesMenuProvider(
             val reader = sheet.activity as? ReaderActivity
             if (reader != null) reader.setReadingOrderReversed(reversed)
             else viewModel.setReadingOrderReversed(reversed)
+        },
+        showExactCompletion = {
+            viewModel.getMangaOrNull()?.id?.let { ExactCompletionDialog.show(sheet.parentFragmentManager, it) }
         },
     )
 
@@ -112,6 +116,7 @@ class ChapterPagesMenuProvider(
         menu.findItem(R.id.action_reverse_chapter_list)?.isChecked = viewModel.isGlobalChaptersReversed.value == true
         menu.findItem(R.id.action_reverse_reading_order)?.isChecked = viewModel.isReadingOrderReversed.value
         menu.findItem(R.id.action_sort_by_name)?.isChecked = viewModel.isChaptersSortedByName.value
+        menu.findItem(R.id.action_sort_by_date)?.isChecked = viewModel.isChaptersSortedByDate.value
         menu.findItem(R.id.action_grid_view)?.isChecked = viewModel.isChaptersInGridView.value == true
         menu.findItem(R.id.action_downloaded)?.let { menuItem ->
             menuItem.isVisible = viewModel.mangaDetails.value?.local != null
@@ -120,6 +125,11 @@ class ChapterPagesMenuProvider(
     }
 
     override fun onMenuItemSelected(menuItem: MenuItem): Boolean = when (menuItem.itemId) {
+        R.id.action_exact_completion -> {
+            showExactCompletion()
+            true
+        }
+
         R.id.action_reverse_chapter_list -> {
             settings.isChaptersReverse = !settings.isChaptersReverse
             true
@@ -132,6 +142,11 @@ class ChapterPagesMenuProvider(
 
         R.id.action_sort_by_name -> {
             viewModel.setChaptersSortedByName(!viewModel.isChaptersSortedByName.value)
+            true
+        }
+
+        R.id.action_sort_by_date -> {
+            viewModel.setChaptersSortedByDate(!viewModel.isChaptersSortedByDate.value)
             true
         }
 

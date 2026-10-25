@@ -17,6 +17,7 @@ fun MangaDetails.mapChapters(
 	bookmarks: List<Bookmark>,
 	isGrid: Boolean,
 	isDownloadedOnly: Boolean,
+	explicitReadIds: Set<Long>? = null,
 ): List<ChapterListItem> {
 	val remoteChapters = chapters[branch].orEmpty()
 	val localChapters = local?.manga?.getChapters(branch).orEmpty()
@@ -44,8 +45,8 @@ fun MangaDetails.mapChapters(
 			}
 			result += (local ?: chapter).toListItem(
 				isCurrent = chapter.id == currentChapterId,
-				isUnread = isUnread,
-				isNew = isUnread && result.size >= newFrom,
+				isUnread = explicitReadIds?.let { chapter.id !in it } ?: isUnread,
+				isNew = (explicitReadIds?.let { chapter.id !in it } ?: isUnread) && result.size >= newFrom,
 				isDownloaded = local != null,
 				isBookmarked = chapter.id in bookmarked,
 				isGrid = isGrid,
@@ -59,7 +60,7 @@ fun MangaDetails.mapChapters(
 			}
 			result += chapter.toListItem(
 				isCurrent = chapter.id == currentChapterId,
-				isUnread = isUnread,
+				isUnread = explicitReadIds?.let { chapter.id !in it } ?: isUnread,
 				isNew = false,
 				isDownloaded = !isLocal,
 				isBookmarked = chapter.id in bookmarked,
