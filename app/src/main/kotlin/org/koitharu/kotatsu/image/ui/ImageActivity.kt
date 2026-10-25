@@ -12,6 +12,14 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.swiperefreshlayout.widget.CircularProgressDrawable
 import coil3.ImageLoader
+import coil3.request.Disposable
+import org.koitharu.kotatsu.core.archive.ArchiveAccess
+import org.koitharu.kotatsu.core.archive.ArchiveDisplaySession
+import org.koitharu.kotatsu.core.archive.ArchiveImageUris
+import org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle
+import org.koitharu.kotatsu.core.archive.retireArchiveDisplay
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import coil3.request.CachePolicy
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
@@ -53,159 +61,191 @@ import androidx.appcompat.R as appcompatR
 
 @AndroidEntryPoint
 class ImageActivity : BaseActivity<ActivityImageBinding>(),
-	ImageRequest.Listener,
-	View.OnClickListener {
+    ImageRequest.Listener,
+    View.OnClickListener {
 
-	@Inject
-	lateinit var coil: ImageLoader
+    @Inject
+    lateinit var coil: ImageLoader
 
-	private var errorBinding: ItemErrorStateBinding? = null
-	private val viewModel: ImageViewModel by viewModels()
-	private lateinit var menuMediator: PopupMenuMediator
+    private var errorBinding: ItemErrorStateBinding? = null
+    private val viewModel: ImageViewModel by viewModels()
+    private lateinit var menuMediator: PopupMenuMediator
+    private var imageRequest: Disposable? = null
+    private var archiveDisplayRetired = false
 
-	override fun onCreate(savedInstanceState: Bundle?) {
-		super.onCreate(savedInstanceState)
-		setContentView(ActivityImageBinding.inflate(layoutInflater))
-		viewBinding.buttonBack.setOnClickListener(this)
-		viewBinding.buttonMenu.setOnClickListener(this)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        ArchiveSessionLifecycle.enforceBeforeDisplay()
+        super.onCreate(savedInstanceState)
+        setContentView(ActivityImageBinding.inflate(layoutInflater))
+        val archive = try {
+            intent.data?.let { ArchiveImageUris.displayArchive(this, it) }
+        } catch (_: org.koitharu.kotatsu.core.archive.ArchiveAccessException.Locked) {
+            retireProtectedDisplay()
+            return
+        }
+        val archiveListener = ArchiveDisplaySession(ArchiveAccess.get(this).sessions, { listOfNotNull(archive) }) {
+            runOnUiThread { retireProtectedDisplay() }
+        }
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) { archiveListener.close() }
+        })
+        viewBinding.buttonBack.setOnClickListener(this)
+        viewBinding.buttonMenu.setOnClickListener(this)
 
-		val manga = intent.getParcelableExtraCompat<ParcelableManga>(AppRouter.KEY_MANGA)?.manga
-		val menuProvider = ImageMenuProvider(
-			activity = this,
-			snackbarHost = viewBinding.root,
-			viewModel = viewModel,
-			manga = manga,
-		)
-		menuMediator = PopupMenuMediator(menuProvider)
-		viewModel.isLoading.observe(this, ::onLoadingStateChanged)
-		viewModel.onError.observeEvent(this, SnackbarErrorObserver(viewBinding.root, null))
-		viewModel.onImageSaved.observeEvent(this, ::onImageSaved)
-		loadImage()
-	}
+        val manga = intent.getParcelableExtraCompat<ParcelableManga>(AppRouter.KEY_MANGA)?.manga
+        val menuProvider = ImageMenuProvider(
+            activity = this,
+            snackbarHost = viewBinding.root,
+            viewModel = viewModel,
+            manga = manga,
+        )
+        menuMediator = PopupMenuMediator(menuProvider)
+        viewModel.isLoading.observe(this, ::onLoadingStateChanged)
+        viewModel.onError.observeEvent(this, SnackbarErrorObserver(viewBinding.root, null))
+        viewModel.onImageSaved.observeEvent(this, ::onImageSaved)
+        loadImage()
+    }
 
-	override fun onClick(v: View) {
-		when (v.id) {
-			R.id.button_back -> dispatchNavigateUp()
-			R.id.button_menu -> menuMediator.onLongClick(v)
-			else -> loadImage()
-		}
-	}
+    override fun onResume() {
+        ArchiveSessionLifecycle.enforceBeforeDisplay()
+        super.onResume()
+    }
 
-	override fun onError(request: ImageRequest, result: ErrorResult) {
-		viewBinding.progressBar.hide()
-		with(errorBinding ?: ItemErrorStateBinding.bind(viewBinding.stubError.inflate())) {
-			errorBinding = this
-			root.isVisible = true
-			textViewError.text = result.throwable.getDisplayMessage(resources)
-			textViewError.setCompoundDrawablesWithIntrinsicBounds(0, result.throwable.getDisplayIcon(), 0, 0)
-			buttonRetry.isVisible = true
-			buttonRetry.setOnClickListener(this@ImageActivity)
-		}
-	}
+    private fun retireProtectedDisplay() {
+        if (archiveDisplayRetired) return
+        archiveDisplayRetired = true
+        viewBinding.root.alpha = 0f
+        imageRequest?.dispose()
+        imageRequest = null
+        retireArchiveDisplay(this, viewBinding.root) {}
+    }
 
-	override fun onStart(request: ImageRequest) {
-		viewBinding.progressBar.show()
-		(errorBinding?.root ?: viewBinding.stubError).isVisible = false
-	}
+    override fun onClick(v: View) {
+        when (v.id) {
+            R.id.button_back -> dispatchNavigateUp()
+            R.id.button_menu -> menuMediator.onLongClick(v)
+            else -> loadImage()
+        }
+    }
 
-	override fun onSuccess(request: ImageRequest, result: SuccessResult) {
-		viewBinding.progressBar.hide()
-		(errorBinding?.root ?: viewBinding.stubError).isVisible = false
-	}
+    override fun onError(request: ImageRequest, result: ErrorResult) {
+        viewBinding.progressBar.hide()
+        with(errorBinding ?: ItemErrorStateBinding.bind(viewBinding.stubError.inflate())) {
+            errorBinding = this
+            root.isVisible = true
+            textViewError.text = result.throwable.getDisplayMessage(resources)
+            textViewError.setCompoundDrawablesWithIntrinsicBounds(0, result.throwable.getDisplayIcon(), 0, 0)
+            buttonRetry.isVisible = true
+            buttonRetry.setOnClickListener(this@ImageActivity)
+        }
+    }
 
-	override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
-		val typeMask = WindowInsetsCompat.Type.systemBars()
-		val barsInsets = insets.getInsets(typeMask)
-		val baseMargin = v.resources.getDimensionPixelOffset(R.dimen.screen_padding)
-		viewBinding.buttonMenu.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-			marginEnd = barsInsets.end(v) + baseMargin
-			topMargin = barsInsets.top + baseMargin
-		}
-		viewBinding.buttonBack.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-			marginStart = barsInsets.start(v) + baseMargin
-			topMargin = barsInsets.top + baseMargin
-		}
-		return insets.consumeAll(typeMask)
-	}
+    override fun onStart(request: ImageRequest) {
+        viewBinding.progressBar.show()
+        (errorBinding?.root ?: viewBinding.stubError).isVisible = false
+    }
 
-	private fun loadImage() {
-		val url = intent.data?.toString()
-		val isAnimated = url?.isAnimatedImage() == true
+    override fun onSuccess(request: ImageRequest, result: SuccessResult) {
+        viewBinding.progressBar.hide()
+        (errorBinding?.root ?: viewBinding.stubError).isVisible = false
+    }
 
-		if (isAnimated) {
-			viewBinding.ssiv.isVisible = false
-			viewBinding.animatedView.isVisible = true
-			ImageRequest.Builder(applicationContext)
-				.data(intent.data)
-				.memoryCacheKey(intent.getParcelableExtraCompat<CoilMemoryCacheKey>(AppRouter.KEY_PREVIEW)?.data)
-				.memoryCachePolicy(CachePolicy.READ_ONLY)
-				.lifecycle(this)
-				.listener(this)
-				.mangaSourceExtra(MangaSource(intent.getStringExtra(AppRouter.KEY_SOURCE)))
-				.target(viewBinding.animatedView)
-				.enqueueWith(coil)
-		} else {
-			viewBinding.ssiv.isVisible = true
-			viewBinding.animatedView.isVisible = false
-			ImageRequest.Builder(applicationContext)
-				.data(intent.data)
-				.memoryCacheKey(intent.getParcelableExtraCompat<CoilMemoryCacheKey>(AppRouter.KEY_PREVIEW)?.data)
-				.memoryCachePolicy(CachePolicy.READ_ONLY)
-				.lifecycle(this)
-				.listener(this)
-				.mangaSourceExtra(MangaSource(intent.getStringExtra(AppRouter.KEY_SOURCE)))
-				.target(SsivTarget(viewBinding.ssiv))
-				.enqueueWith(coil)
-		}
-	}
+    override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
+        val typeMask = WindowInsetsCompat.Type.systemBars()
+        val barsInsets = insets.getInsets(typeMask)
+        val baseMargin = v.resources.getDimensionPixelOffset(R.dimen.screen_padding)
+        viewBinding.buttonMenu.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+            marginEnd = barsInsets.end(v) + baseMargin
+            topMargin = barsInsets.top + baseMargin
+        }
+        viewBinding.buttonBack.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+            marginStart = barsInsets.start(v) + baseMargin
+            topMargin = barsInsets.top + baseMargin
+        }
+        return insets.consumeAll(typeMask)
+    }
 
-	private fun onImageSaved(uri: Uri) {
-		Snackbar.make(viewBinding.root, R.string.page_saved, Snackbar.LENGTH_LONG)
-			.setAction(R.string.share) {
-				ShareHelper(this).shareImage(uri)
-			}.show()
-	}
+    private fun loadImage() {
+        if (archiveDisplayRetired) return
+        imageRequest?.dispose()
+        val url = intent.data?.toString()
+        val isAnimated = url?.isAnimatedImage() == true
 
-	private fun onLoadingStateChanged(isLoading: Boolean) {
-		val button = viewBinding.buttonMenu
-		button.isClickable = !isLoading
-		if (isLoading) {
-			button.setImageDrawable(
-				CircularProgressDrawable(this).also {
-					it.setStyle(CircularProgressDrawable.LARGE)
-					it.setColorSchemeColors(getThemeColor(appcompatR.attr.colorControlNormal))
-					it.start()
-				},
-			)
-		} else {
-			button.setImageResource(appcompatR.drawable.abc_ic_menu_overflow_material)
-		}
-	}
+        if (isAnimated) {
+            viewBinding.ssiv.isVisible = false
+            viewBinding.animatedView.isVisible = true
+            imageRequest = ImageRequest.Builder(applicationContext)
+                .data(intent.data)
+                .memoryCacheKey(intent.getParcelableExtraCompat<CoilMemoryCacheKey>(AppRouter.KEY_PREVIEW)?.data)
+                .memoryCachePolicy(CachePolicy.READ_ONLY)
+                .lifecycle(this)
+                .listener(this)
+                .mangaSourceExtra(MangaSource(intent.getStringExtra(AppRouter.KEY_SOURCE)))
+                .target(viewBinding.animatedView)
+                .enqueueWith(coil)
+        } else {
+            viewBinding.ssiv.isVisible = true
+            viewBinding.animatedView.isVisible = false
+            imageRequest = ImageRequest.Builder(applicationContext)
+                .data(intent.data)
+                .memoryCacheKey(intent.getParcelableExtraCompat<CoilMemoryCacheKey>(AppRouter.KEY_PREVIEW)?.data)
+                .memoryCachePolicy(CachePolicy.READ_ONLY)
+                .lifecycle(this)
+                .listener(this)
+                .mangaSourceExtra(MangaSource(intent.getStringExtra(AppRouter.KEY_SOURCE)))
+                .target(SsivTarget(viewBinding.ssiv) { !archiveDisplayRetired })
+                .enqueueWith(coil)
+        }
+    }
 
-	private class SsivTarget(
-		override val view: SubsamplingScaleImageView,
-	) : GenericViewTarget<SubsamplingScaleImageView>() {
+    private fun onImageSaved(uri: Uri) {
+        Snackbar.make(viewBinding.root, R.string.page_saved, Snackbar.LENGTH_LONG)
+            .setAction(R.string.share) {
+                ShareHelper(this).shareImage(uri)
+            }.show()
+    }
 
-		override var drawable: Drawable? = null
-			set(value) {
-				field = value
-				setImageDrawable(value)
-			}
+    private fun onLoadingStateChanged(isLoading: Boolean) {
+        val button = viewBinding.buttonMenu
+        button.isClickable = !isLoading
+        if (isLoading) {
+            button.setImageDrawable(
+                CircularProgressDrawable(this).also {
+                    it.setStyle(CircularProgressDrawable.LARGE)
+                    it.setColorSchemeColors(getThemeColor(appcompatR.attr.colorControlNormal))
+                    it.start()
+                },
+            )
+        } else {
+            button.setImageResource(appcompatR.drawable.abc_ic_menu_overflow_material)
+        }
+    }
 
-		override fun equals(other: Any?): Boolean {
-			return (this === other) || (other is SsivTarget && view == other.view)
-		}
+    private class SsivTarget(
+        override val view: SubsamplingScaleImageView,
+        private val canDisplay: () -> Boolean,
+    ) : GenericViewTarget<SubsamplingScaleImageView>() {
 
-		override fun hashCode() = view.hashCode()
+        override var drawable: Drawable? = null
+            set(value) {
+                field = value.takeIf { canDisplay() }
+                setImageDrawable(field)
+            }
 
-		override fun toString() = "SsivTarget(view=$view)"
+        override fun equals(other: Any?): Boolean {
+            return (this === other) || (other is SsivTarget && view == other.view)
+        }
 
-		private fun setImageDrawable(drawable: Drawable?) {
-			if (drawable != null) {
-				view.setImage(ImageSource.bitmap(drawable.toBitmap()))
-			} else {
-				view.recycle()
-			}
-		}
-	}
+        override fun hashCode() = view.hashCode()
+
+        override fun toString() = "SsivTarget(view=$view)"
+
+        private fun setImageDrawable(drawable: Drawable?) {
+            if (drawable != null && canDisplay()) {
+                view.setImage(ImageSource.bitmap(drawable.toBitmap()))
+            } else {
+                view.recycle()
+            }
+        }
+    }
 }

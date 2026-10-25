@@ -1,5 +1,10 @@
 package org.koitharu.kotatsu.reader.ui.novel
 
+/** Rendering placeholders and package image paths are not narration. Ordinary bracketed prose stays intact. */
+internal fun novelSpeechContent(text: String): String = parseNovelImages(text).text
+    .replace(Regex("\\[(?:IMAGE_PLACEHOLDER|INLINE_IMAGE)_\\d+\\]"), "")
+    .trim()
+
 /** Start at the visible paragraph and respect engine limits without splitting surrogate pairs. */
 internal fun novelSpeechChunks(text: String, ratio: Float, limit: Int): List<String> {
     require(limit >= 2)

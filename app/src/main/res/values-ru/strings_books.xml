@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="archive_unlock_beta">Разблокировать архив · Бета</string>
+    <string name="archive_unlock">Разблокировать архив</string>
+    <string name="archive_lock">Заблокировать архив</string>
+    <string name="archive_unlock_summary">Пароль остаётся в памяти только на время сеанса. Защищённые страницы и производные данные не сохраняются в незашифрованном кэше.</string>
+    <string name="archive_password">Пароль</string>
+    <string name="archive_password_confirm">Повторите пароль</string>
+    <string name="archive_password_required">Введите пароль архива.</string>
+    <string name="archive_wrong_password">Неверный пароль архива.</string>
+    <string name="archive_password_mismatch">Введите одинаковый непустой пароль в обоих полях.</string>
+    <string name="archive_export_beta">Экспорт зашифрованной копии · Бета</string>
+    <string name="archive_export">Экспорт зашифрованной копии</string>
+    <string name="archive_export_summary">Создать отдельную копию с шифрованием AES-256 в локальном хранилище. Оригинал не изменится. Сохраните пароль: восстановить его нельзя.</string>
+    <string name="archive_export_in_progress">Создание и проверка зашифрованной копии…</string>
+    <string name="archive_export_no_storage">Нужна папка локального хранилища с доступом на запись.</string>
+    <string name="archive_session_settings_beta">Зашифрованные архивы · Бета</string>
+    <string name="archive_session_timeout">Блокировать после ухода в фон</string>
+    <string name="archive_session_timeout_summary">Пароли хранятся в памяти. Озвучивание откладывает блокировку до паузы или остановки воспроизведения.</string>
+    <string name="archive_lock_all">Заблокировать зашифрованные архивы</string>
+    <string name="archive_locked">Архив заблокирован. Разблокируйте его для продолжения чтения.</string>
+    <string-array name="archive_timeout_labels"><item>1 минута</item><item>5 минут</item><item>15 минут</item><item>30 минут</item></string-array>
+    <string name="archive_plaintext_export_blocked">Страницы защищённого архива нельзя сохранить или отправить без шифрования. Выберите «Экспортировать зашифрованную копию» в меню произведения.</string>
+</resources>

@@ -24,6 +24,12 @@ class LocalMangaZipOutput(
 	manga: Manga,
 ) : LocalMangaOutput(rootFile) {
 
+    init {
+        if (rootFile.exists() && org.koitharu.kotatsu.core.archive.ArchiveRepository.inspectEntries(rootFile).any { it.isEncrypted }) {
+            throw IOException("Protected archives are read-only; export a separate encrypted copy")
+        }
+    }
+
 	private val output = ZipOutput(File(rootFile.path + ".tmp"))
 	private val index = MangaIndex(null)
 	private val mutex = Mutex()

@@ -10,10 +10,12 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toCollection
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withContext
 import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.isBroken
 import org.koitharu.kotatsu.core.model.isLocal
 import org.koitharu.kotatsu.core.model.isNsfw
+import org.koitharu.kotatsu.core.model.isNsfwForFiltering
 import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.prefs.AppSettings
@@ -55,6 +57,7 @@ class LocalMangaRepository @Inject constructor(
     @LocalStorageChanges private val localStorageChanges: MutableSharedFlow<LocalManga?>,
     private val settings: AppSettings,
     private val lock: MangaLock,
+    private val remoteLibraries: org.koitharu.kotatsu.remote.library.RemoteLibraryPersistence,
 ) : MangaRepository {
 
     override val source = LocalMangaSource
@@ -96,8 +99,9 @@ class LocalMangaRepository @Inject constructor(
             return emptyList()
         }
         val list = getRawList()
+        list.removeAll { !settings.sourceContentPolicy.allows(it.manga) }
         if (settings.isNsfwContentDisabled) {
-            list.removeAll { it.manga.isNsfw() }
+            list.removeAll { it.manga.isNsfwForFiltering(settings.useSeparateSourceContentClasses) }
         }
         if (filter != null) {
             val query = filter.query
@@ -134,7 +138,9 @@ class LocalMangaRepository @Inject constructor(
             "Manga is not local or saved"
         }
 
-        else -> LocalMangaParser(manga.url.toUri()).getManga(withDetails = true).manga
+        else -> withContext(Dispatchers.IO) {
+            remoteLibraries.applyAcquiredMetadata(LocalMangaParser(manga.url.toUri()).getManga(withDetails = true).manga)
+        }
     }
 
     override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
@@ -244,6 +250,7 @@ class LocalMangaRepository @Inject constructor(
     }
 
     fun getRawListAsFlow(): Flow<LocalManga> = channelFlow {
+        remoteLibraries.initialize()
         val files = getAllFiles()
         val dispatcher = Dispatchers.IO.limitedParallelism(MAX_PARALLELISM)
         for (file in files) {
@@ -253,7 +260,7 @@ class LocalMangaRepository @Inject constructor(
                 }.onFailure { e ->
                     e.printStackTraceDebug()
                 }.onSuccess { m ->
-                    if (m != null) send(m)
+                    if (m != null) send(m.copy(manga = remoteLibraries.applyAcquiredMetadata(m.manga)))
                 }
             }
         }

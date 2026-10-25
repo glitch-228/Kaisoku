@@ -40,6 +40,7 @@ class AppProtectHelper @Inject constructor(private val settings: AppSettings) :
 	}
 
 	private fun restoreLock() {
+		org.koitharu.kotatsu.core.archive.ArchiveAccess.sessions.lockAll()
 		isUnlocked = settings.appPassword.isNullOrEmpty()
 	}
 }

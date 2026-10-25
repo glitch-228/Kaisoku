@@ -68,6 +68,11 @@ class NovelContinuousAdapter(
 
 	override fun getItemCount(): Int = chapters.size
 
+    override fun onViewRecycled(holder: ChapterViewHolder) {
+        holder.view.clearSessionContent()
+        super.onViewRecycled(holder)
+    }
+
 	fun updateSettings(newSettings: NovelReaderSettings) {
 		if (settings == newSettings) return
 		settings = newSettings

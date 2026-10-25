@@ -38,29 +38,32 @@ class MultimodalTranslator @Inject constructor(
 	private val translateClient by lazy { TranslationHttpClient(okHttpClient) }
 
 	/** Reuse provider configuration for text; the AI rate limit does not throttle Google Translate. */
-	suspend fun translateText(text: String, onProgress: (Int, Int) -> Unit = { _, _ -> }): String = withContext(Dispatchers.IO) {
-		val provider = settings.translateProvider
+	suspend fun translateText(text: String, onProgress: (Int, Int) -> Unit = { _, _ -> }): String =
+		translateText(text, TextTranslationConfig.capture(settings), onProgress)
+
+	/** The cache identity and request use the same snapshot, even if settings change during a request. */
+	suspend fun translateText(
+		text: String,
+		configuration: TextTranslationConfig,
+		onProgress: (Int, Int) -> Unit = { _, _ -> },
+	): String = withContext(Dispatchers.IO) {
+		val provider = configuration.provider
 		if (provider == TranslateProvider.GOOGLE_LENS) {
-			val source = settings.translateSourceLanguage.ifBlank { "auto" }
-			val target = settings.translateTargetLanguage.ifBlank { "en" }
 			return@withContext NovelTextTranslation.translateGoogle(text, onProgress) { part ->
-				googleTranslate.translateText(part, source, target)
+				googleTranslate.translateText(part, configuration.sourceLanguage, configuration.targetLanguage)
 			}
 		}
-		val customHeaders = settings.translateCustomHeaders.trim()
-		val endpoint = settings.translateEndpoint.trim().ifEmpty { throw TranslateException.NoEndpoint() }
-		val apiKey = settings.translateApiKey.trim().ifEmpty { throw TranslateException.NoKey() }
-		val model = settings.translateModel.trim().ifBlank {
-			if (provider == TranslateProvider.GEMINI) "gemini-2.5-flash" else "gpt-4o-mini"
-		}
-		val source = settings.translateSourceLanguage
-		val target = settings.translateTargetLanguage
-		val gemini = provider == TranslateProvider.GEMINI || endpoint.contains("generateContent") ||
-			endpoint.contains("googleapis.com/v1beta/models/")
+		val customHeaders = configuration.customHeaders
+		val endpoint = configuration.endpoint.ifEmpty { throw TranslateException.NoEndpoint() }
+		val apiKey = configuration.apiKey.ifEmpty { throw TranslateException.NoKey() }
+		val model = configuration.model
+		val source = configuration.sourceLanguage
+		val target = configuration.targetLanguage
+		val gemini = configuration.isGemini
 		NovelTextTranslation.translateParts(
 			parts = NovelTextTranslation.parts(text),
 			onProgress = onProgress,
-			concurrency = settings.translateConcurrency,
+			concurrency = configuration.concurrency,
 		) { part ->
 			NovelTextTranslation.translateValidatedPart(part, source, target) { excerpt ->
 				val payload = NovelTextTranslation.payload(excerpt, source, target, model, gemini)

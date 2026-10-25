@@ -30,6 +30,7 @@ import org.koitharu.kotatsu.local.data.LocalStorageManager
 import org.koitharu.kotatsu.local.data.hasRarComicExtension
 import org.koitharu.kotatsu.local.data.hasPdfExtension
 import org.koitharu.kotatsu.local.data.hasZipExtension
+import org.koitharu.kotatsu.local.data.hasEpubExtension
 import org.koitharu.kotatsu.local.data.input.LocalMangaParser
 import org.koitharu.kotatsu.local.data.isPdfUri
 import org.koitharu.kotatsu.local.domain.model.LocalManga
@@ -62,7 +63,7 @@ class SingleMangaImporter @Inject constructor(
         val finalName = when {
             pdf -> name.substringBeforeLast('.').ifBlank { "PDF" }
             hasRarComicExtension(name) -> name.substringBeforeLast('.') + ".cbz"
-            hasZipExtension(name) -> name
+            hasZipExtension(name) || hasEpubExtension(name) -> name
             else -> throw UnsupportedFileException("Unsupported file $name")
         }
         return ImportTransaction.run(getOutputDir(), finalName, { staging ->
@@ -129,6 +130,20 @@ class SingleMangaImporter @Inject constructor(
     }
 
     private suspend fun parseManga(file: File): LocalManga {
+        val archives = org.koitharu.kotatsu.core.archive.ArchiveAccess.get(context)
+        if (file.isFile && archives.isSensitive(file)) {
+            // Import keeps ciphertext intact; a background service must never request/retain passwords.
+            val entries = archives.entries(file)
+            if (hasEpubExtension(file.name)) {
+                if (entries.none { it.name == "mimetype" } || entries.none { it.name == "META-INF/container.xml" }) {
+                    throw IOException("Encrypted EPUB package metadata is missing")
+                }
+            } else if (entries.none { !it.isDirectory && org.koitharu.kotatsu.local.data.hasImageExtension(it.name.substringAfterLast('/')) } &&
+                !(entries.any { it.name == "index.json" } && entries.any { it.name.endsWith(".html", true) || it.name.endsWith(".htm", true) })) {
+                throw IOException("Encrypted archive has no supported pages")
+            }
+            return LocalMangaParser(file).getManga(withDetails = false)
+        }
         val parsed = LocalMangaParser(file).getManga(withDetails = true)
         if (parsed.manga.chapters.isNullOrEmpty()) throw IOException("Imported title has no readable chapters")
         return parsed.copy(manga = parsed.manga.copy(chapters = null))
@@ -150,6 +165,11 @@ class SingleMangaImporter @Inject constructor(
                     zip.closeEntry()
                 }
             }
+        } else if (!isDirectory && hasRarComicExtension(requireName())) {
+            val chapterName = requireName()
+            val convertedName = chapterName.substringBeforeLast('.') + ".cbz"
+            if (File(destDir, convertedName).exists()) throw IOException("Conflicting CBR chapter name: $convertedName")
+            CbrImportTransaction.import(chapterName, destDir, copyInput = { copyFile(uri, it) })
         } else if (isDirectory) {
             val subDir = File(destDir, requireName())
             if (!subDir.mkdir()) throw IOException("Conflicting chapter directory")

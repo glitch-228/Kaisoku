@@ -14,6 +14,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
+import org.koitharu.kotatsu.core.archive.ArchiveAccess
+import org.koitharu.kotatsu.core.archive.ArchivePrivacy
+import org.koitharu.kotatsu.core.archive.ArchiveSessionManager
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koitharu.kotatsu.core.model.MangaHistory
@@ -82,6 +86,9 @@ class NovelReaderViewModel @Inject constructor(
     private val translations = object : LinkedHashMap<Long, Pair<String, String>>(8, .75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Pair<String, String>>?) = size > 8
     }
+    @Volatile var protectedArchive: java.io.File? = null
+        private set
+    private var initialLoad: Job? = null
 
     private fun translationConfig() = listOf(appSettings.translateProvider.name, appSettings.translateEndpoint,
         appSettings.translateModel, appSettings.translateSourceLanguage, appSettings.translateTargetLanguage).joinToString("\n")
@@ -104,14 +111,21 @@ class NovelReaderViewModel @Inject constructor(
     }
 
     suspend fun loadChapterText(index: Int): String? {
+        val token = archiveToken()
         val id = chapters.value.getOrNull(index)?.id ?: return null
         synchronized(translations) {
-            translations[id]?.takeIf { it.first == translationConfig() }?.let { return it.second }
+            translations[id]?.takeIf { it.first == translationConfig() }?.let {
+                token?.let(ArchiveAccess.sessions::requireActive)
+                return it.second
+            }
         }
-        return loadChapterHtml(index)?.let(NovelHtml::decodeChapterHtml)?.let(NovelHtml::toPlainText)
+        val text = loadChapterHtml(index)?.let(NovelHtml::decodeChapterHtml)?.let(NovelHtml::toPlainText)
+        token?.let(ArchiveAccess.sessions::requireActive)
+        return text
     }
 
     suspend fun translateChapter(index: Int, onProgress: (Int, Int) -> Unit) {
+        val token = archiveToken()
         val chapter = chapters.value.getOrNull(index) ?: return
         val config = translationConfig()
         val original = loadChapterHtml(index)?.let(NovelHtml::decodeChapterHtml)?.let(NovelHtml::toPlainText)
@@ -119,15 +133,25 @@ class NovelReaderViewModel @Inject constructor(
         val translated = translator.translateText(original, onProgress)
         kotlinx.coroutines.currentCoroutineContext().ensureActive()
         if (config != translationConfig()) error("Translation settings changed. Please retry.")
+        token?.let(ArchiveAccess.sessions::requireActive)
         synchronized(translations) { translations[chapter.id] = config to translated }
     }
     @Volatile var imageHeaders: Map<String, String> = emptyMap()
         private set
 
-    init {
-        launchLoadingJob(Dispatchers.Default) {
+    init { loadInitial() }
+
+    /** Unlock retries metadata loading; normal ordered reader position writes remain independent. */
+    fun retryArchiveUnlock() { loadInitial() }
+
+    private fun loadInitial() {
+        initialLoad?.cancel()
+        initialLoad = launchLoadingJob(Dispatchers.Default) {
             var target = dataRepository.resolveIntent(intent, withChapters = true)
                 ?: error("Cannot resolve novel ${intent.mangaId}")
+            protectedArchive = withContext(Dispatchers.IO) {
+                ArchivePrivacy.file(target)?.takeIf { ArchiveAccess.get(appContext).isSensitive(it) }
+            }
             if (target.isLocal) target = localRepository.getDetails(target)
             else {
                 val saved = localRepository.findSavedManga(target, withDetails = true)?.manga
@@ -292,13 +316,30 @@ class NovelReaderViewModel @Inject constructor(
     }
 
     suspend fun loadChapterHtml(index: Int): String? {
+        val token = archiveToken()
         val target = manga.value ?: return null
         val chapter = chapters.value.getOrNull(index) ?: return null
-        if (chapter.source.name == "LOCAL") return LocalMangaParser(chapter.url.toUri()).getChapterHtml(chapter)
+        if (chapter.source.name == "LOCAL") {
+            val result = withContext(Dispatchers.IO) { LocalMangaParser(chapter.url.toUri()).getChapterHtml(chapter) }
+            token?.let(ArchiveAccess.sessions::requireActive)
+            return result
+        }
         val repository = repositoryFactory.create(target.source)
         val novelRepository = repository as? org.koitharu.kotatsu.core.parser.ChapterTextRepository
             ?: return null
         return novelRepository.getChapterHtml(chapter).also { imageHeaders = novelRepository.getImageHeaders() }
+    }
+
+    private suspend fun archiveToken(): ArchiveSessionManager.Token? = withContext(Dispatchers.IO) {
+        protectedArchive?.let { ArchiveAccess.get(appContext).sessions.token(it) }
+    }
+
+    override fun onCleared() {
+        synchronized(translations) { translations.clear() }
+        imageHeaders = emptyMap()
+        manga.value = null
+        chapters.value = emptyList()
+        super.onCleared()
     }
 
 }

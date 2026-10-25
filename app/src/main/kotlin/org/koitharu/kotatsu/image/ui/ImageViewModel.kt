@@ -12,6 +12,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withContext
+import org.koitharu.kotatsu.core.archive.ArchiveImageUris
+import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.MangaSource
 import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.ui.BaseViewModel
@@ -24,28 +27,32 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ImageViewModel @Inject constructor(
-	@ApplicationContext private val context: Context,
-	private val savedStateHandle: SavedStateHandle,
-	private val coil: ImageLoader,
+    @ApplicationContext private val context: Context,
+    private val savedStateHandle: SavedStateHandle,
+    private val coil: ImageLoader,
 ) : BaseViewModel() {
 
-	val onImageSaved = MutableEventFlow<Uri>()
+    val onImageSaved = MutableEventFlow<Uri>()
 
-	fun saveImage(destination: Uri) {
-		launchLoadingJob(Dispatchers.Default) {
-			val request = ImageRequest.Builder(context)
-				.memoryCachePolicy(CachePolicy.READ_ONLY)
-				.data(savedStateHandle.require<Uri>(AppRouter.KEY_DATA))
-				.memoryCachePolicy(CachePolicy.DISABLED)
-				.mangaSourceExtra(MangaSource(savedStateHandle[AppRouter.KEY_SOURCE]))
-				.build()
-			val bitmap = coil.execute(request).getDrawableOrThrow().toBitmap()
-			runInterruptible(Dispatchers.IO) {
-				context.contentResolver.openOutputStream(destination)?.use { output ->
-					check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
-				} ?: error("Cannot open output stream")
-			}
-			onImageSaved.call(destination)
-		}
-	}
+    fun saveImage(destination: Uri) {
+        launchLoadingJob(Dispatchers.Default) {
+            val source = savedStateHandle.require<Uri>(AppRouter.KEY_DATA)
+            check(!withContext(Dispatchers.IO) { ArchiveImageUris.isSensitive(context, source) }) {
+                context.getString(R.string.archive_plaintext_export_blocked)
+            }
+            val request = ImageRequest.Builder(context)
+                .memoryCachePolicy(CachePolicy.READ_ONLY)
+                .data(source)
+                .memoryCachePolicy(CachePolicy.DISABLED)
+                .mangaSourceExtra(MangaSource(savedStateHandle[AppRouter.KEY_SOURCE]))
+                .build()
+            val bitmap = coil.execute(request).getDrawableOrThrow().toBitmap()
+            runInterruptible(Dispatchers.IO) {
+                context.contentResolver.openOutputStream(destination)?.use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+                } ?: error("Cannot open output stream")
+            }
+            onImageSaved.call(destination)
+        }
+    }
 }

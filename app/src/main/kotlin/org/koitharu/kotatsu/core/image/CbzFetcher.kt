@@ -6,6 +6,8 @@ import coil3.decode.DataSource
 import coil3.decode.ImageSource
 import coil3.fetch.Fetcher
 import coil3.fetch.SourceFetchResult
+import coil3.fetch.ImageFetchResult
+import coil3.asImage
 import coil3.request.Options
 import coil3.toAndroidUri
 import kotlinx.coroutines.runInterruptible
@@ -15,6 +17,9 @@ import okio.openZip
 import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.isZipUri
 import coil3.Uri as CoilUri
+import org.koitharu.kotatsu.core.archive.ArchiveAccess
+import org.koitharu.kotatsu.core.archive.ArchiveImageUris
+import java.io.File
 
 class CbzFetcher(
 	private val uri: Uri,
@@ -22,6 +27,11 @@ class CbzFetcher(
 ) : Fetcher {
 
 	override suspend fun fetch() = runInterruptible {
+		if (ArchiveImageUris.isSensitive(options.context, uri)) {
+            // Returning an already decoded bitmap avoids Coil's seekable-source plaintext temp files.
+            val bitmap = ArchiveBitmapDecoder.decode(options.context, uri, thumbnail = true)
+            return@runInterruptible ImageFetchResult(bitmap.asImage(), isSampled = false, dataSource = DataSource.MEMORY)
+        }
 		val filePath = uri.schemeSpecificPart.toPath()
 		val entryName = requireNotNull(uri.fragment)
 		val entryPath = entryName.toPath()
@@ -44,7 +54,7 @@ class CbzFetcher(
 			imageLoader: ImageLoader
 		): Fetcher? {
 			val androidUri = data.toAndroidUri()
-			return if (androidUri.isZipUri()) {
+			return if (androidUri.isZipUri() || (androidUri.scheme == "content" && androidUri.authority == options.context.packageName + ".archive")) {
 				CbzFetcher(androidUri, options)
 			} else {
 				null

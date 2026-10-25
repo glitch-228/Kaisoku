@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="archive_unlock_beta">Unlock archive · Beta</string>
+    <string name="archive_unlock">Unlock archive</string>
+    <string name="archive_lock">Lock archive</string>
+    <string name="archive_unlock_summary">The password stays in memory for this session. Protected pages and derived content are not saved as unencrypted cache files.</string>
+    <string name="archive_password">Password</string>
+    <string name="archive_password_confirm">Confirm password</string>
+    <string name="archive_password_required">Enter the archive password.</string>
+    <string name="archive_wrong_password">The archive password is incorrect.</string>
+    <string name="archive_password_mismatch">Enter the same nonempty password in both fields.</string>
+    <string name="archive_export_beta">Export encrypted copy · Beta</string>
+    <string name="archive_export">Export encrypted copy</string>
+    <string name="archive_export_summary">Create a separate AES-256 encrypted copy in local storage. The original stays unchanged. Store the password safely; it cannot be recovered.</string>
+    <string name="archive_export_in_progress">Creating and verifying encrypted copy…</string>
+    <string name="archive_export_no_storage">A writable local storage directory is required.</string>
+    <string name="archive_session_settings_beta">Encrypted archives · Beta</string>
+    <string name="archive_session_timeout">Lock after time in background</string>
+    <string name="archive_session_timeout_summary">Passwords stay in memory. Active text-to-speech postpones locking until playback pauses or stops.</string>
+    <string name="archive_lock_all">Lock encrypted archives now</string>
+    <string name="archive_locked">Archive locked. Unlock it to continue reading.</string>
+    <string-array name="archive_timeout_labels"><item>1 minute</item><item>5 minutes</item><item>15 minutes</item><item>30 minutes</item></string-array>
+    <string-array name="archive_timeout_values"><item>1</item><item>5</item><item>15</item><item>30</item></string-array>
+    <string name="archive_plaintext_export_blocked">Protected archive pages cannot be saved or shared as unencrypted files. Use Export encrypted copy in the title menu.</string>
+</resources>

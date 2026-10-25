@@ -289,18 +289,34 @@ class ReaderImageDecodersTest {
             failure.get()?.let { throw AssertionError(it) }
             assertTrue("Tiled fixture was not loaded", loaded.get())
             instrumentation.runOnMainSync {
+                // The async loaded callback may run after the last manual paint.
+                view.draw(Canvas(pixels))
                 assertEquals(48, view.sWidth)
                 assertEquals(32, view.sHeight)
                 assertTrue(Color.green(pixels.getPixel(100, 100)) > 150)
                 view.orientation = 90
                 view.setScaleAndCenter(10f, PointF(16f, 24f))
-                view.draw(Canvas(pixels))
+            }
+            // Rotation invalidates tiled layers. Wait for a painted, ready layer before checking its transform.
+            var rotatedReady = false
+            val rotatedDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (!rotatedReady && failure.get() == null && System.nanoTime() < rotatedDeadline) {
+                instrumentation.runOnMainSync {
+                    view.draw(Canvas(pixels))
+                    rotatedReady = view.isReady && view.scale > 5f
+                }
+                if (!rotatedReady) Thread.sleep(20)
+            }
+            failure.get()?.let { throw AssertionError(it) }
+            assertTrue("Rotated tiled fixture was not ready", rotatedReady)
+            instrumentation.runOnMainSync {
                 assertEquals(32, view.displaySourceWidth)
                 assertEquals(48, view.displaySourceHeight)
                 val marker = requireNotNull(view.normalizedSourceToView(0.5f, 0.5f))
                 assertEquals(100f, marker.x, 1f)
                 assertEquals(100f, marker.y, 1f)
                 assertTrue(view.scale > 5f)
+                assertEquals(10f, view.scale, 0.01f)
             }
         } finally {
             instrumentation.runOnMainSync { view.recycle() }

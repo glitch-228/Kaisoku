@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.koitharu.kotatsu.core.db.MangaDatabase
@@ -25,6 +26,7 @@ class LocalMangaIndex @Inject constructor(
     private val db: MangaDatabase,
     @ApplicationContext context: Context,
     private val localMangaRepositoryProvider: Provider<LocalMangaRepository>,
+    private val remoteLibraries: org.koitharu.kotatsu.remote.library.RemoteLibraryPersistence,
 ) : FlowCollector<LocalManga?> {
 
     private val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -41,19 +43,16 @@ class LocalMangaIndex @Inject constructor(
     }
 
     suspend fun update() = mutex.withLock {
-        db.withTransaction {
-            val dao = db.getLocalMangaIndexDao()
-            dao.clear()
-            localMangaRepositoryProvider.get()
-                .getRawListAsFlow()
-                .collect { upsert(it) }
-        }
-        currentVersion = VERSION
+        rebuild()
     }
 
     suspend fun updateIfRequired() {
         if (isUpdateRequired()) {
-            update()
+            mutex.withLock {
+                if (isUpdateRequired()) {
+                    rebuild()
+                }
+            }
         }
     }
 
@@ -76,8 +75,11 @@ class LocalMangaIndex @Inject constructor(
     }
 
     private suspend fun readPath(path: String, withDetails: Boolean): LocalManga? {
+        remoteLibraries.initialize()
         return runCatchingCancellable {
-            LocalMangaParser(File(path)).getManga(withDetails)
+            LocalMangaParser(File(path)).getManga(withDetails).let {
+                it.copy(manga = remoteLibraries.applyAcquiredMetadata(it.manga))
+            }
         }.onFailure {
             it.printStackTraceDebug()
         }.getOrNull()
@@ -113,8 +115,26 @@ class LocalMangaIndex @Inject constructor(
         }
     }
 
+    private suspend fun rebuild() {
+        // Storage/archive reads must not hold Room's writer while other screens load.
+        // Keep the published index intact until a complete scan can be committed.
+        val found = localMangaRepositoryProvider.get().getRawListAsFlow().toList()
+        db.withTransaction {
+            db.getLocalMangaIndexDao().clear()
+            found.forEach { upsert(it) }
+        }
+        currentVersion = VERSION
+    }
+
     private suspend fun upsert(manga: LocalManga) {
-        mangaDataRepository.storeManga(manga.manga, replaceExisting = true)
+        val sensitive = manga.file.isFile && org.koitharu.kotatsu.local.data.isSupportedArchive(manga.file.name) &&
+            org.koitharu.kotatsu.core.archive.ArchiveAccess.repository.isSensitive(manga.file)
+        val indexed = if (sensitive) manga.manga.copy(
+            title = manga.file.nameWithoutExtension.replace('_', ' '),
+            altTitles = emptySet(), authors = emptySet(), tags = emptySet(),
+            description = null, coverUrl = null, largeCoverUrl = null, chapters = null,
+        ) else remoteLibraries.applyAcquiredMetadata(manga.manga)
+        mangaDataRepository.storeManga(indexed, replaceExisting = true)
         db.getLocalMangaIndexDao().upsert(manga.toEntity())
     }
 

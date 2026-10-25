@@ -27,6 +27,9 @@ internal class ReaderImageInput(private val context: Context, private val uri: U
     fun <T> read(block: (InputStream) -> T): T {
         ReaderDecodeLimits.checkInterrupted()
         return if (uri.isZipUri()) {
+            if (org.koitharu.kotatsu.core.archive.ArchiveImageUris.isSensitive(context, uri)) {
+                return org.koitharu.kotatsu.core.archive.ArchiveImageUris.openStream(context, uri).use(block)
+            }
             ZipFile(uri.schemeSpecificPart).use { zip ->
                 val entry = zip.getEntry(uri.fragment) ?: throw IOException("Missing reader image archive entry")
                 zip.getInputStream(entry).use(block)

@@ -99,8 +99,28 @@ class NovelReaderActivity :
         get() = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.enforceBeforeDisplay()
         super.onCreate(savedInstanceState)
         setContentView(ActivityNovelReaderBinding.inflate(layoutInflater))
+        val archiveListener = org.koitharu.kotatsu.core.archive.ArchiveAccess.get(this).sessions.addLockListener { paths ->
+            if (viewModel.protectedArchive?.canonicalPath in paths) runOnUiThread {
+                viewBinding.root.alpha = 0f
+                chapterLoadJob?.cancel()
+                preloadJob?.cancel()
+                translationJob?.cancel()
+                speechController.stop()
+                // Keep the real viewport until normal onPause/onStop saves have drained.
+                finish()
+            }
+        }
+        lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) { archiveListener.close() }
+        })
+        supportFragmentManager.setFragmentResultListener(org.koitharu.kotatsu.core.archive.ArchiveUnlockDialog.RESULT_UNLOCKED,
+            this) { _, result ->
+            if (result.getString(org.koitharu.kotatsu.core.archive.ArchiveUnlockDialog.KEY_FILE) ==
+                viewModel.protectedArchive?.canonicalPath) viewModel.retryArchiveUnlock()
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setDisplayHomeAsUp(isEnabled = true, showUpAsClose = false)
         supportActionBar?.title = null
@@ -163,8 +183,8 @@ class NovelReaderActivity :
         }
         viewModel.readerSettings.observe(this) { applySettings(it) }
         viewModel.onError.observeEvent(this) { e ->
-            Snackbar.make(viewBinding.root, e.message ?: getString(R.string.error_occurred), Snackbar.LENGTH_SHORT)
-                .show()
+            if (!showArchiveUnlock(e)) Snackbar.make(viewBinding.root,
+                e.message ?: getString(R.string.error_occurred), Snackbar.LENGTH_SHORT).show()
         }
     }
 
@@ -284,7 +304,7 @@ class NovelReaderActivity :
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (generation == chapterLoadGeneration) showError(e, index)
+                if (generation == chapterLoadGeneration && !showArchiveUnlock(e)) showError(e, index)
             } finally {
                 if (generation == chapterLoadGeneration) showLoading(false)
             }
@@ -833,6 +853,7 @@ class NovelReaderActivity :
     }
 
     override fun onResume() {
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.enforceBeforeDisplay()
         super.onResume()
         viewModel.onResume()
         viewModel.configuredReadingReversed()?.let(::onReverseReadingChanged)
@@ -850,7 +871,20 @@ class NovelReaderActivity :
     override fun onDestroy() {
         speechController.detachActivity(this)
         if (isFinishing && speechController.state.value.mangaId == viewModel.manga.value?.id) speechController.stop()
+        if (viewModel.protectedArchive != null) {
+            viewBinding.readerView.clearSessionContent()
+            continuousAdapter?.clear()
+            viewBinding.continuousScrollView.adapter = null
+            viewBinding.continuousScrollView.recycledViewPool.clear()
+        }
         super.onDestroy()
+    }
+
+    private fun showArchiveUnlock(error: Throwable): Boolean {
+        if (error !is org.koitharu.kotatsu.core.archive.ArchiveAccessException.Locked) return false
+        val file = viewModel.protectedArchive ?: return false
+        org.koitharu.kotatsu.core.archive.ArchiveUnlockDialog.show(supportFragmentManager, file)
+        return true
     }
 
     companion object {

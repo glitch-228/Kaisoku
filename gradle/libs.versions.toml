@@ -47,6 +47,7 @@ room = "2.8.4"
 tsuki = "1.0.6"
 serialization = "1.11.0"
 junrar = "8.1.1"
+zip4j = "2.11.6"
 slf4j = "2.0.19"
 ssiv = "376930523c"
 swiperefreshlayout = "1.1.0"
@@ -132,6 +133,7 @@ play-services-auth = { module = "com.google.android.gms:play-services-auth", ver
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 ssiv = { module = "com.github.KotatsuApp:subsampling-scale-image-view", version.ref = "ssiv" }
 junrar = { module = "com.github.junrar:junrar", version.ref = "junrar" }
+zip4j = { module = "net.lingala.zip4j:zip4j", version.ref = "zip4j" }
 tsuki = { module = "com.github.UsagiApp:Tsuki", version.ref = "tsuki" }
 usagi-rpc = { module = "com.github.UsagiApp:OAuth2-RPC", version.ref = "usagiRpc" }
 workinspector = { module = "com.github.Koitharu:WorkInspector", version.ref = "workinspector" }

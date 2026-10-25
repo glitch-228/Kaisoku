@@ -72,7 +72,11 @@ internal class NovelSpeechController @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val cursor = NovelSpeechSession()
     private val serviceOwnership = NovelSpeechServiceOwnership()
+    private val archiveSession = NovelSpeechArchiveSession(
+        org.koitharu.kotatsu.core.archive.ArchiveAccess.get(context).sessions,
+    )
     private var request: NovelSpeechRequest? = null
+    private var protectedFile: java.io.File? = null
     private var chunks = emptyList<String>()
     private var spokenOffset = 0
     private var loadJob: Job? = null
@@ -94,16 +98,34 @@ internal class NovelSpeechController @Inject constructor(
     private val audioAttributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
 
+    init {
+        org.koitharu.kotatsu.core.archive.ArchiveAccess.get(context).sessions.addLockListener { paths ->
+            if (protectedFile?.canonicalPath in paths) {
+                if (Looper.myLooper() == Looper.getMainLooper()) stop() else handler.post { stop() }
+            }
+        }
+    }
+
     fun start(activity: Activity, value: NovelSpeechRequest) {
         stop()
         if (value.firstText.isBlank() || value.firstChapter !in value.chapters.indices) return
+        try {
+            protectedFile = org.koitharu.kotatsu.core.archive.ArchivePrivacy.file(value.manga)?.takeIf {
+                org.koitharu.kotatsu.core.archive.ArchiveAccess.get(context).isSensitive(it)
+            }
+            archiveSession.capture(protectedFile)
+        } catch (_: Exception) {
+            stop()
+            return
+        }
         serviceOwnership.newRequest()
         request = value
         cursor.seekChapter(value.firstChapter)
         publish(NovelSpeechStatus.PREPARING)
         val token = cursor.generation
-        val action = {
+        val action = action@ {
             if (token == cursor.generation && isActive && !activity.isFinishing && !activity.isDestroyed) {
+                if (!requireArchiveSession()) return@action
                 try { chooseVoice(activity, value.locale) } catch (_: Exception) { fail(R.string.novel_speech_unavailable) }
             }
         }
@@ -180,6 +202,7 @@ internal class NovelSpeechController @Inject constructor(
                 voiceDialog = null
                 voiceActivity = null
                 if (token == cursor.generation && isActive) {
+                    if (!requireArchiveSession()) return@setItems
                     try {
                         if (tts.setVoice(voices[selected]) == TextToSpeech.SUCCESS) startService()
                         else fail(R.string.novel_speech_unavailable)
@@ -192,6 +215,7 @@ internal class NovelSpeechController @Inject constructor(
     }
 
     private fun startService() {
+        if (!requireArchiveSession()) return
         try {
             ContextCompat.startForegroundService(context, Intent(context, NovelSpeechService::class.java)
                 .putExtra(NovelSpeechService.EXTRA_REQUEST, serviceOwnership.attach()))
@@ -203,6 +227,7 @@ internal class NovelSpeechController @Inject constructor(
 
     fun onServiceStarted(token: Long): Long? {
         if (!acceptsServiceStart(token)) return null
+        if (!requireArchiveSession()) return null
         serviceStarted = true
         request?.let { loadChapter(it.firstChapter, it.firstText, it.ratio) }
         return token
@@ -237,6 +262,7 @@ internal class NovelSpeechController @Inject constructor(
 
     fun resume() {
         if (state.value.status != NovelSpeechStatus.PAUSED || !serviceStarted) return
+        if (!requireArchiveSession()) return
         if (loadJob?.isActive == true) publish(NovelSpeechStatus.LOADING)
         else if (chunks.isNotEmpty()) speakNext()
         else loadChapter(cursor.chapter)
@@ -254,6 +280,7 @@ internal class NovelSpeechController @Inject constructor(
     }
 
     private fun loadChapter(index: Int, initialText: String? = null, ratio: Float = 0f) {
+        if (!requireArchiveSession()) return
         loadJob?.cancel()
         cursor.seekChapter(index)
         chunks = emptyList()
@@ -261,6 +288,7 @@ internal class NovelSpeechController @Inject constructor(
         val chapter = value.chapters.getOrNull(index) ?: run { stop(); return }
         val token = cursor.generation
         publish(NovelSpeechStatus.LOADING)
+        if (!isActive) return
         loadJob = scope.launch {
             try {
                 val text = initialText ?: value.cachedTranslations[chapter.id] ?: if (value.translated) {
@@ -279,7 +307,8 @@ internal class NovelSpeechController @Inject constructor(
                 }
                 currentCoroutineContext().ensureActive()
                 if (token != cursor.generation || !isActive) return@launch
-                chunks = novelSpeechChunks(parseNovelImages(text.orEmpty()).text, ratio,
+                if (!requireArchiveSession()) return@launch
+                chunks = novelSpeechChunks(novelSpeechContent(text.orEmpty()), ratio,
                     TextToSpeech.getMaxSpeechInputLength())
                 if (chunks.isEmpty()) { fail(R.string.novel_speech_unavailable); return@launch }
                 if (state.value.status != NovelSpeechStatus.PAUSED) speakNext()
@@ -295,6 +324,7 @@ internal class NovelSpeechController @Inject constructor(
 
     private fun speakNext() {
         if (!serviceStarted || !isActive) return
+        if (!requireArchiveSession()) return
         val text = chunks.getOrNull(cursor.chunk)
         if (text == null) {
             val next = cursor.chapter + 1
@@ -323,6 +353,7 @@ internal class NovelSpeechController @Inject constructor(
         if (spokenOffset in 1 until text.length && text[spokenOffset].isLowSurrogate() &&
             text[spokenOffset - 1].isHighSurrogate()) spokenOffset--
         publish(NovelSpeechStatus.PLAYING)
+        if (!isActive || !requireArchiveSession()) return
         val result = runCatching {
             engine?.speak(text.substring(spokenOffset), TextToSpeech.QUEUE_FLUSH, null, cursor.utteranceId)
         }.getOrNull()
@@ -331,8 +362,20 @@ internal class NovelSpeechController @Inject constructor(
 
     private fun publish(status: NovelSpeechStatus, error: Int? = null) {
         val value = request
-        mutableState.value = NovelSpeechState(status, value?.manga?.id, value?.manga?.title.orEmpty(),
-            value?.chapters?.getOrNull(cursor.chapter)?.title.orEmpty(), error)
+        val generation = cursor.generation
+        val protectedRequest = protectedFile != null
+        val protectedSpeech = protectedRequest &&
+            (status == NovelSpeechStatus.PLAYING || status == NovelSpeechStatus.LOADING)
+        if (protectedRequest && !requireArchiveSession()) return
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.onSpeechChanged(
+            protectedSpeech,
+        )
+        // Changing speech activity can discover that the previous background timer already expired.
+        if (generation != cursor.generation || request !== value) return
+        if (protectedRequest && !requireArchiveSession()) return
+        mutableState.value = NovelSpeechState(status, value?.manga?.id,
+            if (protectedFile != null) protectedFile!!.nameWithoutExtension else value?.manga?.title.orEmpty(),
+            if (protectedFile != null) "" else value?.chapters?.getOrNull(cursor.chapter)?.title.orEmpty(), error)
     }
 
     private fun releaseFocus() {
@@ -348,6 +391,14 @@ internal class NovelSpeechController @Inject constructor(
         mutableState.value = failed.copy(status = NovelSpeechStatus.STOPPED, error = message)
     }
 
+    private fun requireArchiveSession(): Boolean = try {
+        archiveSession.requireActive()
+        true
+    } catch (_: Exception) {
+        stop()
+        false
+    }
+
     fun stop() {
         cursor.invalidate()
         pending = null
@@ -361,6 +412,9 @@ internal class NovelSpeechController @Inject constructor(
         runCatching { engine?.stop() }
         releaseFocus()
         request = null
+        protectedFile = null
+        archiveSession.clear()
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.onSpeechChanged(false)
         serviceStarted = false
         mutableState.value = NovelSpeechState()
     }

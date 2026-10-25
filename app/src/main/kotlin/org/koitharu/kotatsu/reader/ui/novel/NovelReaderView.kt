@@ -44,6 +44,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koitharu.kotatsu.core.util.ext.resolveSp
@@ -1654,6 +1655,18 @@ class NovelReaderView @JvmOverloads constructor(
 	fun clearImageCache() {
 		imageCache.evictAll()
 	}
+
+    /** Called after lifecycle position saves, never from a page-turn callback. */
+    fun clearSessionContent() {
+        scope.coroutineContext.cancelChildren()
+        onPageChangeListener = null
+        onChapterChangeRequestListener = null
+        pageSwipeAnimator?.cancel()
+        resetFoldBitmaps()
+        clearChapterBoundaryPreviews()
+        clearImageCache()
+        setContent("", suppressNotification = true)
+    }
 
 	override fun onDetachedFromWindow() {
 		super.onDetachedFromWindow()

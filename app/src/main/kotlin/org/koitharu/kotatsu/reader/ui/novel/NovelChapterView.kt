@@ -489,6 +489,18 @@ class NovelChapterView @JvmOverloads constructor(
 		scope.coroutineContext.cancelChildren()
 		loadingImages.clear()
 	}
+
+    fun clearSessionContent() {
+        scope.coroutineContext.cancelChildren()
+        chapterContent = ""
+        displayLayout = null
+        imageSpans = emptyList()
+        highlightRange = null
+        imageCache.evictAll()
+        loadingImages.clear()
+        failedImages.clear()
+        invalidate()
+    }
 }
 
 data class ChapterImageSpan(

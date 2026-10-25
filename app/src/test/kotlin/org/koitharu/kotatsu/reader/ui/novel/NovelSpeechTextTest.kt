@@ -4,6 +4,29 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NovelSpeechTextTest {
+    @Test fun narrationOmitsGeneratedImageMarkersAndProtectedPackagePaths() {
+        val text = "First paragraph\n📷 [图片: file+zip:///private/book.epub#OPS/secret.png]\nLast paragraph"
+        val narration = novelSpeechContent(text)
+        assertTrue(narration.contains("First paragraph"))
+        assertTrue(narration.contains("Last paragraph"))
+        assertFalse(narration.contains("IMAGE_PLACEHOLDER"))
+        assertFalse(narration.contains("secret.png"))
+        assertFalse(narration.contains("file+zip:"))
+    }
+
+    @Test fun inlineIllustrationsDoNotBecomeSpokenImplementationTokens() {
+        val narration = novelSpeechContent("<p>Before <img src=\"local-illustration.png\"/> after.</p>")
+        assertTrue(narration.contains("Before"))
+        assertTrue(narration.contains("after."))
+        assertFalse(narration.contains("INLINE_IMAGE"))
+        assertFalse(narration.contains("local-illustration.png"))
+    }
+
+    @Test fun ordinaryBracketedProseAndNonGeneratedMarkerLookalikesRemain() {
+        val text = "[Illustration] A [quiet] night. [IMAGE_PLACEHOLDER_x] [INLINE_IMAGE_name]"
+        assertEquals(text, novelSpeechContent(text))
+    }
+
     @Test fun longCjkAndEmojiTextIsSplitLosslesslyWithinEngineLimits() {
         val text = "这是一个段落😀".repeat(200)
         val chunks = novelSpeechChunks(text, 0f, 37)
