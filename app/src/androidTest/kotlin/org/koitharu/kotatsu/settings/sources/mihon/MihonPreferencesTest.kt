@@ -33,13 +33,20 @@ class MihonPreferencesTest {
             instrumentation.runOnMainSync {
                 val context = ContextThemeWrapper(app, R.style.Theme_Kotatsu)
                 val source = Fixture(preferences)
+                val store = SourcePreferenceDataStore(source.getSourcePreferences())
+                assertEquals(emptySet<String>(), store.getStringSet("languages", null))
+                assertEquals(setOf("en"), store.getStringSet("missing_default", setOf("en")))
+                assertFalse(preferences.contains("languages"))
+                assertFalse(preferences.contains("missing_default"))
                 val manager = PreferenceManager(context).apply {
                     sharedPreferencesName = source.preferenceKey()
-                    preferenceDataStore = SourcePreferenceDataStore(source.getSourcePreferences())
+                    preferenceDataStore = store
                 }
                 val screen = manager.createPreferenceScreen(context)
                 manager.setPreferences(screen)
                 source.setupPreferenceScreen(screen)
+                assertEquals(emptySet<String>(), screen.findPreference<MultiSelectListPreference>("languages")!!.values)
+                assertFalse("Opening an absent empty selection must not persist a new value", preferences.contains("languages"))
                 assertEquals("existing", screen.findPreference<EditTextPreference>("text")!!.text)
                 assertTrue(screen.findPreference<CheckBoxPreference>("enabled")!!.isChecked)
                 val text = screen.findPreference<EditTextPreference>("text")!!

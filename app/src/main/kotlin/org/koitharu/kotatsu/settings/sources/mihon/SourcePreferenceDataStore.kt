@@ -15,8 +15,9 @@ internal class SourcePreferenceDataStore(private val preferences: SharedPreferen
     override fun putFloat(key: String, value: Float) { preferences.edit { putFloat(key, value) } }
     override fun putBoolean(key: String, value: Boolean) { preferences.edit { putBoolean(key, value) } }
     override fun getString(key: String, defValue: String?): String? = preferences.getString(key, defValue)
-    override fun getStringSet(key: String, defValues: Set<String>?): Set<String>? =
-        preferences.getStringSet(key, defValues)?.toSet()
+    // AndroidX MultiSelectListPreference cannot initialize from null when the source omits a default.
+    override fun getStringSet(key: String, defValues: Set<String>?): Set<String> =
+        preferences.getStringSet(key, defValues.orEmpty()).orEmpty().toSet()
     override fun getInt(key: String, defValue: Int): Int = preferences.getInt(key, defValue)
     override fun getLong(key: String, defValue: Long): Long = preferences.getLong(key, defValue)
     override fun getFloat(key: String, defValue: Float): Float = preferences.getFloat(key, defValue)

@@ -4,9 +4,6 @@ import android.app.Application
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import eu.kanade.tachiyomi.network.NetworkHelper
-import kotlinx.serialization.SerialFormat
-import kotlinx.serialization.StringFormat
-import kotlinx.serialization.json.Json
 import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import org.koitharu.kotatsu.core.network.MangaHttpClient
@@ -37,10 +34,6 @@ class MihonInjektBridge @Inject constructor(
 		}
 		val application = context.applicationContext as Application
 		val applicationContext = context.applicationContext
-		val json = Json {
-			ignoreUnknownKeys = true
-			explicitNulls = false
-		}
 		val extensionClient = httpClient.newBuilder()
 			// Cloudflare handling inside the hosted extension source is android-managed solely by the
 			// dedicated Mihon-side interceptor installed right after `Kagane`-style WebView bridge-
@@ -70,9 +63,7 @@ class MihonInjektBridge @Inject constructor(
 				addSingleton(typeReference(NetworkHelper::class.java), networkHelper)
 				addSingleton(typeReference(OkHttpClient::class.java), networkHelper.client)
 				addSingleton(typeReference(CookieJar::class.java), cookieJar)
-				addSingleton(typeReference(Json::class.java), json)
-				addSingleton(typeReference(StringFormat::class.java), json)
-				addSingleton(typeReference(SerialFormat::class.java), json)
+				registerMihonSerialization()
 			}
 		})
 		initialized = true
