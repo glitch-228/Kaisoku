@@ -177,8 +177,8 @@ android {
 		applicationId 'io.github.glitch228.kaisoku'
 		minSdk = 26
 		targetSdk = 36
-		versionCode = 2085
-		versionName = '9.8.7-beta4'
+		versionCode = 2086
+		versionName = '9.8.7-beta5'
 		generatedDensities = []
 		testInstrumentationRunner 'org.koitharu.kotatsu.HiltTestRunner'
 		ksp {
@@ -340,6 +340,7 @@ dependencies {
 	implementation libs.kotlinx.serialization.json.okio
 	implementation libs.kotlinx.serialization.protobuf
 	implementation libs.junrar
+	implementation libs.zip4j
 	implementation libs.slf4j.nop
 	implementation "io.reactivex:rxjava:1.3.8"
 	implementation "uy.kohesive.injekt:injekt-core:1.16.1"

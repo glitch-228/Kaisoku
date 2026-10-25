@@ -1,0 +1,9 @@
+- Add source prompt muting
+- Add exact chapter completion and reviewed progress imports
+- Add Beta tracker metadata and bulk workflows
+- Add optional extended synchronization
+- Add EPUB and encrypted archive support
+- Clear protected previews on archive lock
+- Add WebDAV backups and OPDS/Komga libraries
+- Fix extension catalog initialization and protected credentials
+- Repair sources and reader compatibility
