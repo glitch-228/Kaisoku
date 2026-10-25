@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_library_title">Remote libraries · Beta</string>
+    <string name="remote_library_add">Add OPDS / Komga</string>
+    <string name="remote_library_intro">Connect a personal library over HTTPS. Browse, stream supported comics or acquire EPUB/CBZ for offline reading. Server reading progress is not synchronized.</string>
+    <string name="remote_library_name">Connection name</string>
+    <string name="remote_library_url">Catalog URL / Komga base URL</string>
+    <string name="remote_library_scope">Credential boundary URL (directory)</string>
+    <string name="remote_library_username">Username (optional)</string>
+    <string name="remote_library_password">Password</string>
+    <string name="remote_library_password_keep">Password (leave empty to keep)</string>
+    <string name="remote_library_save">Save connection</string>
+    <string name="remote_library_enabled">Enable this connection</string>
+    <string name="remote_library_scope_help">Credentials go only to this HTTPS origin and directory. Use a separate connection for another server or account. Unknown content follows mixed-content restrictions.</string>
+    <string name="remote_library_unknown">Unknown content</string>
+    <string name="remote_library_safe">Safe content</string>
+    <string name="remote_library_mixed">Mixed content</string>
+    <string name="remote_library_adult">Adult content</string>
+    <string name="remote_library_cached">Showing saved catalog</string>
+    <string name="remote_library_warning">Some information could not be refreshed. Tap for details.</string>
+    <string name="remote_library_search">Search this catalog</string>
+    <string name="remote_library_next">Next page</string>
+    <string name="remote_library_read">Read image stream</string>
+    <string name="remote_library_acquire">Acquire %1$s for offline reading</string>
+    <string name="remote_library_open_local">Open acquired copy</string>
+    <string name="remote_library_details">Refresh this publication</string>
+    <string name="remote_library_unsupported">This publication has no supported image stream or direct EPUB/CBZ acquisition. DRM, PDF, audio and scripted web readers are not supported here.</string>
+    <string name="remote_library_anonymous_title">Acquire from another origin?</string>
+    <string name="remote_library_anonymous_message">This book is hosted outside your credential boundary: %1$s. Continue anonymously? Your library credentials will not be sent.</string>
+    <string name="remote_library_downloading">Acquiring book…</string>
+    <string name="remote_library_progress">Acquired %1$d KiB</string>
+    <string name="remote_library_acquired">Book acquired into local storage</string>
+    <string name="remote_library_error">Library error</string>
+    <string name="remote_library_copy_error">Copy full error</string>
+    <string name="remote_library_refresh">Refresh catalog</string>
+    <string name="remote_library_edit">Edit connection</string>
+    <string name="remote_library_empty">This catalog page is empty or its publications are hidden by content restrictions.</string>
+    <string name="remote_library_stop">Stop</string>
+    <string name="remote_library_server_identity">Changing server or account requires a new connection. Renaming keeps saved titles and progress.</string>
+    <string name="remote_library_cleartext">Allow unencrypted HTTP to a private / loopback IP address</string>
+    <string name="remote_library_cleartext_warning">HTTP exposes your account and book traffic to the local network. This permission is limited to literal private or loopback IP addresses; public HTTP and invalid TLS certificates remain blocked.</string>
+</resources>

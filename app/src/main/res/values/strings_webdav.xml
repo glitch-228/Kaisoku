@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="webdav_title">WebDAV backups · Beta</string>
+    <string name="webdav_information">Upload and restore native backups on your WebDAV server. Connections and credentials stay on this device. Scheduled uploads and retention are off initially. Your server must support PUT, MOVE and PROPFIND; external redirects are not followed.</string>
+    <string name="webdav_configure">Configure connection</string>
+    <string name="webdav_not_configured">No connection configured</string>
+    <string name="webdav_list">Test connection and list backups</string>
+    <string name="webdav_upload">Upload native backup</string>
+    <string name="webdav_upload_confirmation">Upload your native backup, including library, reading state, settings and saved covers, to this connection? Source content and connection passwords are not included.</string>
+    <string name="webdav_schedule">Scheduled uploads</string>
+    <string name="webdav_off">Off</string>
+    <string name="webdav_daily">Daily</string>
+    <string name="webdav_weekly">Weekly</string>
+    <string name="webdav_wifi_only">Unmetered network for scheduled uploads</string>
+    <string name="webdav_wifi_summary">Manual list, upload and restore actions use the current connection.</string>
+    <string name="webdav_retention">Remove older backups uploaded by this device</string>
+    <string name="webdav_keep">Keep the latest %1$d verified backups</string>
+    <string name="webdav_retention_confirmation">After a successful upload, remove only this connection’s older backups whose saved ownership and server version still match. Other devices’ files and modified backups are kept. Servers without strong ETags keep all backups.</string>
+    <string name="webdav_enable">Enable</string>
+    <string name="webdav_disconnect">Disconnect</string>
+    <string name="webdav_disconnect_confirmation">Remove the saved connection and stop its scheduled uploads? Remote backups are kept.</string>
+    <string name="webdav_available_backups">Available native backups</string>
+    <string name="webdav_no_backups">No native backups found in this collection</string>
+    <string name="webdav_working">Working…</string>
+    <string name="webdav_idle">Ready</string>
+    <string name="webdav_cancelled">Cancelled</string>
+    <string name="webdav_uploaded">Backup uploaded and verified</string>
+    <string name="webdav_list_ready">Backup list updated</string>
+    <string name="webdav_restore_choose">Choose backup sections</string>
+    <string name="webdav_restore_confirmation">Download %1$s? You can choose sections and merge behavior in the native restore dialog before restoring anything.</string>
+    <string name="webdav_download">Download</string>
+    <string name="webdav_name">Connection name</string>
+    <string name="webdav_default_name">My WebDAV server</string>
+    <string name="webdav_endpoint">Collection URL (https://…/backups/)</string>
+    <string name="webdav_username">Username</string>
+    <string name="webdav_password">Password or app password</string>
+    <string name="webdav_password_keep">New password (empty keeps the saved password)</string>
+    <string name="webdav_clear_password">Clear the saved password</string>
+    <string name="webdav_allow_lan">Allow unencrypted HTTP for this LAN address</string>
+    <string name="webdav_save">Save</string>
+    <string name="webdav_invalid_endpoint">Check the WebDAV collection URL</string>
+</resources>
