@@ -11,16 +11,17 @@ data class ReadingProgress(
 	val percent: Float,
 	val totalChapters: Int,
 	val mode: ProgressIndicatorMode,
+	val exactReadChapters: Int? = null,
 ) {
 
 	val percentLeft: Float
 		get() = 1f - percent
 
 	val chapters: Int
-		get() = (totalChapters * percent).toInt()
+		get() = exactReadChapters?.coerceIn(0, totalChapters.coerceAtLeast(0)) ?: (totalChapters * percent).toInt()
 
 	val chaptersLeft: Int
-		get() = (totalChapters * percentLeft).toInt()
+		get() = exactReadChapters?.let { (totalChapters - it).coerceAtLeast(0) } ?: (totalChapters * percentLeft).toInt()
 
 	fun isValid() = when (mode) {
 		NONE -> false

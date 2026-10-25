@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="exact_completion">Точный учёт прочитанных глав · Бета</string>
+    <string name="exact_completion_preview">В этом списке %1$d глав. Сначала все главы будут непрочитанными, а текущая позиция сохранится. Переход к следующей главе не отметит предыдущие прочитанными.\n\nМожно отдельно отметить %2$d предыдущих глав. Проверьте это предложение перед включением.</string>
+    <string name="exact_completion_active">Прочитано %1$d из %2$d глав этой ветки. Отключение вернёт прежнее отображение и сохранит точные отметки. Текущая позиция сохранится.</string>
+    <string name="exact_completion_legacy_proposal">Отметить предложенные предыдущие главы</string>
+    <string name="exact_completion_unavailable">Сначала откройте сохранённый список глав.</string>
+    <string name="exact_mark_read">Отметить выбранные главы прочитанными</string>
+    <string name="exact_mark_unread">Отметить выбранные главы непрочитанными</string>
+</resources>

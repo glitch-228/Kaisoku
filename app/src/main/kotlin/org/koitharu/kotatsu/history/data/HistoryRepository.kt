@@ -5,6 +5,7 @@ import dagger.Reusable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.db.entity.toEntity
 import org.koitharu.kotatsu.core.db.entity.toManga
@@ -48,6 +49,8 @@ class HistoryRepository @Inject constructor(
     private val localObserver: HistoryLocalObserver,
     private val newChaptersUseCaseProvider: Provider<CheckNewChaptersUseCase>,
     private val recommendationStore: org.koitharu.kotatsu.suggestions.local.RecommendationStore,
+    val chapterReads: org.koitharu.kotatsu.history.exact.ChapterReadRepository,
+    private val libraryContent: org.koitharu.kotatsu.remote.library.LibraryListContentPolicies,
 ) {
 
     suspend fun getList(offset: Int, limit: Int): List<Manga> {
@@ -96,15 +99,10 @@ class HistoryRepository @Inject constructor(
         order: ListSortOrder,
         filterOptions: Set<ListFilterOption>,
         limit: Int
-    ): Flow<List<MangaWithHistory>> {
-        if (ListFilterOption.Downloaded in filterOptions) {
-            return localObserver.observeAll(order, filterOptions, limit)
-        }
-        return db.getHistoryDao().observeAll(order, filterOptions, limit).mapItems {
-            MangaWithHistory(
-                it.toManga(),
-                it.history.toMangaHistory(),
-            )
+    ): Flow<List<MangaWithHistory>> = libraryContent.observe().flatMapLatest { policy ->
+        if (ListFilterOption.Downloaded in filterOptions) localObserver.observeAll(order, filterOptions, limit, policy)
+        else db.getHistoryDao().observeAll(order, filterOptions, limit, policy).mapItems {
+            MangaWithHistory(it.toManga(), it.history.toMangaHistory())
         }
     }
 
@@ -135,6 +133,7 @@ class HistoryRepository @Inject constructor(
                     deletedAt = 0L,
                 ),
             )
+            if (chapterCompleted) chapterReads.confirmed(manga, chapterId)
         }
         newChaptersUseCaseProvider.get()(manga, chapterId)
         if (force) recommendationStore.manualProgress(manga)
@@ -157,6 +156,7 @@ class HistoryRepository @Inject constructor(
         if (updated == 0) {
             addOrUpdate(manga, chapterId, page, scroll, percent, force = false, chapterCompleted = chapterCompleted)
         } else if (chapterCompleted) {
+            chapterReads.confirmed(manga, chapterId)
             trackerSync.onChapterCompleted(manga, chapterId)
         }
     }
@@ -182,6 +182,12 @@ class HistoryRepository @Inject constructor(
     }
 
     suspend fun getProgress(mangaId: Long, mode: ProgressIndicatorMode): ReadingProgress? {
+        val exact = chapterReads.activeCounts(listOf(mangaId))
+        if (mangaId in exact) {
+            val count = exact[mangaId]
+            return ReadingProgress(count?.percent ?: 0f, count?.totalCount ?: 0, mode, count?.readCount ?: 0)
+                .takeIf { it.isValid() }
+        }
         val entity = db.getHistoryDao().find(mangaId) ?: return null
         val fixedPercent = if (ReadingProgress.isCompleted(entity.percent)) 1f else entity.percent
         return ReadingProgress(
@@ -196,8 +202,10 @@ class HistoryRepository @Inject constructor(
             return emptyMap()
         }
         val entities = db.getHistoryDao().findAllByIds(mangaIds.toLongArray())
+        val exact = chapterReads.activeCounts(mangaIds)
         val result = HashMap<Long, ReadingProgress>(entities.size)
         for (entity in entities) {
+            if (entity.mangaId in exact) continue
             val fixedPercent = if (ReadingProgress.isCompleted(entity.percent)) 1f else entity.percent
             val progress = ReadingProgress(
                 percent = fixedPercent,
@@ -206,30 +214,45 @@ class HistoryRepository @Inject constructor(
             ).takeIf { it.isValid() } ?: continue
             result[entity.mangaId] = progress
         }
+        for ((mangaId, count) in exact) {
+            val progress = ReadingProgress(count?.percent ?: 0f, count?.totalCount ?: 0, mode, count?.readCount ?: 0)
+                .takeIf { it.isValid() } ?: continue
+            result[mangaId] = progress
+        }
         return result
     }
 
     suspend fun clear() {
-        db.getHistoryDao().clear()
+        db.withTransaction {
+            chapterReads.reset(db.getChapterReadDao().allPolicies().map { it.mangaId })
+            db.getHistoryDao().clear()
+        }
     }
 
     suspend fun delete(manga: Manga) = db.withTransaction {
+        chapterReads.reset(listOf(manga.id))
         db.getHistoryDao().delete(manga.id)
         mangaRepository.gcChaptersCache()
     }
 
     suspend fun deleteAfter(minDate: Long) = db.withTransaction {
+        val ids = db.getHistoryDao().idsAfter(minDate)
+        chapterReads.reset(ids)
         db.getHistoryDao().deleteAfter(minDate)
         mangaRepository.gcChaptersCache()
     }
 
     suspend fun deleteNotFavorite() = db.withTransaction {
+        val ids = db.getHistoryDao().idsNotFavorite()
+        chapterReads.reset(ids)
         db.getHistoryDao().deleteNotFavorite()
         mangaRepository.gcChaptersCache()
     }
 
     suspend fun delete(ids: Collection<Long>): ReversibleHandle {
+        var exactBefore: Map<Long, org.koitharu.kotatsu.history.exact.ChapterReadSnapshot> = emptyMap()
         db.withTransaction {
+            exactBefore = chapterReads.reset(ids)
             for (id in ids) {
                 db.getHistoryDao().delete(id)
             }
@@ -237,6 +260,7 @@ class HistoryRepository @Inject constructor(
         }
         return ReversibleHandle {
             recover(ids)
+            chapterReads.restoreResetUndo(exactBefore)
         }
     }
 

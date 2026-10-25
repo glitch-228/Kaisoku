@@ -80,7 +80,7 @@ import org.koitharu.kotatsu.tracker.data.TrackEntity
 import org.koitharu.kotatsu.tracker.data.TrackLogEntity
 import org.koitharu.kotatsu.tracker.data.TracksDao
 
-const val DATABASE_VERSION = 33
+const val DATABASE_VERSION = 38
 
 @Database(
     entities = [
@@ -89,10 +89,27 @@ const val DATABASE_VERSION = 33
         TrackLogEntity::class, SuggestionEntity::class, BookmarkEntity::class, ScrobblingEntity::class,
         MangaSourceEntity::class, StatsEntity::class, LocalMangaIndexEntity::class, LnReaderSourceEntity::class,
         FavoriteOrderEntity::class,
+        org.koitharu.kotatsu.history.exact.ChapterReadPolicyEntity::class,
+        org.koitharu.kotatsu.history.exact.ChapterReadRecordEntity::class,
+        org.koitharu.kotatsu.history.exact.ChapterReadAliasEntity::class,
+        org.koitharu.kotatsu.history.exact.ChapterReadClockEntity::class,
+        org.koitharu.kotatsu.history.exact.ChapterReadCountEntity::class,
+        org.koitharu.kotatsu.scrobbling.v2.TrackerLinkV2Entity::class,
+        org.koitharu.kotatsu.backups.mihon.PendingTrackerImportEntity::class,
+        org.koitharu.kotatsu.backups.mihon.ForeignImportReceiptEntity::class,
+        org.koitharu.kotatsu.sync.extended.MetadataOverrideState::class,
     ],
     version = DATABASE_VERSION,
 )
 abstract class MangaDatabase : RoomDatabase() {
+
+    abstract fun getMetadataOverrideDao(): org.koitharu.kotatsu.sync.extended.MetadataOverrideDao
+
+    abstract fun getMihonImportDao(): org.koitharu.kotatsu.backups.mihon.MihonImportDao
+
+    abstract fun getTrackerLinkV2Dao(): org.koitharu.kotatsu.scrobbling.v2.TrackerLinkV2Dao
+
+    abstract fun getChapterReadDao(): org.koitharu.kotatsu.history.exact.ChapterReadDao
 
     abstract fun getHistoryDao(): HistoryDao
 
@@ -163,6 +180,11 @@ fun getDatabaseMigrations(context: Context): Array<Migration> = arrayOf(
     Migration30To31(),
     Migration31To32(context),
     Migration32To33(),
+    org.koitharu.kotatsu.core.db.migrations.Migration33To34(),
+    org.koitharu.kotatsu.core.db.migrations.Migration34To35(),
+    org.koitharu.kotatsu.core.db.migrations.Migration35To36(),
+    org.koitharu.kotatsu.core.db.migrations.Migration36To37(),
+    org.koitharu.kotatsu.core.db.migrations.Migration37To38(),
 )
 
 fun MangaDatabase(context: Context): MangaDatabase = Room

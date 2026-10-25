@@ -11,8 +11,9 @@ import org.koitharu.kotatsu.community.data.CommunityRepository
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface BackupAgentEntryPoint {
-	val mihonExtensionManager: MihonExtensionManager
-	val nsfwOverridesLoader: NsfwOverridesLoader
-	val lnReaderSourceManager: LnReaderSourceManager
-	val communityRepository: CommunityRepository
+    val remoteLibraries: org.koitharu.kotatsu.remote.library.RemoteLibraryManager
+    val mihonExtensionManager: MihonExtensionManager
+    val nsfwOverridesLoader: NsfwOverridesLoader
+    val lnReaderSourceManager: LnReaderSourceManager
+    val communityRepository: CommunityRepository
 }

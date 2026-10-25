@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mihon_review_title">Проверка импорта Mihon · Бета</string>
+    <string name="mihon_review_pending_state">Импортированные данные трекеров · Бета</string>
+    <string name="mihon_review_preparing">Подготовка нового предпросмотра…</string>
+    <string name="mihon_review_refresh">Обновить предпросмотр</string>
+    <string name="mihon_review_retry">Предпросмотр недоступен. Обновите его, чтобы повторить попытку.</string>
+    <string name="mihon_review_titles">Выбрать произведения</string>
+    <string name="mihon_review_chapters">Проверить издания и отметки глав</string>
+    <string name="mihon_review_exact">Импортировать точные отметки прочтения</string>
+    <string name="mihon_review_resume">Заменить текущие позиции чтения</string>
+    <string name="mihon_review_sources">Проверить соответствие источников</string>
+    <string name="mihon_review_summary">Выбрано: %1$d из %2$d\nТочные отметки: %3$d\nПозиций для замены: %4$d\nНедоступных источников: %5$d</string>
+    <string name="mihon_review_explanation">Текущие позиции, метаданные, даты избранного, закрепления и порядок по умолчанию сохраняются. Замена существующих точных отметок требует явного выбора. Новые произведения могут получить позицию из копии. Записи трекеров ожидают проверки аккаунта; запросов на запись к трекерам нет. Повторный импорт принятой копии ничего не меняет.</string>
+    <string name="mihon_review_confirm">Импортировать %1$d произведений, применить точные отметки к %2$d и заменить %3$d текущих позиций? Изменятся только локальные записи.</string>
+    <string name="mihon_review_anchor">Позиция из копии: %1$s, страница %2$d</string>
+    <string name="mihon_review_no_anchor">Сохранённой позиции нет</string>
+    <string name="mihon_review_chapter_flags">Показать отметки глав</string>
+    <string name="mihon_review_read">Прочитано · %1$s</string>
+    <string name="mihon_review_unread">Не прочитано · %1$s</string>
+    <string name="mihon_review_missing_sources">Произведения сохранят метаданные и исходный идентификатор недоступного источника. Установите подходящее расширение и проверьте соответствие перед чтением онлайн.</string>
+    <string name="mihon_review_row">%1$s · прочитано %2$d / не прочитано %3$d</string>
+    <string name="mihon_review_accepted">Уже импортировано</string>
+    <string name="mihon_review_imported">Импортировано %1$d произведений и %2$d сохранённых глав; %3$d записей трекеров ожидают проверки; %4$d источников недоступны</string>
+</resources>

@@ -11,28 +11,31 @@ import org.koitharu.kotatsu.list.domain.ListSortOrder
 import org.koitharu.kotatsu.local.data.index.LocalMangaIndex
 import org.koitharu.kotatsu.local.domain.LocalObserveMapper
 import org.koitharu.kotatsu.parsers.model.Manga
+import org.koitharu.kotatsu.remote.library.LibraryListContentPolicy
 import javax.inject.Inject
 
 @Reusable
 class LocalFavoritesObserver @Inject constructor(
-	localMangaIndex: LocalMangaIndex,
-	private val db: MangaDatabase,
+    localMangaIndex: LocalMangaIndex,
+    private val db: MangaDatabase,
 ) : LocalObserveMapper<FavouriteManga, Manga>(localMangaIndex) {
 
-	fun observeAll(
-		order: ListSortOrder,
-		filterOptions: Set<ListFilterOption>,
-		limit: Int
-	): Flow<List<Manga>> = db.getFavouritesDao().observeAll(order, filterOptions, limit).mapToLocal()
+    fun observeAll(
+        order: ListSortOrder,
+        filterOptions: Set<ListFilterOption>,
+        limit: Int,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(),
+    ): Flow<List<Manga>> = db.getFavouritesDao().observeAll(order, filterOptions, limit, contentPolicy).mapToLocal()
 
-	fun observeAll(
-		categoryId: Long,
-		order: ListSortOrder,
-		filterOptions: Set<ListFilterOption>,
-		limit: Int
-	): Flow<List<Manga>> = db.getFavouritesDao().observeAll(categoryId, order, filterOptions, limit).mapToLocal()
+    fun observeAll(
+        categoryId: Long,
+        order: ListSortOrder,
+        filterOptions: Set<ListFilterOption>,
+        limit: Int,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(),
+    ): Flow<List<Manga>> = db.getFavouritesDao().observeAll(categoryId, order, filterOptions, limit, contentPolicy).mapToLocal()
 
-	override fun toManga(e: FavouriteManga) = e.manga.toManga(e.tags.toMangaTags(), null)
+    override fun toManga(e: FavouriteManga) = e.manga.toManga(e.tags.toMangaTags(), null)
 
-	override fun toResult(e: FavouriteManga, manga: Manga) = manga
+    override fun toResult(e: FavouriteManga, manga: Manga) = manga
 }

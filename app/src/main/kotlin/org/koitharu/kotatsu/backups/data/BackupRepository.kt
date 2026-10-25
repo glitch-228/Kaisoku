@@ -21,6 +21,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeToSequence
 import kotlinx.serialization.json.encodeToStream
 import kotlinx.serialization.serializer
+import kotlinx.serialization.decodeFromString
 import org.json.JSONArray
 import org.json.JSONObject
 import org.koitharu.kotatsu.backups.data.model.BackupIndex
@@ -37,6 +38,7 @@ import org.koitharu.kotatsu.backups.data.model.StatisticBackup
 import org.koitharu.kotatsu.backups.data.model.TrackBackup
 import org.koitharu.kotatsu.backups.domain.BackupSection
 import org.koitharu.kotatsu.core.db.MangaDatabase
+import org.koitharu.kotatsu.core.db.entity.toManga
 import org.koitharu.kotatsu.core.db.migrations.MangaIdentityMerge
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.MetadataRefreshSettings
@@ -67,7 +69,16 @@ class BackupRepository @Inject constructor(
     private val mangaSourcesRepository: MangaSourcesRepository,
     private val savedFiltersRepository: SavedFiltersRepository,
     private val metadataRefreshSettings: MetadataRefreshSettings = MetadataRefreshSettings(context),
+    private val remoteLibraries: org.koitharu.kotatsu.remote.library.RemoteLibraryPersistence =
+        org.koitharu.kotatsu.remote.library.RemoteLibraryPersistence(context),
+    private val trackerCategories: org.koitharu.kotatsu.scrobbling.v2.categories.CategoryStatusStore =
+        org.koitharu.kotatsu.scrobbling.v2.categories.CategoryStatusStore(context),
 ) {
+
+    private val chapterReads = org.koitharu.kotatsu.history.exact.ChapterReadRepository(database)
+    private val trackerLinks = org.koitharu.kotatsu.scrobbling.v2.TrackerLinkRepository(database)
+    private val metadataOverrides = org.koitharu.kotatsu.sync.extended.MetadataOverrideTransfer(context, database)
+    private val metadataJournal = org.koitharu.kotatsu.sync.extended.MetadataOverrideJournal(database)
 
     private val json = Json {
         allowSpecialFloatingPointValues = true
@@ -176,7 +187,13 @@ class BackupRepository @Inject constructor(
                     section = BackupSection.MANGA_PREFERENCES,
                     data = database.getPreferencesDao().dump().asFlow().map { prefs ->
                         val manga = checkNotNull(database.getMangaDao().find(prefs.mangaId))
-                        if (includeCustomCovers) backupCustomCover(MangaPreferencesBackup(manga, prefs))
+                        if (!org.koitharu.kotatsu.core.archive.ArchivePrivacy.canPersistMetadata(manga.toManga(null))) {
+                            val reference = org.koitharu.kotatsu.core.archive.ArchivePrivacy.publicReference(manga.toManga(null))
+                            val publicManga = manga.copy(manga = manga.manga.copy(title = reference.title,
+                                altTitles = null, authors = null, coverUrl = "", largeCoverUrl = null), tags = emptyList())
+                            MangaPreferencesBackup(publicManga, prefs.copy(titleOverride = null, coverUrlOverride = null,
+                                descriptionOverride = null, contentRatingOverride = null))
+                        } else if (includeCustomCovers) backupCustomCover(MangaPreferencesBackup(manga, prefs))
                         else MangaPreferencesBackup(manga, prefs).withoutCustomCover()
                     },
                     serializer = serializer(),
@@ -189,6 +206,25 @@ class BackupRepository @Inject constructor(
                     },
                     serializer = serializer(),
                 )
+
+                BackupSection.EXACT_COMPLETION -> output.writeJsonArray(
+                    section = section,
+                    data = flowOf(chapterReads.export()),
+                    serializer = serializer(),
+                )
+
+                BackupSection.FOREIGN_IMPORT_STATE -> output.writeJsonArray(
+                    section = section,
+                    data = flowOf(org.koitharu.kotatsu.backups.mihon.ForeignImportTransfer(database).export()),
+                    serializer = serializer(),
+                )
+
+                BackupSection.REMOTE_LIBRARIES -> output.writeString(section, remoteLibraries.exportTransfer())
+                BackupSection.TRACKER_LINKS -> output.writeString(section,
+                    org.koitharu.kotatsu.scrobbling.v2.TrackerLinkTransfer.encode(trackerLinks.export()))
+                BackupSection.TRACKER_CATEGORIES -> output.writeString(section, trackerCategories.exportTransfer())
+                BackupSection.METADATA_OVERRIDES -> output.writeString(section,
+                    metadataOverrides.export(includeCovers = includeCustomCovers).toString(Charsets.UTF_8))
             }
             commonProgress++
             progress?.emit(commonProgress)
@@ -208,6 +244,12 @@ class BackupRepository @Inject constructor(
         progress?.emit(Progress.INDETERMINATE)
         var commonProgress = Progress(0, sections.size)
         val categoryIdRemap = mutableMapOf<Long, Long>()
+        val categoryCreationWitnesses = mutableMapOf<Long, Long>()
+        var pendingTrackerCategories: String? = null
+        val pendingPreferenceMetadata = linkedMapOf<Long, MangaPreferencesBackup>()
+        var preferenceMetadataBytes = 0L
+        var metadataSectionCount = 0
+        var pendingMetadata: ByteArray? = null
         var entry = input.nextEntry
         var result = CompositeResult.EMPTY
         while (entry != null) {
@@ -226,6 +268,7 @@ class BackupRepository @Inject constructor(
 
                     BackupSection.CATEGORIES -> input.readJsonArray<CategoryBackup>(serializer()).restoreToDb {
                         restoreCategory(it, isMerge && !authoritativeRecords, categoryIdRemap)
+                        categoryCreationWitnesses[it.categoryId.toLong()] = it.createdAt
                     }
 
                     BackupSection.FAVOURITES -> input.readJsonArray<FavouriteBackup>(serializer()).restoreToDb {
@@ -286,12 +329,69 @@ class BackupRepository @Inject constructor(
                     BackupSection.MANGA_PREFERENCES -> input.readJsonArray<MangaPreferencesBackup>(serializer())
                         .restoreToDb {
                             upsertManga(it.manga)
-                            getPreferencesDao().upsert(it.toEntity(restoreCustomCover(it)))
+                            require(it.metadataVersion in 0..1) { "Unsupported metadata override version" }
+                            require(it.manga.id !in pendingPreferenceMetadata) { "Duplicate preference metadata identity" }
+                            preferenceMetadataBytes += json.encodeToString(serializer<MangaPreferencesBackup>(), it).length.toLong() * 4
+                            require(pendingPreferenceMetadata.size < 20_000 && preferenceMetadataBytes <=
+                                org.koitharu.kotatsu.sync.extended.MetadataOverrideTransfer.MAX_BYTES) { "Preference metadata is too large" }
+                            val old = getPreferencesDao().find(it.manga.id)
+                            // Causal metadata is applied after section discovery, independent of ZIP order.
+                            getPreferencesDao().upsert(it.toEntity(old?.coverUrlOverride, old?.descriptionOverride).copy(
+                                titleOverride = old?.titleOverride, coverUrlOverride = old?.coverUrlOverride,
+                                descriptionOverride = old?.descriptionOverride, contentRatingOverride = old?.contentRatingOverride,
+                            ))
+                            pendingPreferenceMetadata[it.manga.id] = it
                         }
 
                     BackupSection.TRACKS -> input.readJsonArray<TrackBackup>(serializer()).restoreToDb {
                         upsertManga(it.manga)
                         getTracksDao().upsert(it.toEntity())
+                    }
+
+                    BackupSection.EXACT_COMPLETION -> CompositeResult.EMPTY + runCatchingCancellable {
+                        val bytes = input.readBounded(org.koitharu.kotatsu.history.exact.ChapterReadTransfer.MAX_BYTES)
+                        val envelope = json.decodeFromString<List<org.koitharu.kotatsu.history.exact.ChapterReadEnvelope>>(
+                            bytes.decodeToString(),
+                        ).single()
+                        chapterReads.merge(envelope)
+                    }
+
+                    BackupSection.FOREIGN_IMPORT_STATE -> CompositeResult.EMPTY + runCatchingCancellable {
+                        val bytes = input.readBounded(org.koitharu.kotatsu.backups.mihon.ForeignImportTransfer.MAX_BYTES)
+                        val envelope = json.decodeFromString<List<org.koitharu.kotatsu.backups.mihon.ForeignImportEnvelope>>(
+                            bytes.decodeToString(),
+                        ).single()
+                        org.koitharu.kotatsu.backups.mihon.ForeignImportTransfer(database).merge(envelope)
+                    }
+
+                    BackupSection.REMOTE_LIBRARIES -> CompositeResult.EMPTY + runCatchingCancellable {
+                        val value = json.parseToJsonElement(input.readBounded(16 * 1024 * 1024 + 2).decodeToString())
+                        val sectionValue = (value as? kotlinx.serialization.json.JsonArray)?.singleOrNull()
+                            ?: error("Invalid remote-library backup section")
+                        remoteLibraries.mergeTransfer(sectionValue.toString())
+                    }
+
+                    BackupSection.TRACKER_LINKS -> CompositeResult.EMPTY + runCatchingCancellable {
+                        val sectionValue = readExtendedObject(input,
+                            org.koitharu.kotatsu.scrobbling.v2.TrackerLinkTransfer.MAX_BYTES)
+                        trackerLinks.merge(org.koitharu.kotatsu.scrobbling.v2.TrackerLinkTransfer.decode(
+                            sectionValue.toByteArray(Charsets.UTF_8)))
+                    }
+
+                    BackupSection.TRACKER_CATEGORIES -> CompositeResult.EMPTY + runCatchingCancellable {
+                        check(pendingTrackerCategories == null) { "Duplicate tracker mapping section" }
+                        val value = readExtendedObject(input,
+                            org.koitharu.kotatsu.scrobbling.v2.categories.CategoryStatusLimits.BYTES)
+                        org.koitharu.kotatsu.scrobbling.v2.categories.CategoryStatusCodec.decodeTransfer(value)
+                        pendingTrackerCategories = value
+                    }
+
+                    BackupSection.METADATA_OVERRIDES -> CompositeResult.EMPTY + runCatchingCancellable {
+                        metadataSectionCount++
+                        if (metadataSectionCount > 1) pendingMetadata = null
+                        require(metadataSectionCount == 1) { "Duplicate metadata override section" }
+                        pendingMetadata = readExtendedObject(input,
+                            org.koitharu.kotatsu.sync.extended.MetadataOverrideTransfer.MAX_BYTES).toByteArray(Charsets.UTF_8)
                     }
 
                     null -> CompositeResult.EMPTY // skip unknown entries
@@ -301,6 +401,51 @@ class BackupRepository @Inject constructor(
             }
             input.closeEntry()
             entry = input.nextEntry
+        }
+        if (metadataSectionCount == 1 && pendingMetadata != null) {
+            result += runCatchingCancellable { metadataOverrides.merge(requireNotNull(pendingMetadata)) }
+        } else if (metadataSectionCount == 0) {
+            for (intent in pendingPreferenceMetadata.values) result += runCatchingCancellable {
+                database.withTransaction {
+                    val manga = requireNotNull(database.getMangaDao().find(intent.manga.id))
+                    require(manga.manga.source == intent.manga.source && manga.manga.url == intent.manga.url) {
+                        "Preference metadata source edition changed during restore"
+                    }
+                    val old = requireNotNull(database.getPreferencesDao().find(intent.manga.id))
+                    if (!org.koitharu.kotatsu.core.archive.ArchivePrivacy.canPersistMetadata(manga.toManga(null))) {
+                        // Reader appearance was restored above; archive metadata stays session-only.
+                    } else if (authoritativeRecords) {
+                        database.getPreferencesDao().upsert(old.copy(titleOverride = intent.titleOverride,
+                            coverUrlOverride = restoreCustomCover(intent), contentRatingOverride = intent.contentRatingOverride,
+                            descriptionOverride = if (intent.metadataVersion == 0) old.descriptionOverride else intent.descriptionOverride))
+                    } else {
+                        val next = old.copy(titleOverride = intent.titleOverride, coverUrlOverride = restoreCustomCover(intent),
+                            contentRatingOverride = intent.contentRatingOverride,
+                            descriptionOverride = if (intent.metadataVersion == 0) old.descriptionOverride else intent.descriptionOverride)
+                        database.getPreferencesDao().upsert(next)
+                        metadataJournal.record(manga.manga, next, explicitReset = true)
+                    }
+                }
+            }
+        }
+        // Invalid or newer sections never leave a legacy mirror over the durable local fields.
+        if (metadataSectionCount > 0 || authoritativeRecords) {
+            result += runCatchingCancellable { metadataJournal.overlayOwned() }
+        }
+
+        pendingTrackerCategories?.let { value ->
+            result += runCatchingCancellable {
+                val bindings = database.withTransaction {
+                    categoryIdRemap.mapNotNull { (old, target) ->
+                        val created = categoryCreationWitnesses[old] ?: return@mapNotNull null
+                        require(target in 1..Int.MAX_VALUE.toLong()) { "Invalid restored category identity" }
+                        val category = database.getFavouriteCategoriesDao().findForRestore(target.toInt())
+                            ?: error("Restored tracker mapping category is unavailable")
+                        (old to created) to (target to category.createdAt)
+                    }.toMap()
+                }
+                trackerCategories.mergeTransfer(value, bindings)
+            }
         }
         if (sections.any { it.canContainMangaIdentityDuplicates() }) {
             result += runCatchingCancellable {
@@ -316,6 +461,15 @@ class BackupRepository @Inject constructor(
             }
         }
         return result
+    }
+
+    private fun readExtendedObject(input: InputStream, limit: Int): String {
+        val raw = input.readBounded(limit + 2).decodeToString(throwOnInvalidSequence = true)
+        org.koitharu.kotatsu.core.util.BoundedJson.validateObject(
+            ("{\"section\":" + raw + "}").toByteArray(Charsets.UTF_8), limit + 14)
+        val value = json.parseToJsonElement(raw)
+        return ((value as? kotlinx.serialization.json.JsonArray)?.singleOrNull()
+            as? kotlinx.serialization.json.JsonObject)?.toString() ?: error("Invalid extended backup section")
     }
 
     private suspend fun <T> ZipOutputStream.writeJsonArray(
@@ -491,6 +645,10 @@ class BackupRepository @Inject constructor(
         BackupSection.STATS,
         BackupSection.MANGA_PREFERENCES,
         BackupSection.TRACKS,
+        BackupSection.EXACT_COMPLETION,
+        BackupSection.FOREIGN_IMPORT_STATE,
+        BackupSection.TRACKER_LINKS,
+        BackupSection.METADATA_OVERRIDES,
         -> true
 
         BackupSection.INDEX,
@@ -500,6 +658,8 @@ class BackupRepository @Inject constructor(
         BackupSection.SOURCES,
         BackupSection.SCROBBLING,
         BackupSection.SAVED_FILTERS,
+        BackupSection.REMOTE_LIBRARIES,
+        BackupSection.TRACKER_CATEGORIES,
         -> false
     }
 

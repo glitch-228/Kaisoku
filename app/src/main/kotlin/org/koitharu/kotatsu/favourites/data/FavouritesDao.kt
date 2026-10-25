@@ -24,6 +24,7 @@ import org.koitharu.kotatsu.list.domain.ListSortOrder
 import org.koitharu.kotatsu.list.domain.ReadingProgress.Companion.PROGRESS_COMPLETED
 import org.koitharu.kotatsu.parsers.model.ContentType
 import org.koitharu.kotatsu.parsers.model.MangaParserSource
+import org.koitharu.kotatsu.remote.library.LibraryListContentPolicy
 
 @Dao
 abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
@@ -31,310 +32,328 @@ abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
         "WHERE f.manga_id IN (:ids) AND f.deleted_at=0 AND c.deleted_at=0 AND c.show_in_lib=1 ORDER BY c.sort_key,c.category_id")
     abstract suspend fun searchCategories(ids: List<Long>): List<SearchCategoryMembership>
 
-	/** SELECT **/
+    /** SELECT **/
 
-	@Transaction
-	@Query("SELECT * FROM favourites WHERE deleted_at = 0 GROUP BY manga_id ORDER BY created_at DESC")
-	abstract suspend fun findAll(): List<FavouriteManga>
+    @Transaction
+    @Query("SELECT * FROM favourites WHERE deleted_at = 0 GROUP BY manga_id ORDER BY created_at DESC")
+    abstract suspend fun findAll(): List<FavouriteManga>
 
-	@Transaction
-	@Query("SELECT * FROM favourites WHERE deleted_at = 0 GROUP BY manga_id ORDER BY created_at DESC LIMIT :limit")
-	abstract suspend fun findLast(limit: Int): List<FavouriteManga>
+    @Transaction
+    @Query("SELECT * FROM favourites WHERE deleted_at = 0 GROUP BY manga_id ORDER BY created_at DESC LIMIT :limit")
+    abstract suspend fun findLast(limit: Int): List<FavouriteManga>
 
-	@Transaction
-	@Query("SELECT DISTINCT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (manga.title LIKE :query OR manga.alt_title LIKE :query) LIMIT :limit")
-	abstract suspend fun searchByTitle(query: String, limit: Int): List<MangaWithTags>
+    @Transaction
+    @Query("SELECT DISTINCT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (manga.title LIKE :query OR manga.alt_title LIKE :query) LIMIT :limit")
+    abstract suspend fun searchByTitle(query: String, limit: Int): List<MangaWithTags>
 
-	@Transaction
-	@Query("SELECT DISTINCT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (manga.author LIKE :query) LIMIT :limit")
-	abstract suspend fun searchByAuthor(query: String, limit: Int): List<MangaWithTags>
+    @Transaction
+    @Query("SELECT DISTINCT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND (manga.author LIKE :query) LIMIT :limit")
+    abstract suspend fun searchByAuthor(query: String, limit: Int): List<MangaWithTags>
 
-	@Transaction
-	@Query("SELECT DISTINCT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND EXISTS(SELECT 1 FROM tags LEFT JOIN manga_tags ON manga_tags.tag_id = tags.tag_id WHERE manga_tags.manga_id = manga.manga_id AND tags.title LIKE :query) LIMIT :limit")
-	abstract suspend fun searchByTag(query: String, limit: Int): List<MangaWithTags>
+    @Transaction
+    @Query("SELECT DISTINCT manga.* FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.deleted_at = 0 AND EXISTS(SELECT 1 FROM tags LEFT JOIN manga_tags ON manga_tags.tag_id = tags.tag_id WHERE manga_tags.manga_id = manga.manga_id AND tags.title LIKE :query) LIMIT :limit")
+    abstract suspend fun searchByTag(query: String, limit: Int): List<MangaWithTags>
 
-	fun observeAll(
-		order: ListSortOrder,
-		filterOptions: Set<ListFilterOption>,
-		limit: Int
-	): Flow<List<FavouriteManga>> = observeAll(0L, order, filterOptions, limit)
+    fun observeAll(
+        order: ListSortOrder,
+        filterOptions: Set<ListFilterOption>,
+        limit: Int,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(),
+    ): Flow<List<FavouriteManga>> = observeAll(0L, order, filterOptions, limit, contentPolicy)
 
-	@Transaction
-	@Query("SELECT * FROM favourites WHERE deleted_at = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
-	abstract suspend fun findAllRaw(offset: Int, limit: Int): List<FavouriteManga>
+    @Transaction
+    @Query("SELECT * FROM favourites WHERE deleted_at = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
+    abstract suspend fun findAllRaw(offset: Int, limit: Int): List<FavouriteManga>
 
-	@Transaction
-	@Query("SELECT * FROM favourites ORDER BY MAX(created_at, deleted_at) DESC LIMIT :limit OFFSET :offset")
-	abstract suspend fun findAllForBackup(offset: Int, limit: Int): List<FavouriteManga>
+    @Transaction
+    @Query("SELECT * FROM favourites ORDER BY MAX(created_at, deleted_at) DESC LIMIT :limit OFFSET :offset")
+    abstract suspend fun findAllForBackup(offset: Int, limit: Int): List<FavouriteManga>
 
-	@Query("SELECT DISTINCT manga_id FROM favourites WHERE deleted_at = 0 AND category_id IN (SELECT category_id FROM favourite_categories WHERE track = 1 AND deleted_at = 0)")
-	abstract suspend fun findIdsWithTrack(): LongArray
+    @Query("SELECT DISTINCT manga_id FROM favourites WHERE deleted_at = 0 AND category_id IN (SELECT category_id FROM favourite_categories WHERE track = 1 AND deleted_at = 0)")
+    abstract suspend fun findIdsWithTrack(): LongArray
 
-	@Transaction
-	@Query(
-		"SELECT * FROM favourites WHERE category_id = :categoryId AND deleted_at = 0 " +
-			"GROUP BY manga_id ORDER BY created_at DESC",
-	)
-	abstract suspend fun findAll(categoryId: Long): List<FavouriteManga>
+    @Transaction
+    @Query(
+        "SELECT * FROM favourites WHERE category_id = :categoryId AND deleted_at = 0 " +
+            "GROUP BY manga_id ORDER BY created_at DESC",
+    )
+    abstract suspend fun findAll(categoryId: Long): List<FavouriteManga>
 
-	fun observeAll(
-		categoryId: Long,
-		order: ListSortOrder,
-		filterOptions: Set<ListFilterOption>,
-		limit: Int
-	): Flow<List<FavouriteManga>> = observeAllImpl(
-		MangaQueryBuilder(TABLE_FAVOURITES, this)
-			.join("LEFT JOIN manga ON favourites.manga_id = manga.manga_id")
-			.where("deleted_at = 0")
-			.where(
-				if (categoryId != 0L) {
-					"category_id = $categoryId"
-				} else {
-					"(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1"
-				},
-			)
-			.filters(filterOptions)
-			.groupBy("favourites.manga_id")
-			.orderBy(getOrderBy(order, categoryId))
-			.limit(limit)
-			.build(),
-	)
+    fun observeAll(
+        categoryId: Long,
+        order: ListSortOrder,
+        filterOptions: Set<ListFilterOption>,
+        limit: Int,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(),
+    ): Flow<List<FavouriteManga>> = observeAllImpl(
+        MangaQueryBuilder(TABLE_FAVOURITES) { option ->
+            if (option == ListFilterOption.Macro.NSFW) contentPolicy.nsfwSql else getCondition(option)
+        }
+            .join("LEFT JOIN manga ON favourites.manga_id = manga.manga_id")
+            .where("deleted_at = 0")
+            .where(contentPolicy.allowedSql)
+            .where(
+                if (categoryId != 0L) {
+                    "category_id = $categoryId"
+                } else {
+                    "(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1"
+                },
+            )
+            .filters(filterOptions)
+            .groupBy("favourites.manga_id")
+            .orderBy(getOrderBy(order, categoryId))
+            .limit(limit)
+            .build(),
+    )
 
-	suspend fun findCovers(categoryId: Long, order: ListSortOrder): List<Cover> {
-		val orderBy = getOrderBy(order, categoryId)
+    suspend fun findCovers(categoryId: Long, order: ListSortOrder,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(), hideAdult: Boolean = false): List<Cover> {
+        val orderBy = getOrderBy(order, categoryId)
 
-		@Language("RoomSql")
-		val query = SimpleSQLiteQuery(
-			"SELECT manga.cover_url AS url, manga.source AS source FROM favourites " +
-				"LEFT JOIN manga ON favourites.manga_id = manga.manga_id " +
-				"WHERE favourites.category_id = ? AND deleted_at = 0 ORDER BY $orderBy",
-			arrayOf<Any>(categoryId),
-		)
-		return findCoversImpl(query)
-	}
+        @Language("RoomSql")
+        val query = SimpleSQLiteQuery(
+            "SELECT manga.cover_url AS url, manga.source AS source FROM favourites " +
+                "LEFT JOIN manga ON favourites.manga_id = manga.manga_id " +
+                "WHERE favourites.category_id = ? AND deleted_at = 0 AND ${contentPolicy.allowedSql} " +
+                (if (hideAdult) "AND NOT(${contentPolicy.nsfwSql}) " else "") + "ORDER BY $orderBy",
+            arrayOf<Any>(categoryId),
+        )
+        return findCoversImpl(query)
+    }
 
-	suspend fun findCovers(order: ListSortOrder, limit: Int): List<Cover> {
-		val orderBy = getOrderBy(order)
+    suspend fun findCovers(order: ListSortOrder, limit: Int,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(), hideAdult: Boolean = false): List<Cover> {
+        val orderBy = getOrderBy(order)
 
-		@Language("RoomSql")
-		val query = SimpleSQLiteQuery(
-			"SELECT manga.cover_url AS url, manga.source AS source FROM favourites " +
-				"LEFT JOIN manga ON favourites.manga_id = manga.manga_id " +
-				"WHERE deleted_at = 0 AND " +
-				"(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1 " +
-				"GROUP BY manga.manga_id ORDER BY $orderBy LIMIT ?",
-			arrayOf<Any>(limit),
-		)
-		return findCoversImpl(query)
-	}
+        @Language("RoomSql")
+        val query = SimpleSQLiteQuery(
+            "SELECT manga.cover_url AS url, manga.source AS source FROM favourites " +
+                "LEFT JOIN manga ON favourites.manga_id = manga.manga_id " +
+                "WHERE deleted_at = 0 AND " +
+                "(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1 " +
+                "AND ${contentPolicy.allowedSql} " + (if (hideAdult) "AND NOT(${contentPolicy.nsfwSql}) " else "") +
+                "GROUP BY manga.manga_id ORDER BY $orderBy LIMIT ?",
+            arrayOf<Any>(limit),
+        )
+        return findCoversImpl(query)
+    }
 
-	@Query("SELECT COUNT(DISTINCT manga_id) FROM favourites WHERE deleted_at = 0")
-	abstract fun observeMangaCount(): Flow<Int>
+    @Query("SELECT COUNT(DISTINCT manga_id) FROM favourites WHERE deleted_at = 0")
+    abstract fun observeMangaCount(): Flow<Int>
 
-	@Query("SELECT MIN(created_at) FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0")
-	abstract fun observeFavoriteDate(mangaId: Long): Flow<Long?>
+    @Query("SELECT MIN(created_at) FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0")
+    abstract fun observeFavoriteDate(mangaId: Long): Flow<Long?>
 
-	@Query("SELECT * FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0")
-	abstract suspend fun findAllRaw(mangaId: Long): List<FavouriteEntity>
+    @Query("SELECT * FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0")
+    abstract suspend fun findAllRaw(mangaId: Long): List<FavouriteEntity>
 
-	@Query("SELECT * FROM favourites WHERE manga_id = :mangaId AND category_id = :categoryId")
-	abstract suspend fun findForRestore(mangaId: Long, categoryId: Long): FavouriteEntity?
+    @Query("SELECT * FROM favourites WHERE manga_id = :mangaId AND category_id = :categoryId")
+    abstract suspend fun findForRestore(mangaId: Long, categoryId: Long): FavouriteEntity?
 
-	@Query("SELECT DISTINCT category_id FROM favourites WHERE manga_id = :id AND deleted_at = 0")
-	abstract fun observeIds(id: Long): Flow<List<Long>>
+    @Query("SELECT DISTINCT category_id FROM favourites WHERE manga_id = :id AND deleted_at = 0")
+    abstract fun observeIds(id: Long): Flow<List<Long>>
 
-	@Query("SELECT favourite_categories.* FROM favourites LEFT JOIN favourite_categories ON favourite_categories.category_id = favourites.category_id WHERE favourites.manga_id = :mangaId AND favourites.deleted_at = 0")
-	abstract fun observeCategories(mangaId: Long): Flow<List<FavouriteCategoryEntity>>
+    @Query("SELECT favourite_categories.* FROM favourites LEFT JOIN favourite_categories ON favourite_categories.category_id = favourites.category_id WHERE favourites.manga_id = :mangaId AND favourites.deleted_at = 0")
+    abstract fun observeCategories(mangaId: Long): Flow<List<FavouriteCategoryEntity>>
 
-	@Query("SELECT DISTINCT category_id FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0 ORDER BY favourites.created_at ASC")
-	abstract suspend fun findCategoriesIds(mangaId: Long): List<Long>
+    @Query("SELECT DISTINCT category_id FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0 ORDER BY favourites.created_at ASC")
+    abstract suspend fun findCategoriesIds(mangaId: Long): List<Long>
 
-	@Query("SELECT DISTINCT manga_id FROM favourites WHERE deleted_at = 0 AND manga_id IN (:mangaIds)")
-	abstract suspend fun findExistingMangaIds(mangaIds: LongArray): LongArray
+    @Query("SELECT DISTINCT manga_id FROM favourites WHERE deleted_at = 0 AND manga_id IN (:mangaIds)")
+    abstract suspend fun findExistingMangaIds(mangaIds: LongArray): LongArray
 
-	@Query("SELECT COUNT(category_id) FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0")
-	abstract suspend fun findCategoriesCount(mangaId: Long): Int
+    @Query("SELECT COUNT(category_id) FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0")
+    abstract suspend fun findCategoriesCount(mangaId: Long): Int
 
-	@Query(
-		"SELECT manga.source AS count FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id " +
-			"WHERE favourites.deleted_at = 0 AND " +
-			"(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1 " +
-			"GROUP BY manga.source ORDER BY COUNT(manga.source) DESC LIMIT :limit",
-	)
-	abstract suspend fun findPopularSources(limit: Int): List<String>
+    @Query(
+        "SELECT manga.source AS count FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id " +
+            "WHERE favourites.deleted_at = 0 AND " +
+            "(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1 " +
+            "GROUP BY manga.source ORDER BY COUNT(manga.source) DESC LIMIT :limit",
+    )
+    abstract suspend fun findPopularSources(limit: Int): List<String>
 
-	@Query(
-		"SELECT manga.source AS count FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id " +
-			"WHERE favourites.category_id = :categoryId AND favourites.deleted_at = 0 " +
-			"GROUP BY manga.source ORDER BY COUNT(manga.source) DESC LIMIT :limit",
-	)
-	abstract suspend fun findPopularSources(categoryId: Long, limit: Int): List<String>
+    @Query(
+        "SELECT manga.source AS count FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id " +
+            "WHERE favourites.category_id = :categoryId AND favourites.deleted_at = 0 " +
+            "GROUP BY manga.source ORDER BY COUNT(manga.source) DESC LIMIT :limit",
+    )
+    abstract suspend fun findPopularSources(categoryId: Long, limit: Int): List<String>
 
-	@Query(
-		"""SELECT tags.title FROM tags
-		LEFT JOIN manga_tags ON tags.tag_id = manga_tags.tag_id
-		INNER JOIN favourites ON favourites.manga_id = manga_tags.manga_id
-		WHERE favourites.deleted_at = 0
-		GROUP BY tags.title
-		ORDER BY COUNT(manga_tags.manga_id) DESC
-		LIMIT :limit""",
-	)
-	abstract suspend fun findPopularTagTitles(limit: Int): List<String>
+    @Query(
+        """SELECT tags.title FROM tags
+        LEFT JOIN manga_tags ON tags.tag_id = manga_tags.tag_id
+        INNER JOIN favourites ON favourites.manga_id = manga_tags.manga_id
+        WHERE favourites.deleted_at = 0
+        GROUP BY tags.title
+        ORDER BY COUNT(manga_tags.manga_id) DESC
+        LIMIT :limit""",
+    )
+    abstract suspend fun findPopularTagTitles(limit: Int): List<String>
 
-	@Query(
-		"""SELECT tags.title FROM tags
-		LEFT JOIN manga_tags ON tags.tag_id = manga_tags.tag_id
-		INNER JOIN favourites ON favourites.manga_id = manga_tags.manga_id
-		WHERE favourites.category_id = :categoryId AND favourites.deleted_at = 0
-		GROUP BY tags.title
-		ORDER BY COUNT(manga_tags.manga_id) DESC
-		LIMIT :limit""",
-	)
-	abstract suspend fun findPopularTagTitles(categoryId: Long, limit: Int): List<String>
+    @Query(
+        """SELECT tags.title FROM tags
+        LEFT JOIN manga_tags ON tags.tag_id = manga_tags.tag_id
+        INNER JOIN favourites ON favourites.manga_id = manga_tags.manga_id
+        WHERE favourites.category_id = :categoryId AND favourites.deleted_at = 0
+        GROUP BY tags.title
+        ORDER BY COUNT(manga_tags.manga_id) DESC
+        LIMIT :limit""",
+    )
+    abstract suspend fun findPopularTagTitles(categoryId: Long, limit: Int): List<String>
 
-	fun dump(): Flow<FavouriteManga> = flow {
-		val window = 10
-		var offset = 0
-		while (currentCoroutineContext().isActive) {
-			val list = findAllForBackup(offset, window)
-			if (list.isEmpty()) {
-				break
-			}
-			offset += window
-			list.forEach { emit(it) }
-		}
-	}
+    fun dump(): Flow<FavouriteManga> = flow {
+        val window = 10
+        var offset = 0
+        while (currentCoroutineContext().isActive) {
+            val list = findAllForBackup(offset, window)
+            if (list.isEmpty()) {
+                break
+            }
+            offset += window
+            list.forEach { emit(it) }
+        }
+    }
 
-    @Query("SELECT favourites.category_id, COUNT(DISTINCT favourites.manga_id) AS count FROM favourites " +
+    suspend fun categoryCounts(hideAdult: Boolean,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(hideAdult)): List<CategoryCount> =
+        categoryCountsImpl(SimpleSQLiteQuery("SELECT favourites.category_id, COUNT(DISTINCT favourites.manga_id) AS count FROM favourites " +
         "JOIN manga ON manga.manga_id=favourites.manga_id LEFT JOIN preferences ON preferences.manga_id=manga.manga_id " +
-        "WHERE favourites.deleted_at=0 AND (:hideAdult=0 OR CASE WHEN preferences.content_rating_override IS NULL " +
-        "THEN manga.nsfw=0 ELSE preferences.content_rating_override != 'ADULT' END) GROUP BY favourites.category_id")
-    abstract suspend fun categoryCounts(hideAdult: Boolean): List<CategoryCount>
+        "WHERE favourites.deleted_at=0 AND ${contentPolicy.allowedSql} " +
+        (if (hideAdult) "AND NOT(${contentPolicy.nsfwSql}) " else "") + "GROUP BY favourites.category_id"))
 
-    @Query("SELECT COUNT(DISTINCT favourites.manga_id) FROM favourites JOIN manga ON manga.manga_id=favourites.manga_id " +
+    suspend fun visibleFavoritesCount(hideAdult: Boolean,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(hideAdult)): Int =
+        visibleFavoritesCountImpl(SimpleSQLiteQuery("SELECT COUNT(DISTINCT favourites.manga_id) FROM favourites JOIN manga ON manga.manga_id=favourites.manga_id " +
         "JOIN favourite_categories ON favourite_categories.category_id=favourites.category_id " +
         "LEFT JOIN preferences ON preferences.manga_id=manga.manga_id WHERE favourites.deleted_at=0 " +
-        "AND favourite_categories.deleted_at=0 AND favourite_categories.show_in_lib=1 AND (:hideAdult=0 OR " +
-        "CASE WHEN preferences.content_rating_override IS NULL THEN manga.nsfw=0 ELSE preferences.content_rating_override != 'ADULT' END)")
-    abstract suspend fun visibleFavoritesCount(hideAdult: Boolean): Int
+        "AND favourite_categories.deleted_at=0 AND favourite_categories.show_in_lib=1 AND ${contentPolicy.allowedSql} " +
+        if (hideAdult) "AND NOT(${contentPolicy.nsfwSql})" else ""))
 
-    @Query("SELECT COALESCE(preferences.cover_override, manga.cover_url) AS url, manga.source AS source " +
+    suspend fun categoryPreviewCovers(categoryId: Long, hideAdult: Boolean, limit: Int,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(hideAdult)): List<Cover> =
+        findCoversImpl(SimpleSQLiteQuery("SELECT COALESCE(preferences.cover_override, manga.cover_url) AS url, manga.source AS source " +
         "FROM favourites JOIN manga ON manga.manga_id=favourites.manga_id " +
         "JOIN favourite_categories ON favourite_categories.category_id=favourites.category_id " +
         "LEFT JOIN preferences ON preferences.manga_id=manga.manga_id WHERE favourites.deleted_at=0 " +
         "AND favourite_categories.deleted_at=0 AND favourite_categories.show_in_lib=1 " +
-        "AND (:categoryId=0 OR favourites.category_id=:categoryId) AND (:hideAdult=0 OR " +
-        "CASE WHEN preferences.content_rating_override IS NULL THEN manga.nsfw=0 ELSE preferences.content_rating_override != 'ADULT' END) " +
-        "GROUP BY favourites.manga_id ORDER BY MAX(favourites.created_at) DESC, manga.manga_id LIMIT :limit")
-    abstract suspend fun categoryPreviewCovers(categoryId: Long, hideAdult: Boolean, limit: Int): List<Cover>
+        "AND (?=0 OR favourites.category_id=?) AND ${contentPolicy.allowedSql} " +
+        (if (hideAdult) "AND NOT(${contentPolicy.nsfwSql}) " else "") +
+        "GROUP BY favourites.manga_id ORDER BY MAX(favourites.created_at) DESC, manga.manga_id LIMIT ?",
+            arrayOf<Any>(categoryId, categoryId, limit)))
 
-	/** INSERT **/
+    @RawQuery protected abstract suspend fun categoryCountsImpl(query: SupportSQLiteQuery): List<CategoryCount>
+    @RawQuery protected abstract suspend fun visibleFavoritesCountImpl(query: SupportSQLiteQuery): Int
 
-	@Insert(onConflict = OnConflictStrategy.REPLACE)
-	abstract suspend fun insert(favourite: FavouriteEntity)
+    /** INSERT **/
 
-	/** DELETE **/
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insert(favourite: FavouriteEntity)
 
-	suspend fun delete(mangaId: Long) = setDeletedAt(
-		mangaId = mangaId,
-		deletedAt = System.currentTimeMillis(),
-	)
+    /** DELETE **/
 
-	suspend fun delete(mangaId: Long, categoryId: Long) = setDeletedAt(
-		categoryId = categoryId,
-		mangaId = mangaId,
-		deletedAt = System.currentTimeMillis(),
-	)
+    suspend fun delete(mangaId: Long) = setDeletedAt(
+        mangaId = mangaId,
+        deletedAt = System.currentTimeMillis(),
+    )
 
-	suspend fun deleteAll(categoryId: Long) = setDeletedAtAll(
-		categoryId = categoryId,
-		deletedAt = System.currentTimeMillis(),
-	)
+    suspend fun delete(mangaId: Long, categoryId: Long) = setDeletedAt(
+        categoryId = categoryId,
+        mangaId = mangaId,
+        deletedAt = System.currentTimeMillis(),
+    )
 
-	suspend fun recover(mangaId: Long) = setDeletedAt(
-		mangaId = mangaId,
-		deletedAt = 0L,
-	)
+    suspend fun deleteAll(categoryId: Long) = setDeletedAtAll(
+        categoryId = categoryId,
+        deletedAt = System.currentTimeMillis(),
+    )
 
-	suspend fun recover(categoryId: Long, mangaId: Long) = setDeletedAt(
-		categoryId = categoryId,
-		mangaId = mangaId,
-		deletedAt = 0L,
-	)
+    suspend fun recover(mangaId: Long) = setDeletedAt(
+        mangaId = mangaId,
+        deletedAt = 0L,
+    )
 
-	@Query("DELETE FROM favourites WHERE deleted_at != 0 AND deleted_at < :maxDeletionTime")
-	abstract suspend fun gc(maxDeletionTime: Long)
+    suspend fun recover(categoryId: Long, mangaId: Long) = setDeletedAt(
+        categoryId = categoryId,
+        mangaId = mangaId,
+        deletedAt = 0L,
+    )
 
-	/** TOOLS **/
+    @Query("DELETE FROM favourites WHERE deleted_at != 0 AND deleted_at < :maxDeletionTime")
+    abstract suspend fun gc(maxDeletionTime: Long)
 
-	@Upsert
-	abstract suspend fun upsert(entity: FavouriteEntity)
+    /** TOOLS **/
 
-	@Transaction
-	@RawQuery(observedEntities = [FavouriteEntity::class, FavoriteOrderEntity::class])
-	protected abstract fun observeAllImpl(query: SupportSQLiteQuery): Flow<List<FavouriteManga>>
+    @Upsert
+    abstract suspend fun upsert(entity: FavouriteEntity)
 
-	@RawQuery
-	protected abstract suspend fun findCoversImpl(query: SupportSQLiteQuery): List<Cover>
+    @Transaction
+    @RawQuery(observedEntities = [FavouriteEntity::class, FavoriteOrderEntity::class,
+        org.koitharu.kotatsu.core.db.entity.MangaEntity::class, org.koitharu.kotatsu.core.db.entity.MangaPrefsEntity::class,
+        org.koitharu.kotatsu.history.exact.ChapterReadPolicyEntity::class, org.koitharu.kotatsu.history.exact.ChapterReadCountEntity::class])
+    protected abstract fun observeAllImpl(query: SupportSQLiteQuery): Flow<List<FavouriteManga>>
 
-	@Query("UPDATE favourites SET deleted_at = :deletedAt WHERE manga_id = :mangaId")
-	protected abstract suspend fun setDeletedAt(mangaId: Long, deletedAt: Long)
+    @RawQuery
+    protected abstract suspend fun findCoversImpl(query: SupportSQLiteQuery): List<Cover>
 
-	@Query("UPDATE favourites SET deleted_at = :deletedAt WHERE manga_id = :mangaId AND category_id = :categoryId")
-	protected abstract suspend fun setDeletedAt(categoryId: Long, mangaId: Long, deletedAt: Long)
+    @Query("UPDATE favourites SET deleted_at = :deletedAt WHERE manga_id = :mangaId")
+    protected abstract suspend fun setDeletedAt(mangaId: Long, deletedAt: Long)
 
-	@Query("UPDATE favourites SET deleted_at = :deletedAt WHERE category_id = :categoryId AND deleted_at = 0")
-	protected abstract suspend fun setDeletedAtAll(categoryId: Long, deletedAt: Long)
+    @Query("UPDATE favourites SET deleted_at = :deletedAt WHERE manga_id = :mangaId AND category_id = :categoryId")
+    protected abstract suspend fun setDeletedAt(categoryId: Long, mangaId: Long, deletedAt: Long)
 
-	private fun getOrderBy(sortOrder: ListSortOrder, scopeId: Long = 0L) = when (sortOrder) {
+    @Query("UPDATE favourites SET deleted_at = :deletedAt WHERE category_id = :categoryId AND deleted_at = 0")
+    protected abstract suspend fun setDeletedAtAll(categoryId: Long, deletedAt: Long)
+
+    private fun getOrderBy(sortOrder: ListSortOrder, scopeId: Long = 0L) = when (sortOrder) {
         ListSortOrder.MANUAL -> "COALESCE((SELECT rank FROM favorite_order WHERE favorite_order.manga_id=manga.manga_id " +
             "AND favorite_order.scope_id=$scopeId),2147483647) ASC, " +
             "(SELECT MAX(f.created_at) FROM favourites f WHERE f.manga_id=manga.manga_id AND f.deleted_at=0 " +
             "AND ($scopeId=0 OR f.category_id=$scopeId)) DESC, manga.manga_id ASC"
-		ListSortOrder.RATING -> "manga.rating DESC"
-		ListSortOrder.RATING_REVERSE -> "manga.rating ASC"
-		ListSortOrder.NEWEST -> "favourites.created_at DESC"
-		ListSortOrder.OLDEST -> "favourites.created_at ASC"
-		ListSortOrder.ALPHABETIC -> "manga.title ASC"
-		ListSortOrder.ALPHABETIC_REVERSE -> "manga.title DESC"
-		ListSortOrder.NEW_CHAPTERS -> "IFNULL((SELECT chapters_new FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) DESC"
-		ListSortOrder.NEW_CHAPTERS_REVERSE -> "IFNULL((SELECT chapters_new FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) ASC"
-		ListSortOrder.PROGRESS -> "IFNULL((SELECT percent FROM history WHERE history.manga_id = manga.manga_id), 0) DESC"
-		ListSortOrder.UNREAD -> "IFNULL((SELECT percent FROM history WHERE history.manga_id = manga.manga_id), 0) ASC"
-		ListSortOrder.UNREAD_CHAPTERS -> "IFNULL((SELECT CASE WHEN history.chapters > 0 AND history.percent BETWEEN 0 AND 1 THEN CAST(history.chapters * (1 - history.percent) AS INTEGER) ELSE 0 END FROM history WHERE history.manga_id = manga.manga_id AND history.deleted_at = 0), 0) DESC"
-		ListSortOrder.UNREAD_CHAPTERS_REVERSE -> "IFNULL((SELECT CASE WHEN history.chapters > 0 AND history.percent BETWEEN 0 AND 1 THEN CAST(history.chapters * (1 - history.percent) AS INTEGER) ELSE 0 END FROM history WHERE history.manga_id = manga.manga_id AND history.deleted_at = 0), 0) ASC"
-		ListSortOrder.LAST_READ -> "IFNULL((SELECT updated_at FROM history WHERE history.manga_id = manga.manga_id), 0) DESC"
-		ListSortOrder.LONG_AGO_READ -> "IFNULL((SELECT updated_at FROM history WHERE history.manga_id = manga.manga_id), 0) ASC"
-		ListSortOrder.UPDATED -> "IFNULL((SELECT last_chapter_date FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) DESC"
-		ListSortOrder.UPDATED_REVERSE -> "IFNULL((SELECT last_chapter_date FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) ASC"
-		ListSortOrder.TOTAL_CHAPTERS -> "(SELECT COUNT(*) FROM chapters WHERE chapters.manga_id = manga.manga_id) DESC"
-		ListSortOrder.TOTAL_CHAPTERS_REVERSE -> "(SELECT COUNT(*) FROM chapters WHERE chapters.manga_id = manga.manga_id) ASC"
+        ListSortOrder.RATING -> "manga.rating DESC"
+        ListSortOrder.RATING_REVERSE -> "manga.rating ASC"
+        ListSortOrder.NEWEST -> "favourites.created_at DESC"
+        ListSortOrder.OLDEST -> "favourites.created_at ASC"
+        ListSortOrder.ALPHABETIC -> "manga.title ASC"
+        ListSortOrder.ALPHABETIC_REVERSE -> "manga.title DESC"
+        ListSortOrder.NEW_CHAPTERS -> "IFNULL((SELECT chapters_new FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) DESC"
+        ListSortOrder.NEW_CHAPTERS_REVERSE -> "IFNULL((SELECT chapters_new FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) ASC"
+        ListSortOrder.PROGRESS -> org.koitharu.kotatsu.history.exact.ChapterReadSql.percent("IFNULL((SELECT percent FROM history WHERE history.manga_id = manga.manga_id), 0)") + " DESC"
+        ListSortOrder.UNREAD -> org.koitharu.kotatsu.history.exact.ChapterReadSql.percent("IFNULL((SELECT percent FROM history WHERE history.manga_id = manga.manga_id), 0)") + " ASC"
+        ListSortOrder.UNREAD_CHAPTERS -> org.koitharu.kotatsu.history.exact.ChapterReadSql.remaining("IFNULL((SELECT CASE WHEN history.chapters > 0 AND history.percent BETWEEN 0 AND 1 THEN CAST(history.chapters * (1 - history.percent) AS INTEGER) ELSE 0 END FROM history WHERE history.manga_id = manga.manga_id AND history.deleted_at = 0), 0)") + " DESC"
+        ListSortOrder.UNREAD_CHAPTERS_REVERSE -> org.koitharu.kotatsu.history.exact.ChapterReadSql.remaining("IFNULL((SELECT CASE WHEN history.chapters > 0 AND history.percent BETWEEN 0 AND 1 THEN CAST(history.chapters * (1 - history.percent) AS INTEGER) ELSE 0 END FROM history WHERE history.manga_id = manga.manga_id AND history.deleted_at = 0), 0)") + " ASC"
+        ListSortOrder.LAST_READ -> "IFNULL((SELECT updated_at FROM history WHERE history.manga_id = manga.manga_id), 0) DESC"
+        ListSortOrder.LONG_AGO_READ -> "IFNULL((SELECT updated_at FROM history WHERE history.manga_id = manga.manga_id), 0) ASC"
+        ListSortOrder.UPDATED -> "IFNULL((SELECT last_chapter_date FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) DESC"
+        ListSortOrder.UPDATED_REVERSE -> "IFNULL((SELECT last_chapter_date FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) ASC"
+        ListSortOrder.TOTAL_CHAPTERS -> "(SELECT COUNT(*) FROM chapters WHERE chapters.manga_id = manga.manga_id) DESC"
+        ListSortOrder.TOTAL_CHAPTERS_REVERSE -> "(SELECT COUNT(*) FROM chapters WHERE chapters.manga_id = manga.manga_id) ASC"
 
-		else -> throw IllegalArgumentException("Sort order $sortOrder is not supported")
-	}
+        else -> throw IllegalArgumentException("Sort order $sortOrder is not supported")
+    }
 
-	override fun getCondition(option: ListFilterOption): String? = when (option) {
-		ListFilterOption.Macro.COMPLETED -> "EXISTS(SELECT * FROM history WHERE history.manga_id = favourites.manga_id AND history.percent >= $PROGRESS_COMPLETED)"
-		ListFilterOption.Macro.NEW_CHAPTERS -> "IFNULL((SELECT chapters_new FROM tracks WHERE tracks.manga_id = favourites.manga_id), 0) > 0"
-		ListFilterOption.Macro.NSFW -> "manga.nsfw = 1"
-		is ListFilterOption.Tag -> "EXISTS(SELECT * FROM manga_tags WHERE favourites.manga_id = manga_tags.manga_id AND tag_id = ${option.tagId})"
-		is ListFilterOption.TagTitle -> "EXISTS(SELECT * FROM manga_tags LEFT JOIN tags ON tags.tag_id = manga_tags.tag_id WHERE favourites.manga_id = manga_tags.manga_id AND tags.title = ${sqlEscapeString(option.titleText)})"
-		ListFilterOption.Downloaded -> "EXISTS(SELECT * FROM local_index WHERE local_index.manga_id = favourites.manga_id)"
-		is ListFilterOption.Source -> "manga.source = ${sqlEscapeString(option.mangaSource.name)}"
-		is ListFilterOption.State -> option.state?.let { "manga.state = ${sqlEscapeString(it.name)}" }
-		is ListFilterOption.ContentType -> contentTypeCondition(option)
-		else -> null
-	}
+    override fun getCondition(option: ListFilterOption): String? = when (option) {
+        ListFilterOption.Macro.COMPLETED -> org.koitharu.kotatsu.history.exact.ChapterReadSql.completed("EXISTS(SELECT * FROM history WHERE history.manga_id = favourites.manga_id AND history.percent >= $PROGRESS_COMPLETED)")
+        ListFilterOption.Macro.NEW_CHAPTERS -> "IFNULL((SELECT chapters_new FROM tracks WHERE tracks.manga_id = favourites.manga_id), 0) > 0"
+        ListFilterOption.Macro.NSFW -> "manga.nsfw = 1"
+        is ListFilterOption.Tag -> "EXISTS(SELECT * FROM manga_tags WHERE favourites.manga_id = manga_tags.manga_id AND tag_id = ${option.tagId})"
+        is ListFilterOption.TagTitle -> "EXISTS(SELECT * FROM manga_tags LEFT JOIN tags ON tags.tag_id = manga_tags.tag_id WHERE favourites.manga_id = manga_tags.manga_id AND tags.title = ${sqlEscapeString(option.titleText)})"
+        ListFilterOption.Downloaded -> "EXISTS(SELECT * FROM local_index WHERE local_index.manga_id = favourites.manga_id)"
+        is ListFilterOption.Source -> "manga.source = ${sqlEscapeString(option.mangaSource.name)}"
+        is ListFilterOption.State -> option.state?.let { "manga.state = ${sqlEscapeString(it.name)}" }
+        is ListFilterOption.ContentType -> contentTypeCondition(option)
+        else -> null
+    }
 
-	private fun contentTypeCondition(option: ListFilterOption.ContentType): String {
-		val sources = MangaParserSource.entries
-			.asSequence()
-			.filter { it.contentType == option.contentType }
-			.joinToString(
-				prefix = "manga.source IN (",
-				postfix = ")",
-				transform = { sqlEscapeString(it.name) },
-			)
-		return sources.takeUnless { it == "manga.source IN ()" } ?: "0"
-	}
+    private fun contentTypeCondition(option: ListFilterOption.ContentType): String {
+        val sources = MangaParserSource.entries
+            .asSequence()
+            .filter { it.contentType == option.contentType }
+            .joinToString(
+                prefix = "manga.source IN (",
+                postfix = ")",
+                transform = { sqlEscapeString(it.name) },
+            )
+        return sources.takeUnless { it == "manga.source IN ()" } ?: "0"
+    }
 }

@@ -65,11 +65,21 @@ data class MihonBackupCategory(
 data class MihonBackupTracking(
 	@ProtoNumber(1) val syncId: Int = 0,
 	@ProtoNumber(2) val libraryId: Long = 0,
+    @ProtoNumber(3) val mediaIdInt: Int = 0,
+    @ProtoNumber(4) val trackingUrl: String = "",
+    @ProtoNumber(5) val title: String = "",
 	@ProtoNumber(6) val lastChapterRead: Float = 0f,
+    @ProtoNumber(7) val totalChapters: Int = 0,
 	@ProtoNumber(8) val score: Float = 0f,
 	@ProtoNumber(9) val status: Int = 0,
+    @ProtoNumber(10) val startedReadingDate: Long = 0,
+    @ProtoNumber(11) val finishedReadingDate: Long = 0,
+    @ProtoNumber(12) val private: Boolean = false,
 	@ProtoNumber(100) val mediaId: Long = 0,
-)
+) {
+    // Match Mihon's actual legacy-field precedence while retaining both originals in the pending payload.
+    val effectiveMediaId: Long get() = if (mediaIdInt != 0) mediaIdInt.toLong() else mediaId
+}
 
 @Serializable
 @SerialName("eu.kanade.tachiyomi.data.backup.models.BackupSource")

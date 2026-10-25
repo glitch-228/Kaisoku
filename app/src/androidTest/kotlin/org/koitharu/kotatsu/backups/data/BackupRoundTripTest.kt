@@ -2,6 +2,7 @@ package org.koitharu.kotatsu.backups.data
 
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.core.net.toUri
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -96,17 +97,20 @@ class BackupRoundTripTest {
                     assertTrue(result.failures.toString(), result.isAllSuccess)
                     val actual = db.getPreferencesDao().dump().single()
                     assertEquals(prefs.toEntity(actual.coverUrlOverride), actual)
-                    assertArrayEquals(byteArrayOf(1, 2, 3, 4), File(directory, "sync-732.webp").readBytes())
+                    val restoredCover = File(requireNotNull(requireNotNull(actual.coverUrlOverride).toUri().path))
+                    assertEquals(directory.canonicalFile, restoredCover.canonicalFile.parentFile)
+                    assertArrayEquals(byteArrayOf(1, 2, 3, 4), restoredCover.readBytes())
                     val output = ByteArrayOutputStream()
                     ZipOutputStream(output).use { repository.createBackup(it, null, setOf(BackupSection.MANGA_PREFERENCES)) }
                     ZipInputStream(ByteArrayInputStream(output.toByteArray())).use { zip ->
                         assertEquals(BackupSection.MANGA_PREFERENCES.entryName, zip.nextEntry.name)
                         val exported = old.decodeFromString<List<MangaPreferencesBackup>>(zip.readBytes().decodeToString()).single()
-                        assertEquals(old.encodeToString(prefs.withoutCustomCover()), old.encodeToString(exported))
+                        assertEquals(old.encodeToString(prefs.withoutCustomCover().copy(metadataVersion = 1)),
+                            old.encodeToString(exported))
                     }
                     // Export must not remove or change the active custom cover.
                     assertEquals(actual, db.getPreferencesDao().dump().single())
-                    assertArrayEquals(byteArrayOf(1, 2, 3, 4), File(directory, "sync-732.webp").readBytes())
+                    assertArrayEquals(byteArrayOf(1, 2, 3, 4), restoredCover.readBytes())
                 }
             }
         } finally { directory.deleteRecursively() }

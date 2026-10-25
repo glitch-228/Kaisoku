@@ -10,24 +10,26 @@ import org.koitharu.kotatsu.list.domain.ListSortOrder
 import org.koitharu.kotatsu.local.data.index.LocalMangaIndex
 import org.koitharu.kotatsu.local.domain.LocalObserveMapper
 import org.koitharu.kotatsu.parsers.model.Manga
+import org.koitharu.kotatsu.remote.library.LibraryListContentPolicy
 import javax.inject.Inject
 
 @Reusable
 class HistoryLocalObserver @Inject constructor(
-	localMangaIndex: LocalMangaIndex,
-	private val db: MangaDatabase,
+    localMangaIndex: LocalMangaIndex,
+    private val db: MangaDatabase,
 ) : LocalObserveMapper<HistoryWithManga, MangaWithHistory>(localMangaIndex) {
 
-	fun observeAll(
-		order: ListSortOrder,
-		filterOptions: Set<ListFilterOption>,
-		limit: Int
-	) = db.getHistoryDao().observeAll(order, filterOptions, limit).mapToLocal()
+    fun observeAll(
+        order: ListSortOrder,
+        filterOptions: Set<ListFilterOption>,
+        limit: Int,
+        contentPolicy: LibraryListContentPolicy = LibraryListContentPolicy.legacy(),
+    ) = db.getHistoryDao().observeAll(order, filterOptions, limit, contentPolicy).mapToLocal()
 
-	override fun toManga(e: HistoryWithManga) = e.manga.toManga(e.tags.toMangaTags(), null)
+    override fun toManga(e: HistoryWithManga) = e.manga.toManga(e.tags.toMangaTags(), null)
 
-	override fun toResult(e: HistoryWithManga, manga: Manga) = MangaWithHistory(
-		manga = manga,
-		history = e.history.toMangaHistory(),
-	)
+    override fun toResult(e: HistoryWithManga, manga: Manga) = MangaWithHistory(
+        manga = manga,
+        history = e.history.toMangaHistory(),
+    )
 }

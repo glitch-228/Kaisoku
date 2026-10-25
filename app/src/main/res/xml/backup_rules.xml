@@ -8,6 +8,8 @@
 			domain="sharedpref"
 			path="_local_index.xml" />
 		<exclude domain="database" />
+		<exclude domain="sharedpref" path="_source_switch_prompt_snoozes.xml" />
+        <exclude domain="sharedpref" path="_community_reply_state.xml" />
 		<exclude domain="device_database" />
 		<exclude domain="external" />
 	</cloud-backup>
@@ -19,6 +21,8 @@
 			domain="sharedpref"
 			path="_local_index.xml" />
 		<exclude domain="database" />
+		<exclude domain="sharedpref" path="_source_switch_prompt_snoozes.xml" />
+        <exclude domain="sharedpref" path="_community_reply_state.xml" />
 		<exclude domain="device_database" />
 	</device-transfer>
 </data-extraction-rules>

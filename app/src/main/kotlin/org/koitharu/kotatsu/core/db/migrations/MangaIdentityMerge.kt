@@ -81,6 +81,28 @@ object MangaIdentityMerge {
     }
 
     private fun mergePrepared(db: SupportSQLiteDatabase): Map<Long, Long> {
+        // Exact-state editions and opaque tracker links cannot be silently reconciled by URL heuristics.
+        // Leave conflicting titles intact until a caller supplies a reviewed identity/chapter mapping.
+        if (hasTable(db, "chapter_read_policy")) {
+            db.execSQL("""
+                DELETE FROM manga_identity_merge WHERE old_id IN (
+                    SELECT a.old_id FROM manga_identity_merge a
+                    JOIN chapter_read_policy p ON p.manga_id=a.old_id
+                    JOIN manga m ON m.manga_id=a.new_id
+                    WHERE p.source!=m.source OR EXISTS(
+                        SELECT 1 FROM chapter_read_policy n WHERE n.manga_id=a.new_id
+                    ) OR (SELECT COUNT(*) FROM manga_identity_merge b
+                        JOIN chapter_read_policy q ON q.manga_id=b.old_id WHERE b.new_id=a.new_id)>1
+                )
+            """.trimIndent())
+        }
+        if (hasTable(db, "tracker_links_v2")) {
+            db.execSQL("DELETE FROM manga_identity_merge WHERE old_id IN (SELECT manga_id FROM tracker_links_v2)")
+        }
+        for (table in listOf("tracker_import_pending", "foreign_import_receipt", "metadata_override_state")) if (hasTable(db, table)) {
+            // Unverified foreign references need an explicit edition mapping, never a URL heuristic.
+            db.execSQL("DELETE FROM manga_identity_merge WHERE old_id IN (SELECT manga_id FROM $table)")
+        }
         val mergedIds = linkedMapOf<Long, Long>()
         db.query("SELECT old_id, new_id FROM manga_identity_merge ORDER BY old_id").use { cursor ->
             while (cursor.moveToNext()) mergedIds[cursor.getLong(0)] = cursor.getLong(1)
@@ -262,6 +284,44 @@ object MangaIdentityMerge {
                 (f.updated_at=n.updated_at AND f.revision=n.revision AND f.rank>n.rank)
             ORDER BY f.updated_at,f.revision,f.rank
         """.trimIndent())
+        if (hasTable(db, "chapter_read_policy")) {
+            // The preceding guard permits only one exact policy for the same source edition.
+            // Durable chapter/source/branch references are copied verbatim, never renumbered.
+            db.execSQL("""
+                INSERT OR IGNORE INTO chapter_read_policy
+                SELECT a.new_id,p.source,p.edition_url,p.generation,p.enabled,p.deleted,p.progress_branch,
+                    p.revision_wall,p.revision_logical,p.revision_actor,p.import_fingerprint,
+                    p.generation_wall,p.generation_logical,p.generation_actor
+                FROM chapter_read_policy p JOIN manga_identity_merge a ON a.old_id=p.manga_id
+            """.trimIndent())
+            db.execSQL("""
+                INSERT OR IGNORE INTO chapter_read_record
+                SELECT a.new_id,p.generation,p.reference_id,p.source,p.branch_key,p.chapter_id,p.original_url,
+                    p.is_read,p.revision_wall,p.revision_logical,p.revision_actor
+                FROM chapter_read_record p JOIN manga_identity_merge a ON a.old_id=p.manga_id
+            """.trimIndent())
+            db.execSQL("""
+                INSERT OR IGNORE INTO chapter_read_alias
+                SELECT a.new_id,p.reference_id,p.source,p.branch_key,p.url
+                FROM chapter_read_alias p JOIN manga_identity_merge a ON a.old_id=p.manga_id
+            """.trimIndent())
+            db.execSQL("""
+                INSERT OR IGNORE INTO chapter_read_count
+                SELECT a.new_id,p.branch_key,p.read_count,p.total_count,p.list_revision,
+                    p.chapter_references,p.revision_wall,p.revision_logical,p.revision_actor
+                FROM chapter_read_count p JOIN manga_identity_merge a ON a.old_id=p.manga_id
+            """.trimIndent())
+            for (table in listOf("chapter_read_policy", "chapter_read_record", "chapter_read_alias", "chapter_read_count")) {
+                db.execSQL("DELETE FROM $table WHERE manga_id IN (SELECT old_id FROM manga_identity_merge)")
+            }
+        }
+        if (hasColumn(db, "preferences", "description_override")) db.execSQL("""
+            UPDATE preferences SET description_override=COALESCE(description_override,(
+                SELECT p.description_override FROM preferences p JOIN manga_identity_merge a ON a.old_id=p.manga_id
+                WHERE a.new_id=preferences.manga_id AND p.description_override IS NOT NULL
+                ORDER BY a.old_id LIMIT 1
+            )) WHERE manga_id IN (SELECT new_id FROM manga_identity_merge)
+        """.trimIndent())
         db.execSQL("DELETE FROM stats WHERE manga_id IN (SELECT old_id FROM manga_identity_merge)")
         db.execSQL("DELETE FROM history WHERE manga_id IN (SELECT old_id FROM manga_identity_merge)")
         db.execSQL("DELETE FROM favourites WHERE manga_id IN (SELECT old_id FROM manga_identity_merge)")
@@ -280,6 +340,17 @@ object MangaIdentityMerge {
         db.execSQL("DROP TABLE IF EXISTS manga_identity_canonical")
         return mergedIds
     }
+
+    private fun hasTable(db: SupportSQLiteDatabase, name: String): Boolean =
+        db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", arrayOf(name)).use { it.moveToFirst() }
+
+    private fun hasColumn(db: SupportSQLiteDatabase, table: String, column: String): Boolean =
+        db.query("PRAGMA table_info(`$table`)").use { cursor ->
+            val index = cursor.getColumnIndexOrThrow("name")
+            var found = false
+            while (cursor.moveToNext()) if (cursor.getString(index) == column) found = true
+            found
+        }
 
     private fun identitySource(alias: String): String {
         return "CASE WHEN $alias.source = 'MANGA_OVH_UPDATES' THEN 'MANGA_OVH' ELSE $alias.source END"

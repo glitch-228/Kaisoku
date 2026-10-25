@@ -17,59 +17,61 @@ import org.koitharu.kotatsu.tracker.data.TrackLogWithManga
 @Dao
 abstract class TrackLogsDao : MangaQueryBuilder.ConditionCallback {
 
-	fun observeAll(
-		limit: Int,
-		filterOptions: Set<ListFilterOption>,
-	): Flow<List<TrackLogWithManga>> = observeAllImpl(
-		MangaQueryBuilder("track_logs", this)
-			.filters(filterOptions)
-			.limit(limit)
-			.orderBy("created_at DESC")
-			.build(),
-	)
+    fun observeAll(
+        limit: Int,
+        filterOptions: Set<ListFilterOption>,
+        unreadOnly: Boolean = false,
+    ): Flow<List<TrackLogWithManga>> = observeAllImpl(
+        MangaQueryBuilder("track_logs", this)
+            .apply { if (unreadOnly) where("unread = 1") }
+            .filters(filterOptions)
+            .limit(limit)
+            .orderBy("created_at DESC")
+            .build(),
+    )
 
-	@Query("SELECT COUNT(*) FROM track_logs WHERE unread = 1")
-	abstract fun observeUnreadCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM track_logs WHERE unread = 1")
+    abstract fun observeUnreadCount(): Flow<Int>
 
-	@Query("DELETE FROM track_logs")
-	abstract suspend fun clear()
+    @Query("DELETE FROM track_logs")
+    abstract suspend fun clear()
 
-	@Query("UPDATE track_logs SET unread = 0 WHERE id = :id")
-	abstract suspend fun markAsRead(id: Long)
+    @Query("UPDATE track_logs SET unread = 0 WHERE id = :id")
+    abstract suspend fun markAsRead(id: Long)
 
-	@Query("SELECT * FROM track_logs WHERE id = :id")
-	abstract suspend fun find(id: Long): TrackLogEntity?
+    @Query("SELECT * FROM track_logs WHERE id = :id")
+    abstract suspend fun find(id: Long): TrackLogEntity?
 
-	@Query("DELETE FROM track_logs WHERE id = :id")
-	abstract suspend fun delete(id: Long)
+    @Query("DELETE FROM track_logs WHERE id = :id")
+    abstract suspend fun delete(id: Long)
 
-	@Insert(onConflict = OnConflictStrategy.REPLACE)
-	abstract suspend fun insert(entity: TrackLogEntity): Long
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insert(entity: TrackLogEntity): Long
 
-	@Query("DELETE FROM track_logs WHERE manga_id NOT IN (SELECT manga_id FROM tracks)")
-	abstract suspend fun gc()
+    @Query("DELETE FROM track_logs WHERE manga_id NOT IN (SELECT manga_id FROM tracks)")
+    abstract suspend fun gc()
 
-	@Query("DELETE FROM track_logs WHERE id IN (SELECT id FROM track_logs ORDER BY created_at DESC LIMIT 0 OFFSET :size)")
-	abstract suspend fun trim(size: Int)
+    @Query("DELETE FROM track_logs WHERE id IN (SELECT id FROM track_logs ORDER BY created_at DESC LIMIT 0 OFFSET :size)")
+    abstract suspend fun trim(size: Int)
 
-	@Query("SELECT COUNT(*) FROM track_logs")
-	abstract suspend fun count(): Int
+    @Query("SELECT COUNT(*) FROM track_logs")
+    abstract suspend fun count(): Int
 
-	@Query("SELECT * FROM track_logs WHERE manga_id = :mangaId ORDER BY created_at DESC LIMIT 1")
-	abstract suspend fun findLast(mangaId: Long): TrackLogEntity?
+    @Query("SELECT * FROM track_logs WHERE manga_id = :mangaId ORDER BY created_at DESC LIMIT 1")
+    abstract suspend fun findLast(mangaId: Long): TrackLogEntity?
 
-	@Transaction
-	@RawQuery(observedEntities = [TrackLogEntity::class])
-	protected abstract fun observeAllImpl(query: SupportSQLiteQuery): Flow<List<TrackLogWithManga>>
+    @Transaction
+    @RawQuery(observedEntities = [TrackLogEntity::class])
+    protected abstract fun observeAllImpl(query: SupportSQLiteQuery): Flow<List<TrackLogWithManga>>
 
-	override fun getCondition(option: ListFilterOption): String? = when (option) {
-		ListFilterOption.Macro.FAVORITE -> "EXISTS(SELECT * FROM favourites WHERE favourites.manga_id = track_logs.manga_id)"
-		is ListFilterOption.Favorite -> "EXISTS(SELECT * FROM favourites WHERE favourites.manga_id = track_logs.manga_id AND favourites.category_id = ${option.category.id})"
-		is ListFilterOption.Tag -> "EXISTS(SELECT * FROM manga_tags WHERE manga_tags.manga_id = track_logs.manga_id AND tag_id = ${option.tagId})"
-		ListFilterOption.Macro.NSFW -> "(SELECT nsfw FROM manga WHERE manga.manga_id = track_logs.manga_id) = 1"
-		is ListFilterOption.State -> option.state?.let {
-			"(SELECT state FROM manga WHERE manga.manga_id = track_logs.manga_id) = ${DatabaseUtils.sqlEscapeString(it.name)}"
-		}
-		else -> null
-	}
+    override fun getCondition(option: ListFilterOption): String? = when (option) {
+        ListFilterOption.Macro.FAVORITE -> "EXISTS(SELECT * FROM favourites WHERE favourites.manga_id = track_logs.manga_id)"
+        is ListFilterOption.Favorite -> "EXISTS(SELECT * FROM favourites WHERE favourites.manga_id = track_logs.manga_id AND favourites.category_id = ${option.category.id})"
+        is ListFilterOption.Tag -> "EXISTS(SELECT * FROM manga_tags WHERE manga_tags.manga_id = track_logs.manga_id AND tag_id = ${option.tagId})"
+        ListFilterOption.Macro.NSFW -> "(SELECT nsfw FROM manga WHERE manga.manga_id = track_logs.manga_id) = 1"
+        is ListFilterOption.State -> option.state?.let {
+            "(SELECT state FROM manga WHERE manga.manga_id = track_logs.manga_id) = ${DatabaseUtils.sqlEscapeString(it.name)}"
+        }
+        else -> null
+    }
 }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="exact_completion">Exact chapter completion · Beta</string>
+    <string name="exact_completion_preview">This chapter list has %1$d entries. Exact completion starts with every chapter unread and keeps your resume position. Opening a later chapter will not mark earlier chapters read.\n\nAn optional proposal would mark %2$d earlier chapters read. Review it before enabling.</string>
+    <string name="exact_completion_active">%1$d of %2$d chapters in this branch are explicitly read. Disabling restores the legacy display and retains these flags. Your resume position is preserved.</string>
+    <string name="exact_completion_legacy_proposal">Use the earlier-chapter proposal</string>
+    <string name="exact_completion_unavailable">Open a saved chapter list before changing exact completion.</string>
+    <string name="exact_mark_read">Mark selected chapters read</string>
+    <string name="exact_mark_unread">Mark selected chapters unread</string>
+</resources>

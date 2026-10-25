@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mihon_review_title">Review Mihon import · Beta</string>
+    <string name="mihon_review_pending_state">Imported tracker evidence · Beta</string>
+    <string name="mihon_review_preparing">Preparing a fresh preview…</string>
+    <string name="mihon_review_refresh">Refresh preview</string>
+    <string name="mihon_review_retry">Preview unavailable. Refresh to try again.</string>
+    <string name="mihon_review_titles">Choose titles</string>
+    <string name="mihon_review_chapters">Preview editions and chapter flags</string>
+    <string name="mihon_review_exact">Import exact read/unread flags</string>
+    <string name="mihon_review_resume">Replace existing reading positions</string>
+    <string name="mihon_review_sources">Review source bindings</string>
+    <string name="mihon_review_summary">Selected: %1$d of %2$d titles\nExact completion: %3$d\nExisting positions to replace: %4$d\nUnavailable sources: %5$d</string>
+    <string name="mihon_review_explanation">Existing reading positions, metadata, favorite dates, pins and order are preserved by default. Existing exact completion requires explicit selection. New titles can restore their saved position. Tracker references remain pending account verification; nothing is sent to a tracker. Repeated accepted snapshots make no further changes.</string>
+    <string name="mihon_review_confirm">Import %1$d titles, apply exact chapter flags to %2$d, and replace %3$d existing reading positions? This changes local records only.</string>
+    <string name="mihon_review_anchor">Saved position: %1$s, page %2$d</string>
+    <string name="mihon_review_no_anchor">No saved reading position</string>
+    <string name="mihon_review_chapter_flags">View read/unread flags</string>
+    <string name="mihon_review_read">Read · %1$s</string>
+    <string name="mihon_review_unread">Unread · %1$s</string>
+    <string name="mihon_review_missing_sources">These titles retain their saved metadata and unresolved source identity. Install the matching extension and review the source mapping before reading online.</string>
+    <string name="mihon_review_row">%1$s · %2$d read / %3$d unread</string>
+    <string name="mihon_review_accepted">Already accepted</string>
+    <string name="mihon_review_imported">Imported %1$d titles and %2$d saved chapters; %3$d tracker references await verification; %4$d sources are unavailable</string>
+</resources>
