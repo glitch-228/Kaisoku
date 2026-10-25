@@ -4,6 +4,24 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:title="@string/appearance">
 
+    <SwitchPreferenceCompat
+        android:key="animated_menus"
+        android:defaultValue="false"
+        android:title="@string/animated_menus"
+        android:summary="@string/animated_menus_summary" />
+
+    <SwitchPreferenceCompat
+        android:key="bar_blur"
+        android:defaultValue="false"
+        android:title="@string/bar_blur"
+        android:summary="@string/bar_blur_summary" />
+
+    <SwitchPreferenceCompat
+        android:key="tv_launcher"
+        android:defaultValue="false"
+        android:title="@string/tv_launcher"
+        android:summary="@string/tv_launcher_summary" />
+
     <org.koitharu.kotatsu.settings.utils.ThemeChooserPreference
         android:key="color_theme"
         android:title="@string/color_theme" />
@@ -39,6 +57,18 @@
         android:title="@string/language" />
 
     <PreferenceCategory android:title="@string/manga_list">
+
+        <SwitchPreferenceCompat
+            android:key="cover_preload"
+            android:defaultValue="false"
+            android:title="@string/cover_preload"
+            android:summary="@string/cover_preload_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="cover_refresh_action"
+            android:defaultValue="false"
+            android:title="@string/cover_refresh_action"
+            android:summary="@string/cover_refresh_action_summary" />
 
         <ListPreference
             android:entries="@array/list_modes"
@@ -149,6 +179,12 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/details">
+
+        <SwitchPreferenceCompat
+            android:key="chapter_date_sort_default"
+            android:defaultValue="false"
+            android:title="@string/sort_chapters_by_date"
+            android:summary="@string/sort_chapters_by_date_summary" />
 
         <SwitchPreferenceCompat
             android:key="details_chapters_inline"

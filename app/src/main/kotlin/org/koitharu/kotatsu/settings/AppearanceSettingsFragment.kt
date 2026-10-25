@@ -63,6 +63,16 @@ class AppearanceSettingsFragment :
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.pref_appearance)
+        findPreference<TwoStatePreference>(AppSettings.KEY_BAR_BLUR)?.isEnabled = Build.VERSION.SDK_INT >= 33
+        findPreference<TwoStatePreference>(AppSettings.KEY_TV_LAUNCHER)?.setOnPreferenceChangeListener { _, value ->
+            try {
+                org.koitharu.kotatsu.core.os.TvLauncherSettings.apply(requireContext(), value as Boolean)
+                true
+            } catch (error: Exception) {
+                com.google.android.material.snackbar.Snackbar.make(listView, error.message ?: getString(R.string.operation_not_supported), com.google.android.material.snackbar.Snackbar.LENGTH_LONG).show()
+                false
+            }
+        }
         findPreference<SliderPreference>(AppSettings.KEY_GRID_SIZE)?.summaryProvider = PercentSummaryProvider()
         findPreference<ListPreference>(AppSettings.KEY_FAVORITES_ORDER)?.run {
             val orders = ListSortOrder.FAVORITES.sortedBy { it.ordinal }
@@ -141,6 +151,7 @@ class AppearanceSettingsFragment :
 
             AppSettings.KEY_COLOR_THEME,
             AppSettings.KEY_THEME_AMOLED,
+            AppSettings.KEY_ANIMATED_MENUS,
                 -> {
                 bindWallpaperStatus()
                 postRestart()

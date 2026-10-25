@@ -19,17 +19,17 @@ import coil3.asImage
 import coil3.request.Disposable
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
-import coil3.request.NullRequestData
 import coil3.request.SuccessResult
 import coil3.request.allowRgb565
-import coil3.request.crossfade
 import coil3.request.lifecycle
 import coil3.request.target
+import coil3.request.transitionFactory
 import coil3.size.Scale
 import coil3.size.Size
 import coil3.size.SizeResolver
 import coil3.target.ViewTarget
 import coil3.transition.TransitionTarget
+import coil3.transition.Transition
 import coil3.util.CoilUtils
 import com.google.android.material.imageview.ShapeableImageView
 import dagger.hilt.android.AndroidEntryPoint
@@ -81,7 +81,7 @@ open class CoilImageView @JvmOverloads constructor(
     var fallbackDrawable: Drawable? = null
 
     private var currentRequest: Disposable? = null
-    private var currentImageData: Any = NullRequestData
+    private var currentRequestKey: ViewImageRequestKey? = null
     private var networkWaitingJob: Job? = null
     private val weakRequestListener = WeakImageRequestListener(this)
 
@@ -177,25 +177,30 @@ open class CoilImageView @JvmOverloads constructor(
         currentRequest?.dispose()
         CoilUtils.dispose(this)
         currentRequest = null
-        currentImageData = NullRequestData
+        currentRequestKey = null
         setImageDrawable(null)
     }
 
-    fun reload() {
+    fun reload(skipCache: Boolean = false) {
         CoilUtils.result(this)?.let { result ->
-            enqueueRequest(result.request, force = true)
+            val request = if (skipCache) result.request.newBuilder()
+                .memoryCachePolicy(coil3.request.CachePolicy.WRITE_ONLY)
+                .diskCachePolicy(coil3.request.CachePolicy.WRITE_ONLY)
+                .build() else result.request
+            enqueueRequest(request, force = true)
         }
     }
 
     protected fun enqueueRequest(request: ImageRequest, force: Boolean = false): Disposable {
         val previous = currentRequest
-        if (!force && currentImageData == request.data && previous?.job?.isCancelled == false && !isFailed) {
+        val key = ViewImageRequestKey.from(request, exactImageSize)
+        if (!force && currentRequestKey == key && previous?.job?.isCancelled == false && !isFailed) {
             return previous
         }
         networkWaitingJob?.cancel()
         networkWaitingJob = null
         previous?.dispose()
-        currentImageData = request.data
+        currentRequestKey = key
         return coil.enqueue(request).also { currentRequest = it }
     }
 
@@ -212,7 +217,7 @@ open class CoilImageView @JvmOverloads constructor(
         } else {
             0
         }
-        crossfade(crossfadeDuration)
+        transitionFactory(if (crossfadeDuration > 0) NetworkOnlyCrossfade(crossfadeDuration) else Transition.Factory.NONE)
         if (useExistingDrawable) {
             val previousDrawable = this@CoilImageView.drawable?.asImage()
             if (previousDrawable != null) {

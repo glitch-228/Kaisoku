@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="community_reply_checks">Background reply checks · Beta</string>
+    <string name="community_reply_checks_summary">Check for replies every six hours using your existing Community identity. Requires Android notification permission. Re-enable after changing accounts.</string>
+    <string name="community_reply_identity_required">Set up your Community identity before enabling background reply checks.</string>
+    <string name="community_new_replies">New replies are available. Tap to open the saved inbox.</string>
+    <string name="community_similar">Community similar titles · Beta</string>
+    <string name="community_similar_summary">Add a manual Details action for similar titles. Sends the selected title’s source and identifier to the Community service; history and statistics stay on this device. Separate from local suggestions; inactive in Legacy mode. Source selection is always manual.</string>
+    <string name="community_similar_empty">No compatible titles were returned. Availability depends on the Community service and your content filters.</string>
+    <string name="animated_menus">Animated menus · Beta</string>
+    <string name="animated_menus_summary">Reveal popup menus with a rounded animation. Follows the system animation setting.</string>
+    <string name="bar_blur">Blur behind bars · Beta</string>
+    <string name="bar_blur_summary">Blur only the main screen content behind the status bar and floating navigation bar. Requires Android 13 or newer; uses extra graphics processing.</string>
+    <string name="tv_launcher">Show in TV launcher · Beta</string>
+    <string name="tv_launcher_summary">Show the existing app entrance in Android TV launchers. The regular launcher is unaffected; some screens still require touch or a pointer.</string>
+    <string name="refresh_cover">Refresh cover</string>
+    <string name="cover_refresh_action">Show Refresh cover action</string>
+    <string name="cover_refresh_action_summary">Add a Details menu action to fetch its online cover again, bypassing cached images.</string>
+    <string name="cover_preload">Preload nearby covers · Beta</string>
+    <string name="cover_preload_summary">Load up to two small covers ahead when a list stops scrolling, on an unmetered connection. Uses extra data; skips private libraries, local books and Incognito mode.</string>
+    <string name="extra_page_retention">Retain more adjacent pages · Beta</string>
+    <string name="extra_page_retention_summary">With sufficient memory, keep up to two more pages on each side in paged mode, or two more cached holders in webtoon mode. Uses more RAM; applies when opening the reader.</string>
+    <string name="sort_chapters_by_date">Sort chapter list by upload date</string>
+    <string name="sort_chapters_by_date_summary">Use upload dates for chapter lists by default. Reading order and progress stay unchanged. Unknown dates appear last; each title can override this in its chapter menu.</string>
+    <string name="feed_unread_only">Unread updates only</string>
+    <string name="feed_unread_only_summary">Hide opened feed entries without deleting them. Turn off to show all updates again.</string>
+</resources>

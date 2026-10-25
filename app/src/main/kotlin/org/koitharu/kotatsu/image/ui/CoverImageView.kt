@@ -52,253 +52,264 @@ import androidx.appcompat.R as appcompatR
 import com.google.android.material.R as materialR
 
 class CoverImageView @JvmOverloads constructor(
-	context: Context,
-	attrs: AttributeSet? = null,
-	@AttrRes defStyleAttr: Int = R.attr.coverImageViewStyle,
+    context: Context,
+    attrs: AttributeSet? = null,
+    @AttrRes defStyleAttr: Int = R.attr.coverImageViewStyle,
 ) : CoilImageView(context, attrs, defStyleAttr) {
 
-	private var aspectRationHeight: Int = 0
-	private var aspectRationWidth: Int = 0
-	var trimImage: Boolean = false
+    private var aspectRationHeight: Int = 0
+    private var aspectRationWidth: Int = 0
+    var trimImage: Boolean = false
 
-	private val hasAspectRatio: Boolean
-		get() = aspectRationHeight > 0 && aspectRationWidth > 0
+    private val hasAspectRatio: Boolean
+        get() = aspectRationHeight > 0 && aspectRationWidth > 0
 
-	init {
-		context.withStyledAttributes(attrs, R.styleable.CoverImageView, defStyleAttr) {
-			aspectRationHeight = getInt(R.styleable.CoverImageView_aspectRationHeight, aspectRationHeight)
-			aspectRationWidth = getInt(R.styleable.CoverImageView_aspectRationWidth, aspectRationWidth)
-			trimImage = getBoolean(R.styleable.CoverImageView_trimImage, trimImage)
-		}
-		if (placeholderDrawable == null) {
-			placeholderDrawable = AnimatedPlaceholderDrawable(context)
-		}
-		if (errorDrawable == null) {
-			errorDrawable = ColorUtils.blendARGB(
-				context.getThemeColor(materialR.attr.colorErrorContainer),
-				context.getThemeColor(appcompatR.attr.colorBackgroundFloating),
-				0.25f,
-			).toDrawable()
-		}
-		if (fallbackDrawable == null) {
-			fallbackDrawable = context.getThemeColor(materialR.attr.colorSurfaceContainer).toDrawable()
-		}
-		addImageRequestListener(ErrorForegroundListener())
-	}
+    init {
+        context.withStyledAttributes(attrs, R.styleable.CoverImageView, defStyleAttr) {
+            aspectRationHeight = getInt(R.styleable.CoverImageView_aspectRationHeight, aspectRationHeight)
+            aspectRationWidth = getInt(R.styleable.CoverImageView_aspectRationWidth, aspectRationWidth)
+            trimImage = getBoolean(R.styleable.CoverImageView_trimImage, trimImage)
+        }
+        if (placeholderDrawable == null) {
+            placeholderDrawable = AnimatedPlaceholderDrawable(context)
+        }
+        if (errorDrawable == null) {
+            errorDrawable = ColorUtils.blendARGB(
+                context.getThemeColor(materialR.attr.colorErrorContainer),
+                context.getThemeColor(appcompatR.attr.colorBackgroundFloating),
+                0.25f,
+            ).toDrawable()
+        }
+        if (fallbackDrawable == null) {
+            fallbackDrawable = context.getThemeColor(materialR.attr.colorSurfaceContainer).toDrawable()
+        }
+        addImageRequestListener(ErrorForegroundListener())
+    }
 
-	override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-		super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-		if (!hasAspectRatio) {
-			return
-		}
-		val isExactWidth = MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY
-		val isExactHeight = MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY
-		when {
-			isExactHeight && isExactWidth -> Unit
-			isExactHeight -> setMeasuredDimension(
-				/* measuredWidth = */ measuredHeight * aspectRationWidth / aspectRationHeight,
-				/* measuredHeight = */ measuredHeight,
-			)
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        if (!hasAspectRatio) {
+            return
+        }
+        val isExactWidth = MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY
+        val isExactHeight = MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY
+        when {
+            isExactHeight && isExactWidth -> Unit
+            isExactHeight -> setMeasuredDimension(
+                /* measuredWidth = */ measuredHeight * aspectRationWidth / aspectRationHeight,
+                /* measuredHeight = */ measuredHeight,
+            )
 
-			isExactWidth -> setMeasuredDimension(
-				/* measuredWidth = */ measuredWidth,
-				/* measuredHeight = */ measuredWidth * aspectRationHeight / aspectRationWidth,
-			)
-		}
-	}
+            isExactWidth -> setMeasuredDimension(
+                /* measuredWidth = */ measuredWidth,
+                /* measuredHeight = */ measuredWidth * aspectRationHeight / aspectRationWidth,
+            )
+        }
+    }
 
-	private fun isAnimatedUrl(url: String?): Boolean = url?.isAnimatedImage() == true
+    private fun isAnimatedUrl(url: String?): Boolean = url?.isAnimatedImage() == true
 
-	override fun setImageAsync(page: ReaderPage) = enqueueRequest(
-		newRequestBuilder(applyTrim = true)
-			.data(page.toMangaPage())
-			.mangaSourceExtra(page.source)
-			.build(),
-	)
+    override fun setImageAsync(page: ReaderPage) = enqueueRequest(
+        newRequestBuilder(applyTrim = true)
+            .data(page.toMangaPage())
+            .mangaSourceExtra(page.source)
+            .build(),
+    )
 
-	fun setImageAsync(page: MangaPage) = enqueueRequest(
-		newRequestBuilder(applyTrim = true)
-			.data(page)
-			.mangaSourceExtra(page.source)
-			.build(),
-	)
+    fun setImageAsync(page: MangaPage) = enqueueRequest(
+        newRequestBuilder(applyTrim = true)
+            .data(page)
+            .mangaSourceExtra(page.source)
+            .build(),
+    )
 
-	fun setImageAsync(cover: Cover?) = enqueueRequest(
-		newRequestBuilder(applyTrim = !isAnimatedUrl(cover?.url))
-			.data(cover?.url)
-			.mangaSourceExtra(cover?.mangaSource)
-			.build(),
-	)
+    fun setImageAsync(cover: Cover?) = enqueueRequest(
+        newRequestBuilder(applyTrim = !isAnimatedUrl(cover?.url))
+            .data(cover?.url)
+            .mangaSourceExtra(cover?.mangaSource)
+            .build(),
+    )
 
-	fun setImageAsync(
-		coverUrl: String?,
-		manga: Manga?,
-	) = enqueueRequest(
-		newRequestBuilder(applyTrim = !isAnimatedUrl(coverUrl))
-			.data(coverUrl)
-			.mangaExtra(manga)
-			.build(),
-	)
+    fun setImageAsync(
+        coverUrl: String?,
+        manga: Manga?,
+    ) = enqueueRequest(
+        newRequestBuilder(applyTrim = !isAnimatedUrl(coverUrl))
+            .data(coverUrl)
+            .mangaExtra(manga)
+            .build(),
+    )
 
-	fun setImageAsync(
-		coverUrl: String?,
-		source: MangaSource,
-	) = enqueueRequest(
-		newRequestBuilder(applyTrim = !isAnimatedUrl(coverUrl))
-			.data(coverUrl)
-			.mangaSourceExtra(source)
-			.build(),
-	)
+    fun setImageAsync(
+        coverUrl: String?,
+        source: MangaSource,
+    ) = enqueueRequest(
+        newRequestBuilder(applyTrim = !isAnimatedUrl(coverUrl))
+            .data(coverUrl)
+            .mangaSourceExtra(source)
+            .build(),
+    )
 
-	fun setImageAsync(
-		bookmark: Bookmark
-	) = enqueueRequest(
-		newRequestBuilder(applyTrim = true)
-			.data(bookmark.toMangaPage())
-			.decodeRegion(bookmark.scroll)
-			.bookmarkExtra(bookmark)
-			.build(),
-	)
+    fun setImageAsync(
+        bookmark: Bookmark
+    ) = enqueueRequest(
+        newRequestBuilder(applyTrim = true)
+            .data(bookmark.toMangaPage())
+            .decodeRegion(bookmark.scroll)
+            .bookmarkExtra(bookmark)
+            .build(),
+    )
 
-	private fun newRequestBuilder(applyTrim: Boolean) = super.newRequestBuilder().apply {
-		if (trimImage && applyTrim) {
-			transformations(listOf(TrimTransformation()))
-		}
-		if (hasAspectRatio) {
-			size(CoverSizeResolver(this@CoverImageView))
-		}
-	}
+    private fun newRequestBuilder(applyTrim: Boolean) = super.newRequestBuilder().apply {
+        if (trimImage && applyTrim) {
+            transformations(listOf(TrimTransformation()))
+        }
+        if (hasAspectRatio) {
+            size(CoverSizeResolver(this@CoverImageView))
+        }
+    }
 
-	@Deprecated("Use newRequestBuilder(applyTrim) instead", level = DeprecationLevel.HIDDEN)
-	override fun newRequestBuilder() = newRequestBuilder(applyTrim = true)
+    @Deprecated("Use newRequestBuilder(applyTrim) instead", level = DeprecationLevel.HIDDEN)
+    override fun newRequestBuilder() = newRequestBuilder(applyTrim = true)
 
-	private inner class ErrorForegroundListener : ImageRequest.Listener {
+    private inner class ErrorForegroundListener : ImageRequest.Listener {
 
-		override fun onSuccess(request: ImageRequest, result: SuccessResult) {
-			super.onSuccess(request, result)
-			foreground = null
-		}
+        override fun onSuccess(request: ImageRequest, result: SuccessResult) {
+            super.onSuccess(request, result)
+            foreground = null
+        }
 
-		override fun onCancel(request: ImageRequest) {
-			super.onCancel(request)
-			foreground = null
-		}
+        override fun onCancel(request: ImageRequest) {
+            super.onCancel(request)
+            foreground = null
+        }
 
-		override fun onStart(request: ImageRequest) {
-			super.onStart(request)
-			foreground = null
-		}
+        override fun onStart(request: ImageRequest) {
+            super.onStart(request)
+            foreground = null
+        }
 
-		override fun onError(request: ImageRequest, result: ErrorResult) {
-			super.onError(request, result)
-			foreground = if (result.throwable.isNetworkError() && !networkState.isOnline()) {
-				ContextCompat.getDrawable(context, R.drawable.ic_offline)?.let {
-					LayerDrawable(arrayOf(it)).apply {
-						setLayerGravity(0, Gravity.CENTER)
-						setTint(ContextCompat.getColor(context, R.color.dim_lite))
-					}
-				}
-			} else {
-				result.throwable.getShortMessage()?.let { text ->
-					TextDrawable.create(context, text, materialR.attr.textAppearanceTitleSmall)
-				}
-			}
-		}
+        override fun onError(request: ImageRequest, result: ErrorResult) {
+            super.onError(request, result)
+            foreground = if (result.throwable.isNetworkError() && !networkState.isOnline()) {
+                ContextCompat.getDrawable(context, R.drawable.ic_offline)?.let {
+                    LayerDrawable(arrayOf(it)).apply {
+                        setLayerGravity(0, Gravity.CENTER)
+                        setTint(ContextCompat.getColor(context, R.color.dim_lite))
+                    }
+                }
+            } else {
+                result.throwable.getShortMessage()?.let { text ->
+                    TextDrawable.create(context, text, materialR.attr.textAppearanceTitleSmall)
+                }
+            }
+        }
 
-		private fun Throwable.getShortMessage(): String? = when (this) {
-			is HttpException -> response.code.toString()
-			is HttpStatusException -> statusCode.toString()
-			is ContentUnavailableException,
-			is FileNotFoundException -> "404"
+        private fun Throwable.getShortMessage(): String? = when (this) {
+            is HttpException -> response.code.toString()
+            is HttpStatusException -> statusCode.toString()
+            is ContentUnavailableException,
+            is FileNotFoundException -> "404"
 
-			is TooManyRequestExceptions -> "429"
-			is ParseException -> "</>"
-			is UnsupportedSourceException -> "X"
-			is CloudFlareProtectedException -> "?"
-			else -> cause?.getShortMessage()
-		}
-	}
+            is TooManyRequestExceptions -> "429"
+            is ParseException -> "</>"
+            is UnsupportedSourceException -> "X"
+            is CloudFlareProtectedException -> "?"
+            else -> cause?.getShortMessage()
+        }
+    }
 
-	private class CoverSizeResolver(
-		view: CoverImageView,
-	) : SizeResolver {
+    private class CoverSizeResolver(
+        view: CoverImageView,
+    ) : SizeResolver {
 
-		private val viewRef = WeakReference(view)
+        private val viewRef = WeakReference(view)
 
-		override suspend fun size(): Size {
-			val view = viewRef.get() ?: throw kotlinx.coroutines.CancellationException("Cover view was released")
-			// Fast path: the view is already measured.
-			getSize(view)?.let { return it }
+        private val requestSizeKey = listOf(
+            view.aspectRationWidth, view.aspectRationHeight,
+            view.layoutParams?.width, view.layoutParams?.height,
+            view.paddingLeft, view.paddingTop, view.paddingRight, view.paddingBottom,
+        )
 
-			// Slow path: wait for the view to be measured.
-			return suspendCancellableCoroutine { continuation ->
-				val viewTreeObserver = view.viewTreeObserver
+        override fun equals(other: Any?): Boolean = other is CoverSizeResolver &&
+            viewRef.get() === other.viewRef.get() && requestSizeKey == other.requestSizeKey
 
-				val preDrawListener = object : OnPreDrawListener {
-					private var isResumed = false
+        override fun hashCode(): Int = requestSizeKey.hashCode()
 
-					override fun onPreDraw(): Boolean {
-						val size = getSize(view)
-						if (size != null) {
-							viewTreeObserver.removePreDrawListenerSafe(this)
+        override suspend fun size(): Size {
+            val view = viewRef.get() ?: throw kotlinx.coroutines.CancellationException("Cover view was released")
+            // Fast path: the view is already measured.
+            getSize(view)?.let { return it }
 
-							if (!isResumed) {
-								isResumed = true
-								continuation.resume(size)
-							}
-						}
-						return true
-					}
-				}
+            // Slow path: wait for the view to be measured.
+            return suspendCancellableCoroutine { continuation ->
+                val viewTreeObserver = view.viewTreeObserver
 
-				viewTreeObserver.addOnPreDrawListener(preDrawListener)
+                val preDrawListener = object : OnPreDrawListener {
+                    private var isResumed = false
 
-				continuation.invokeOnCancellation {
-					viewTreeObserver.removePreDrawListenerSafe(preDrawListener)
-				}
-			}
-		}
+                    override fun onPreDraw(): Boolean {
+                        val size = getSize(view)
+                        if (size != null) {
+                            viewTreeObserver.removePreDrawListenerSafe(this)
 
-		private fun getSize(view: CoverImageView): Size? = resolveCoverImageSize(
-			width = getWidth(view),
-			height = getHeight(view),
-			aspectWidth = view.aspectRationWidth,
-			aspectHeight = view.aspectRationHeight,
-		)
+                            if (!isResumed) {
+                                isResumed = true
+                                continuation.resume(size)
+                            }
+                        }
+                        return true
+                    }
+                }
 
-		private fun getWidth(view: CoverImageView) = getDimension(
-			paramSize = view.layoutParams?.width ?: -1,
-			viewSize = view.width,
-			paddingSize = view.paddingLeft + view.paddingRight,
-		)
+                viewTreeObserver.addOnPreDrawListener(preDrawListener)
 
-		private fun getHeight(view: CoverImageView) = getDimension(
-			paramSize = view.layoutParams?.height ?: -1,
-			viewSize = view.height,
-			paddingSize = view.paddingTop + view.paddingBottom,
-		)
+                continuation.invokeOnCancellation {
+                    viewTreeObserver.removePreDrawListenerSafe(preDrawListener)
+                }
+            }
+        }
 
-		private fun getDimension(paramSize: Int, viewSize: Int, paddingSize: Int): Dimension.Pixels? {
-			if (paramSize == ViewGroup.LayoutParams.WRAP_CONTENT) {
-				return null
-			}
-			val insetParamSize = paramSize - paddingSize
-			if (insetParamSize > 0) {
-				return Dimension(insetParamSize)
-			}
-			val insetViewSize = viewSize - paddingSize
-			if (insetViewSize > 0) {
-				return Dimension(insetViewSize)
-			}
-			return null
-		}
+        private fun getSize(view: CoverImageView): Size? = resolveCoverImageSize(
+            width = getWidth(view),
+            height = getHeight(view),
+            aspectWidth = view.aspectRationWidth,
+            aspectHeight = view.aspectRationHeight,
+        )
 
-		private fun ViewTreeObserver.removePreDrawListenerSafe(victim: OnPreDrawListener) {
-			if (isAlive) {
-				removeOnPreDrawListener(victim)
-			} else {
-				viewRef.get()?.viewTreeObserver?.removeOnPreDrawListener(victim)
-			}
-		}
-	}
+        private fun getWidth(view: CoverImageView) = getDimension(
+            paramSize = view.layoutParams?.width ?: -1,
+            viewSize = view.width,
+            paddingSize = view.paddingLeft + view.paddingRight,
+        )
+
+        private fun getHeight(view: CoverImageView) = getDimension(
+            paramSize = view.layoutParams?.height ?: -1,
+            viewSize = view.height,
+            paddingSize = view.paddingTop + view.paddingBottom,
+        )
+
+        private fun getDimension(paramSize: Int, viewSize: Int, paddingSize: Int): Dimension.Pixels? {
+            if (paramSize == ViewGroup.LayoutParams.WRAP_CONTENT) {
+                return null
+            }
+            val insetParamSize = paramSize - paddingSize
+            if (insetParamSize > 0) {
+                return Dimension(insetParamSize)
+            }
+            val insetViewSize = viewSize - paddingSize
+            if (insetViewSize > 0) {
+                return Dimension(insetViewSize)
+            }
+            return null
+        }
+
+        private fun ViewTreeObserver.removePreDrawListenerSafe(victim: OnPreDrawListener) {
+            if (isAlive) {
+                removeOnPreDrawListener(victim)
+            } else {
+                viewRef.get()?.viewTreeObserver?.removeOnPreDrawListener(victim)
+            }
+        }
+    }
 }

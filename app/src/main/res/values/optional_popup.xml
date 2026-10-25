@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="optional_menu_corner_radius">20dp</dimen>
+    <style name="ThemeOverlay.Kaisoku.AnimatedMenus" parent="">
+        <item name="popupWindowStyle">@style/Widget.Kaisoku.AnimatedPopupWindow</item>
+        <item name="android:popupWindowStyle">@style/Widget.Kaisoku.AnimatedPopupWindow</item>
+    </style>
+    <style name="Widget.Kaisoku.AnimatedPopupWindow" parent="Widget.AppCompat.PopupWindow">
+        <item name="android:popupEnterTransition">@transition/optional_popup_enter</item>
+        <item name="android:popupExitTransition">@android:transition/fade</item>
+    </style>
+</resources>
