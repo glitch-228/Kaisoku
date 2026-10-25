@@ -20,6 +20,7 @@ import org.koitharu.kotatsu.core.network.MangaHttpClient
 import org.koitharu.kotatsu.core.network.cookies.MutableCookieJar
 import org.koitharu.kotatsu.core.network.webview.WebViewExecutor
 import org.koitharu.kotatsu.core.prefs.SourceSettings
+import org.koitharu.kotatsu.core.util.ext.isLowRamDevice
 import org.koitharu.kotatsu.core.util.ext.toList
 import org.koitharu.kotatsu.core.util.ext.toMimeType
 import org.koitharu.kotatsu.core.util.ext.use
@@ -97,14 +98,17 @@ class MangaLoaderContextImpl @Inject constructor(
 
     override fun redrawImageResponse(response: Response, redraw: (image: Bitmap) -> Bitmap): Response {
         return response.map { body ->
-            BitmapDecoderCompat.decode(body.byteStream(), body.contentType()?.toMimeType(), isMutable = true)
-                .use { bitmap ->
-                    (redraw(BitmapWrapper.create(bitmap)) as BitmapWrapper).use { result ->
-                        Buffer().also {
-                            result.compressTo(it.outputStream())
-                        }.asResponseBody("image/png".toMediaType())
-                    }
+            val transform: (android.graphics.Bitmap) -> okhttp3.ResponseBody = { bitmap ->
+                (redraw(BitmapWrapper.create(bitmap)) as BitmapWrapper).use { result ->
+                    Buffer().also { result.compressTo(it.outputStream()) }.asResponseBody("image/png".toMediaType())
                 }
+            }
+            if (response.request.tag(MangaSource::class.java)?.name == "PROCOMIC") {
+                withBoundedParserImage(body, androidContext.isLowRamDevice(), transform)
+            } else {
+                BitmapDecoderCompat.decode(body.byteStream(), body.contentType()?.toMimeType(), isMutable = true)
+                    .use(transform)
+            }
         }
     }
 
