@@ -37,630 +37,716 @@ import javax.inject.Singleton
  * Kotatsu-Redo's open community client/server design; Kaisoku identifies itself on every request.
  *
  * The server deliberately has no password or login endpoint.  A random 256-bit bearer secret is
- * generated on the device and is the pseudonymous account credential.	Nothing is sent until the
- * user enables Community features.	 Aggregate source scores remain cacheable public data.
+ * generated on the device and is the pseudonymous account credential.  Nothing is sent until the
+ * user enables Community features.  Aggregate source scores remain cacheable public data.
  */
 @Singleton
 class CommunityRepository @Inject constructor(
-	@ApplicationContext context: Context,
-	@CommunityHttpClient private val client: OkHttpClient,
-	private val settings: AppSettings,
+    @ApplicationContext context: Context,
+    @CommunityHttpClient private val client: OkHttpClient,
+    private val settings: AppSettings,
 ) {
-	private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-	private val jsonType = "application/json; charset=utf-8".toMediaType()
-	private val identityMutex = Mutex()
-	private val workMutex = Mutex()
-	private val scoreCache = CommunityScoreCache()
-	private val summaryMutex = Mutex()
-	private val summaryCache = mutableMapOf<String, CachedCommunitySummary>()
-	private val telemetryLock = Any()
-	private val telemetryMutex = Mutex()
-	private val deviceId: String = Settings.Secure.getString(
-		context.contentResolver,
-		Settings.Secure.ANDROID_ID,
-	)?.takeIf { it.isNotBlank() } ?: "kaisoku-${Build.FINGERPRINT.hashCode()}"
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val replyPrefs = context.getSharedPreferences("_community_reply_state", Context.MODE_PRIVATE)
+    private val jsonType = "application/json; charset=utf-8".toMediaType()
+    private val identityMutex = Mutex()
+    private val workMutex = Mutex()
+    private val notificationMutex = Mutex()
+    private val similarMutex = Mutex()
+    private val similarCache = linkedMapOf<String, Pair<Long, List<CommunitySimilarTitle>>>()
+    private val scoreCache = CommunityScoreCache()
+    private val summaryMutex = Mutex()
+    private val summaryCache = mutableMapOf<String, CachedCommunitySummary>()
+    private val telemetryLock = Any()
+    private val telemetryMutex = Mutex()
+    private val deviceId: String = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ANDROID_ID,
+    )?.takeIf { it.isNotBlank() } ?: "kaisoku-${Build.FINGERPRINT.hashCode()}"
 
-	val isEnabled: Boolean
-		get() = settings.isCommunityEnabled
+    val isEnabled: Boolean
+        get() = settings.isCommunityEnabled
 
-	val isTelemetryEnabled: Boolean
-		get() = settings.isCommunityTelemetryEnabled
+    val isTelemetryEnabled: Boolean
+        get() = settings.isCommunityTelemetryEnabled
 
-	val serverUrl: String
-		get() = prefs.getString(KEY_SERVER, DEFAULT_SERVER)?.trimEnd('/').orEmpty().ifBlank { DEFAULT_SERVER }
+    val serverUrl: String
+        get() = prefs.getString(KEY_SERVER, DEFAULT_SERVER)?.trimEnd('/').orEmpty().ifBlank { DEFAULT_SERVER }
 
-	val hasIdentity: Boolean
-		get() = prefs.getString(KEY_SECRET, null).orEmpty().isNotBlank()
+    val hasIdentity: Boolean
+        get() = prefs.getString(KEY_SECRET, null).orEmpty().isNotBlank()
 
-	fun setEnabled(enabled: Boolean) {
-		settings.isCommunityEnabled = enabled
-		if (!enabled) settings.isCommunityTelemetryEnabled = false
-	}
+    fun setEnabled(enabled: Boolean) {
+        settings.isCommunityEnabled = enabled
+        if (!enabled) settings.isCommunityTelemetryEnabled = false
+    }
 
-	fun setTelemetryEnabled(enabled: Boolean) {
-		settings.isCommunityTelemetryEnabled = enabled && settings.isCommunityEnabled
-	}
+    fun setTelemetryEnabled(enabled: Boolean) {
+        settings.isCommunityTelemetryEnabled = enabled && settings.isCommunityEnabled
+    }
 
-	suspend fun ensureIdentity(): CommunityIdentity = withContext(Dispatchers.IO) {
-		identityMutex.withLock {
-			check(isEnabled) { "Community features are disabled" }
-			val secret = prefs.getString(KEY_SECRET, null)
-			if (!secret.isNullOrBlank()) {
-				val marker = identityMarker(secret)
-				if (prefs.getString(KEY_REGISTERED_IDENTITY, null) == marker) {
-					prefs.getString(KEY_REGISTERED_IDENTITY_JSON, null)?.let { cached ->
-						parseIdentity(JSONObject(cached)).let { return@withLock it }
-					}
-				}
-				try {
-					val identity = parseIdentity(request("/v1/identity/me", secret = secret))
-					rememberIdentity(secret, identity)
-					return@withLock identity
-				} catch (error: CommunityApiException.Unauthorized) {
-					// A restored/rotated credential can be validated by the registration endpoint.
-				}
-			}
-			val identity = parseIdentity(request(
-				"/v1/identity/hello",
-				method = "POST",
-				body = JSONObject().put("ssaid", deviceId),
-				secret = getOrCreateSecret(),
-			))
-			rememberIdentity(requireSecret(), identity)
-			identity
-		}
-	}
+    suspend fun ensureIdentity(): CommunityIdentity = withContext(Dispatchers.IO) {
+        identityMutex.withLock {
+            check(isEnabled) { "Community features are disabled" }
+            val secret = prefs.getString(KEY_SECRET, null)
+            if (!secret.isNullOrBlank()) {
+                val marker = identityMarker(secret)
+                if (prefs.getString(KEY_REGISTERED_IDENTITY, null) == marker) {
+                    prefs.getString(KEY_REGISTERED_IDENTITY_JSON, null)?.let { cached ->
+                        parseIdentity(JSONObject(cached)).let { return@withLock it }
+                    }
+                }
+                try {
+                    val identity = parseIdentity(request("/v1/identity/me", secret = secret))
+                    rememberIdentity(secret, identity)
+                    return@withLock identity
+                } catch (error: CommunityApiException.Unauthorized) {
+                    // A restored/rotated credential can be validated by the registration endpoint.
+                }
+            }
+            val identity = parseIdentity(request(
+                "/v1/identity/hello",
+                method = "POST",
+                body = JSONObject().put("ssaid", deviceId),
+                secret = getOrCreateSecret(),
+            ))
+            rememberIdentity(requireSecret(), identity)
+            identity
+        }
+    }
 
-	suspend fun identityOrNull(): CommunityIdentity? = withContext(Dispatchers.IO) {
-		if (!isEnabled || !hasIdentity) return@withContext null
-		try {
-			parseIdentity(request("/v1/identity/me", secret = requireSecret()))
-		} catch (error: CancellationException) {
-			throw error
-		} catch (_: Exception) {
-			null
-		}
-	}
+    suspend fun identityOrNull(): CommunityIdentity? = withContext(Dispatchers.IO) {
+        if (!isEnabled || !hasIdentity) return@withContext null
+        try {
+            parseIdentity(request("/v1/identity/me", secret = requireSecret()))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            null
+        }
+    }
 
-	suspend fun importRecoveryKey(value: String): CommunityIdentity = withContext(Dispatchers.IO) {
-		identityMutex.withLock {
-			check(isEnabled) { "Community features are disabled" }
-			val decoded = Base64.decode(value.trim(), Base64.DEFAULT)
-			check(decoded.size == SECRET_BYTES) { "Invalid community recovery key" }
-			val secret = Base64.encodeToString(decoded, Base64.NO_WRAP)
-			// Validate an existing account without replacing the current key or creating a new account.
-			val identity = parseIdentity(request("/v1/identity/me", secret = secret))
-			prefs.edit().putString(KEY_SECRET, secret).remove(KEY_NOTIFICATION_CURSOR)
-				.remove(KEY_TELEMETRY_PENDING).putString(KEY_REGISTERED_IDENTITY, identityMarker(secret))
-				.putString(KEY_REGISTERED_IDENTITY_JSON, identity.toJson().toString()).apply()
-			identity
-		}
-	}
+    suspend fun importRecoveryKey(value: String): CommunityIdentity = withContext(Dispatchers.IO) {
+        identityMutex.withLock {
+            check(isEnabled) { "Community features are disabled" }
+            val decoded = Base64.decode(value.trim(), Base64.DEFAULT)
+            check(decoded.size == SECRET_BYTES) { "Invalid community recovery key" }
+            val secret = Base64.encodeToString(decoded, Base64.NO_WRAP)
+            // Validate an existing account without replacing the current key or creating a new account.
+            val identity = parseIdentity(request("/v1/identity/me", secret = secret))
+            prefs.edit().putString(KEY_SECRET, secret).remove(KEY_NOTIFICATION_CURSOR)
+                .remove(KEY_TELEMETRY_PENDING).putString(KEY_REGISTERED_IDENTITY, identityMarker(secret))
+                .putString(KEY_REGISTERED_IDENTITY_JSON, identity.toJson().toString()).apply()
+            identity
+        }
+    }
 
-	fun exportRecoveryKey(): String? = prefs.getString(KEY_SECRET, null)
+    fun exportRecoveryKey(): String? = prefs.getString(KEY_SECRET, null)
 
-	suspend fun deleteIdentity() = withContext(Dispatchers.IO) {
-		identityMutex.withLock {
-			if (hasIdentity) {
-				request("/v1/identity/me", method = "DELETE", secret = requireSecret())
-			}
-			// Keep the credential on failure so the user can retry deleting their server data.
-			prefs.edit().remove(KEY_SECRET).remove(KEY_REGISTERED_IDENTITY).remove(KEY_REGISTERED_IDENTITY_JSON)
-				.remove(KEY_NOTIFICATION_CURSOR)
-				.remove(KEY_TELEMETRY_PENDING).apply()
-		}
-	}
+    suspend fun deleteIdentity() = withContext(Dispatchers.IO) {
+        identityMutex.withLock {
+            if (hasIdentity) {
+                request("/v1/identity/me", method = "DELETE", secret = requireSecret())
+            }
+            // Keep the credential on failure so the user can retry deleting their server data.
+            prefs.edit().remove(KEY_SECRET).remove(KEY_REGISTERED_IDENTITY).remove(KEY_REGISTERED_IDENTITY_JSON)
+                .remove(KEY_NOTIFICATION_CURSOR)
+                .remove(KEY_TELEMETRY_PENDING).apply()
+            replyPrefs.edit().clear().apply()
+        }
+    }
 
-	suspend fun resolveWork(manga: Manga): Long = withContext(Dispatchers.IO) {
-		val cacheKey = "${manga.source.name}\u0000${manga.url.ifBlank { manga.publicUrl }}".encodeUtf8().sha256().hex()
-		workMutex.withLock {
-			prefs.getString(KEY_WORK_PREFIX + cacheKey, null)?.toLongOrNull()?.let { return@withLock it }
-			val fingerprint = JSONObject()
-			.put("source", manga.source.name)
-			.put("key", manga.url.ifBlank { manga.publicUrl })
-			.put("title", manga.title)
-			.put("alt_titles", JSONArray(manga.altTitles.toList()))
-			.put("content_type", "manga")
-			.put("nsfw", manga.contentRating == ContentRating.ADULT)
-			val response = request(
-			path = "/v1/works/resolve",
-			method = "POST",
-			body = JSONObject().put("works", JSONArray().put(fingerprint)),
-			secret = requireSecret(),
-		)
-			val resolved = response.optJSONArray("resolved")?.optJSONObject(0)
-			?: error("Community server returned no work identity")
-			val workId = resolved.optString("work_id").toLongOrNull()
-			?: error("Community server returned an invalid work identity")
-			prefs.edit().putString(KEY_WORK_PREFIX + cacheKey, workId.toString()).apply()
-			workId
-		}
-	}
+    suspend fun resolveWork(manga: Manga): Long = withContext(Dispatchers.IO) {
+        val cacheKey = "${manga.source.name}\u0000${manga.url.ifBlank { manga.publicUrl }}".encodeUtf8().sha256().hex()
+        workMutex.withLock {
+            prefs.getString(KEY_WORK_PREFIX + cacheKey, null)?.toLongOrNull()?.let { return@withLock it }
+            val fingerprint = JSONObject()
+            .put("source", manga.source.name)
+            .put("key", manga.url.ifBlank { manga.publicUrl })
+            .put("title", manga.title)
+            .put("alt_titles", JSONArray(manga.altTitles.toList()))
+            .put("content_type", "manga")
+            .put("nsfw", manga.contentRating == ContentRating.ADULT)
+            val response = request(
+            path = "/v1/works/resolve",
+            method = "POST",
+            body = JSONObject().put("works", JSONArray().put(fingerprint)),
+            secret = requireSecret(),
+        )
+            val resolved = response.optJSONArray("resolved")?.optJSONObject(0)
+            ?: error("Community server returned no work identity")
+            val workId = resolved.optString("work_id").toLongOrNull()
+            ?: error("Community server returned an invalid work identity")
+            prefs.edit().putString(KEY_WORK_PREFIX + cacheKey, workId.toString()).apply()
+            workId
+        }
+    }
 
-	suspend fun getRating(manga: Manga): CommunityRating = withContext(Dispatchers.IO) {
-		val workId = resolveWork(manga)
-		val response = request("/v1/works/$workId/rating", secret = requireSecret())
-		CommunityRating(
-			workId = workId,
-			count = response.optInt("count"),
-			average = response.optDouble("average", 0.0).toFloat(),
-			mine = if (response.isNull("mine")) null else response.optDouble("mine").toFloat(),
-		)
-	}
+    suspend fun getRating(manga: Manga): CommunityRating = withContext(Dispatchers.IO) {
+        val workId = resolveWork(manga)
+        val response = request("/v1/works/$workId/rating", secret = requireSecret())
+        CommunityRating(
+            workId = workId,
+            count = response.optInt("count"),
+            average = response.optDouble("average", 0.0).toFloat(),
+            mine = if (response.isNull("mine")) null else response.optDouble("mine").toFloat(),
+        )
+    }
 
-	data class Summary(val rating: CommunityRating, val comments: Int)
-	private data class CachedCommunitySummary(val value: Summary, val savedAt: Long)
+    data class Summary(val rating: CommunityRating, val comments: Int)
+    private data class CachedCommunitySummary(val value: Summary, val savedAt: Long)
 
-	fun cachedSummary(manga: Manga): Summary? = synchronized(summaryCache) {
-		summaryCache[summaryKey(manga)]?.value
-	}
+    fun cachedSummary(manga: Manga): Summary? = synchronized(summaryCache) {
+        summaryCache[summaryKey(manga)]?.value
+    }
 
-	fun isSummaryCachedFresh(manga: Manga): Boolean = synchronized(summaryCache) {
-		val cached = summaryCache[summaryKey(manga)] ?: return@synchronized false
-		System.currentTimeMillis() - cached.savedAt <= SUMMARY_TTL_MS
-	}
+    fun isSummaryCachedFresh(manga: Manga): Boolean = synchronized(summaryCache) {
+        val cached = summaryCache[summaryKey(manga)] ?: return@synchronized false
+        System.currentTimeMillis() - cached.savedAt <= SUMMARY_TTL_MS
+    }
 
-	suspend fun getSummary(manga: Manga): Summary = withContext(Dispatchers.IO) {
-		if (isSummaryCachedFresh(manga)) cachedSummary(manga)?.let { return@withContext it }
-		summaryMutex.withLock {
-			if (isSummaryCachedFresh(manga)) cachedSummary(manga)?.let { return@withLock it }
-			val workId = resolveWork(manga)
-			val ratingJson = request("/v1/works/$workId/rating", secret = requireSecret())
-			val commentsJson = request("/v1/works/$workId/comments?limit=1", secret = requireSecret())
-			val value = Summary(
-				CommunityRating(
-					workId = workId,
-					count = ratingJson.optInt("count"),
-					average = ratingJson.optDouble("average", 0.0).toFloat(),
-					mine = if (ratingJson.isNull("mine")) null else ratingJson.optDouble("mine").toFloat(),
-				),
-				commentsJson.optInt("total"),
-			)
-			synchronized(summaryCache) { summaryCache[summaryKey(manga)] = CachedCommunitySummary(value, System.currentTimeMillis()) }
-			value
-		}
-	}
+    suspend fun getSummary(manga: Manga): Summary = withContext(Dispatchers.IO) {
+        if (isSummaryCachedFresh(manga)) cachedSummary(manga)?.let { return@withContext it }
+        summaryMutex.withLock {
+            if (isSummaryCachedFresh(manga)) cachedSummary(manga)?.let { return@withLock it }
+            val workId = resolveWork(manga)
+            val ratingJson = request("/v1/works/$workId/rating", secret = requireSecret())
+            val commentsJson = request("/v1/works/$workId/comments?limit=1", secret = requireSecret())
+            val value = Summary(
+                CommunityRating(
+                    workId = workId,
+                    count = ratingJson.optInt("count"),
+                    average = ratingJson.optDouble("average", 0.0).toFloat(),
+                    mine = if (ratingJson.isNull("mine")) null else ratingJson.optDouble("mine").toFloat(),
+                ),
+                commentsJson.optInt("total"),
+            )
+            synchronized(summaryCache) { summaryCache[summaryKey(manga)] = CachedCommunitySummary(value, System.currentTimeMillis()) }
+            value
+        }
+    }
 
-	private fun summaryKey(manga: Manga): String {
-		val account = prefs.getString(KEY_SECRET, null).orEmpty().encodeUtf8().sha256().hex()
-		return "$serverUrl|$account|${manga.source.name}|${manga.url.ifBlank { manga.publicUrl }}"
-	}
+    private fun summaryKey(manga: Manga): String {
+        val account = prefs.getString(KEY_SECRET, null).orEmpty().encodeUtf8().sha256().hex()
+        return "$serverUrl|$account|${manga.source.name}|${manga.url.ifBlank { manga.publicUrl }}"
+    }
 
-	private fun invalidateSummary(manga: Manga) = synchronized(summaryCache) { summaryCache.remove(summaryKey(manga)) }
-	private fun invalidateAllSummaries() = synchronized(summaryCache) { summaryCache.clear() }
+    private fun invalidateSummary(manga: Manga) = synchronized(summaryCache) { summaryCache.remove(summaryKey(manga)) }
+    private fun invalidateAllSummaries() = synchronized(summaryCache) { summaryCache.clear() }
 
-	suspend fun setRating(manga: Manga, stars: Float): CommunityRating = withContext(Dispatchers.IO) {
-		if (stars <= 0f) return@withContext clearRating(manga)
-		val workId = resolveWork(manga)
-		val value = (stars.coerceIn(0.5f, 5f) * 2f).toInt()
-		val response = request(
-			"/v1/works/$workId/rating",
-			method = "PUT",
-			body = JSONObject().put("value", value),
-			secret = requireSecret(),
-		)
-		invalidateSummary(manga)
-		CommunityRating(workId, response.optInt("count"), response.optDouble("average", 0.0).toFloat(), response.optDouble("mine", stars.toDouble()).toFloat())
-	}
+    suspend fun setRating(manga: Manga, stars: Float): CommunityRating = withContext(Dispatchers.IO) {
+        if (stars <= 0f) return@withContext clearRating(manga)
+        val workId = resolveWork(manga)
+        val value = (stars.coerceIn(0.5f, 5f) * 2f).toInt()
+        val response = request(
+            "/v1/works/$workId/rating",
+            method = "PUT",
+            body = JSONObject().put("value", value),
+            secret = requireSecret(),
+        )
+        invalidateSummary(manga)
+        CommunityRating(workId, response.optInt("count"), response.optDouble("average", 0.0).toFloat(), response.optDouble("mine", stars.toDouble()).toFloat())
+    }
 
-	suspend fun clearRating(manga: Manga): CommunityRating = withContext(Dispatchers.IO) {
-		val workId = resolveWork(manga)
-		val response = request("/v1/works/$workId/rating", method = "DELETE", secret = requireSecret())
-		invalidateSummary(manga)
-		CommunityRating(workId, response.optInt("count"), response.optDouble("average", 0.0).toFloat(), null)
-	}
+    suspend fun clearRating(manga: Manga): CommunityRating = withContext(Dispatchers.IO) {
+        val workId = resolveWork(manga)
+        val response = request("/v1/works/$workId/rating", method = "DELETE", secret = requireSecret())
+        invalidateSummary(manga)
+        CommunityRating(workId, response.optInt("count"), response.optDouble("average", 0.0).toFloat(), null)
+    }
 
-	suspend fun getComments(
-		manga: Manga,
-		chapter: Long? = null,
-		sort: String = "top",
-		lang: String? = null,
-		offset: Int = 0,
-		limit: Int = 100,
-	): List<CommunityComment> = getCommentsPage(manga, chapter, sort, lang, offset, limit).comments
+    suspend fun getComments(
+        manga: Manga,
+        chapter: Long? = null,
+        sort: String = "top",
+        lang: String? = null,
+        offset: Int = 0,
+        limit: Int = 100,
+    ): List<CommunityComment> = getCommentsPage(manga, chapter, sort, lang, offset, limit).comments
 
-	suspend fun getCommentsPage(
-		manga: Manga,
-		chapter: Long? = null,
-		sort: String = "top",
-		lang: String? = null,
-		offset: Int = 0,
-		limit: Int = 100,
-	): CommunityCommentPage = withContext(Dispatchers.IO) {
-		val workId = resolveWork(manga)
-		val url = serverUrl.toHttpUrl().newBuilder()
-			.addPathSegments("v1/works/$workId/comments")
-			.addQueryParameter("sort", if (sort == "new") "new" else "top")
-			.addQueryParameter("limit", limit.coerceIn(1, 100).toString())
-			.addQueryParameter("offset", offset.coerceAtLeast(0).toString())
-			.apply { lang?.takeIf { it.isNotBlank() }?.let { addQueryParameter("lang", it) } }
-			.apply { chapter?.let { addQueryParameter("chapter", it.toString()) } }
-			.build()
-		val response = request(url.toString(), secret = requireSecret())
-		return@withContext CommunityCommentPage(
-			comments = response.optJSONArray("comments")?.toComments().orEmpty(),
-			total = response.optInt("total"),
-			byLanguage = response.optJSONObject("by_language")?.toIntMap().orEmpty(),
-			minimumLength = response.optJSONObject("rules")?.optInt("min_length", 20) ?: 20,
-		)
-	}
+    suspend fun getCommentsPage(
+        manga: Manga,
+        chapter: Long? = null,
+        sort: String = "top",
+        lang: String? = null,
+        offset: Int = 0,
+        limit: Int = 100,
+    ): CommunityCommentPage = withContext(Dispatchers.IO) {
+        val workId = resolveWork(manga)
+        val url = serverUrl.toHttpUrl().newBuilder()
+            .addPathSegments("v1/works/$workId/comments")
+            .addQueryParameter("sort", if (sort == "new") "new" else "top")
+            .addQueryParameter("limit", limit.coerceIn(1, 100).toString())
+            .addQueryParameter("offset", offset.coerceAtLeast(0).toString())
+            .apply { lang?.takeIf { it.isNotBlank() }?.let { addQueryParameter("lang", it) } }
+            .apply { chapter?.let { addQueryParameter("chapter", it.toString()) } }
+            .build()
+        val response = request(url.toString(), secret = requireSecret())
+        return@withContext CommunityCommentPage(
+            comments = response.optJSONArray("comments")?.toComments().orEmpty(),
+            total = response.optInt("total"),
+            byLanguage = response.optJSONObject("by_language")?.toIntMap().orEmpty(),
+            minimumLength = response.optJSONObject("rules")?.optInt("min_length", 20) ?: 20,
+        )
+    }
 
-	suspend fun postComment(
-		manga: Manga,
-		body: String,
-		chapter: Long? = null,
-		parentId: Long? = null,
-		spoiler: Boolean = false,
-	): CommunityComment = withContext(Dispatchers.IO) {
-		val workId = resolveWork(manga)
-		val url = serverUrl.toHttpUrl().newBuilder()
-			.addPathSegments("v1/works/$workId/comments")
-			.apply { chapter?.let { addQueryParameter("chapter", it.toString()) } }
-			.build()
-		val payload = JSONObject()
-			.put("body", body.trim())
-			.apply { parentId?.let { put("parent_id", it.toString()) } }
-			.put("is_spoiler", spoiler)
-			.put("lang", java.util.Locale.getDefault().language)
-		val response = request(url.toString(), method = "POST", body = payload, secret = requireSecret())
-		invalidateSummary(manga)
-		response.toComment()
-	}
+    suspend fun postComment(
+        manga: Manga,
+        body: String,
+        chapter: Long? = null,
+        parentId: Long? = null,
+        spoiler: Boolean = false,
+    ): CommunityComment = withContext(Dispatchers.IO) {
+        val workId = resolveWork(manga)
+        val url = serverUrl.toHttpUrl().newBuilder()
+            .addPathSegments("v1/works/$workId/comments")
+            .apply { chapter?.let { addQueryParameter("chapter", it.toString()) } }
+            .build()
+        val payload = JSONObject()
+            .put("body", body.trim())
+            .apply { parentId?.let { put("parent_id", it.toString()) } }
+            .put("is_spoiler", spoiler)
+            .put("lang", java.util.Locale.getDefault().language)
+        val response = request(url.toString(), method = "POST", body = payload, secret = requireSecret())
+        invalidateSummary(manga)
+        response.toComment()
+    }
 
-	suspend fun editComment(commentId: Long, body: String): CommunityComment = withContext(Dispatchers.IO) {
-		val response = request(
-			"/v1/comments/$commentId",
-			method = "PATCH",
-			body = JSONObject().put("body", body.trim()).put("lang", Locale.getDefault().language),
-			secret = requireSecret(),
-		)
-		invalidateAllSummaries()
-		response.toComment()
-	}
+    suspend fun editComment(commentId: Long, body: String): CommunityComment = withContext(Dispatchers.IO) {
+        val response = request(
+            "/v1/comments/$commentId",
+            method = "PATCH",
+            body = JSONObject().put("body", body.trim()).put("lang", Locale.getDefault().language),
+            secret = requireSecret(),
+        )
+        invalidateAllSummaries()
+        response.toComment()
+    }
 
-	suspend fun deleteComment(commentId: Long) = withContext(Dispatchers.IO) {
-		request("/v1/comments/$commentId", method = "DELETE", secret = requireSecret())
-		invalidateAllSummaries()
-		Unit
-	}
+    suspend fun deleteComment(commentId: Long) = withContext(Dispatchers.IO) {
+        request("/v1/comments/$commentId", method = "DELETE", secret = requireSecret())
+        invalidateAllSummaries()
+        Unit
+    }
 
-	suspend fun vote(commentId: Long, value: Int): CommunityComment = withContext(Dispatchers.IO) {
-		val response = request(
-			"/v1/comments/$commentId/vote",
-			method = "PUT",
-			body = JSONObject().put("value", value.coerceIn(-1, 1)),
-			secret = requireSecret(),
-		)
-		invalidateAllSummaries()
-		response.toComment()
-	}
+    suspend fun vote(commentId: Long, value: Int): CommunityComment = withContext(Dispatchers.IO) {
+        val response = request(
+            "/v1/comments/$commentId/vote",
+            method = "PUT",
+            body = JSONObject().put("value", value.coerceIn(-1, 1)),
+            secret = requireSecret(),
+        )
+        invalidateAllSummaries()
+        response.toComment()
+    }
 
-	suspend fun setNickname(nickname: String): CommunityIdentity = withContext(Dispatchers.IO) {
-		request(
-			"/v1/identity/nickname",
-			method = "POST",
-			body = JSONObject().put("nickname", nickname.trim()),
-			secret = requireSecret(),
-		).let(::parseIdentity)
-	}
+    suspend fun setNickname(nickname: String): CommunityIdentity = withContext(Dispatchers.IO) {
+        request(
+            "/v1/identity/nickname",
+            method = "POST",
+            body = JSONObject().put("nickname", nickname.trim()),
+            secret = requireSecret(),
+        ).let(::parseIdentity)
+    }
 
-	suspend fun getNotifications(limit: Int = 100): List<CommunityNotification> = withContext(Dispatchers.IO) {
-		val url = serverUrl.toHttpUrl().newBuilder()
-			.addPathSegments("v1/notifications")
-			.addQueryParameter("limit", limit.coerceIn(1, 100).toString())
-			.apply {
-				prefs.getString(KEY_NOTIFICATION_CURSOR, null)?.takeIf { it.isNotBlank() }?.let {
-					addQueryParameter("since", it)
-				}
-			}
-			.build()
-		val response = request(url.toString(), secret = requireSecret())
-		response.optString("cursor").takeIf { it.isNotBlank() }?.let {
-			prefs.edit().putString(KEY_NOTIFICATION_CURSOR, it).apply()
-		}
-		response.optJSONArray("replies")?.toNotifications().orEmpty()
-	}
+    val notificationScope: String?
+        get() = if (!isEnabled) null else prefs.getString(KEY_SECRET, null)?.takeIf(String::isNotBlank)
+            ?.let { identityMarker(it).encodeUtf8().sha256().hex() }
 
-	suspend fun exportData(): String = withContext(Dispatchers.IO) {
-		requestText("/v1/identity/export", secret = requireSecret())
-	}
+    val isReplyChecksAuthorized: Boolean
+        get() = settings.isCommunityReplyChecksEnabled && notificationScope?.let {
+            replyPrefs.getString("reply_approved_scope", null) == it
+        } == true
 
-	suspend fun disputeFilterBlock(blockId: Long) = withContext(Dispatchers.IO) {
-		request("/v1/filter/blocks/$blockId/dispute", method = "POST", secret = requireSecret())
-		Unit
-	}
+    fun authorizeReplyChecks(enabled: Boolean): Boolean {
+        val scope = notificationScope
+        if (enabled && scope == null) return false
+        replyPrefs.edit().apply {
+            if (enabled) putString("reply_approved_scope", scope) else remove("reply_approved_scope")
+        }.apply()
+        return true
+    }
 
-	suspend fun refreshScores(force: Boolean = false): Map<String, CommunitySourceScore> = withContext(Dispatchers.IO) {
-		if (!isEnabled) return@withContext emptyMap()
-		scoreCache.refresh(force) {
-			val response = request("/v1/sources/scores?region=${regionCode()}")
-			(response.optJSONArray("sources") ?: response.optJSONArray("scores")).orEmpty()
-				.toScores().associateBy { it.source }
-		}
-	}
+    fun cachedNotificationInbox(): List<CommunityNotification> = cachedNotifications(notificationScope)
 
-	fun scoreFor(source: String): CommunitySourceScore? = scoreCache.get(source)
+    suspend fun getNotifications(limit: Int = 100): List<CommunityNotification> {
+        pollNotifications(automatic = false, limit = limit) { true }
+        return cachedNotifications(notificationScope)
+    }
 
-	suspend fun rankSources(sources: List<org.koitharu.kotatsu.core.model.MangaSourceInfo>): List<org.koitharu.kotatsu.core.model.MangaSourceInfo> {
-		if (!isEnabled || sources.size < 2) return sources
-		val sourceScores = refreshScores()
-		if (sourceScores.isEmpty() || sources.none { sourceScores.containsKey(it.name) }) return sources
-		val order = sources.withIndex().associate { it.value.name to it.index }
-		return sources.sortedWith(
-			compareBy<org.koitharu.kotatsu.core.model.MangaSourceInfo> { !it.isPinned }
-				.thenByDescending { sourceScores[it.name]?.composite ?: Double.NEGATIVE_INFINITY }
-				.thenBy { order[it.name] ?: Int.MAX_VALUE },
-		)
-	}
+    /** Serialize manual/background reads; acknowledge only delivered replies for the same account. */
+    suspend fun pollNotifications(
+        automatic: Boolean = true,
+        limit: Int = 100,
+        deliver: suspend (List<CommunityNotification>) -> Boolean,
+    ): Boolean = withContext(Dispatchers.IO) {
+        notificationMutex.withLock {
+            identityMutex.withLock account@ {
+                val scope = notificationScope ?: return@account false
+                if (automatic && !isReplyChecksAuthorized) return@account false
+                val secret = requireSecret()
+                val cursorKey = KEY_NOTIFICATION_CURSOR + "_" + scope
+                // The legacy cursor has no account witness; a bounded replay is safer than skipping another account's replies.
+                val cursor = replyPrefs.getString(cursorKey, null)
+                val url = serverUrl.toHttpUrl().newBuilder().addPathSegments("v1/notifications")
+                    .addQueryParameter("limit", limit.coerceIn(1, 100).toString())
+                    .apply { cursor?.takeIf(String::isNotBlank)?.let { addQueryParameter("since", it) } }.build()
+                val response = kotlinx.coroutines.withTimeout(20_000) { request(url.toString(), secret = secret, maxResponseBytes = 2_097_152L) }
+                require((response.optJSONArray("replies")?.length() ?: 0) <= limit.coerceIn(1, 100)) {
+                    "Community server exceeded the requested reply batch"
+                }
+                require(response.optString("cursor").length <= 4096) { "Community cursor exceeds its safe limit" }
+                val replies = response.optJSONArray("replies")?.toNotifications().orEmpty().take(100)
+                if (notificationScope != scope || (automatic && !isReplyChecksAuthorized)) return@account false
+                if (!deliver(replies)) return@account false
+                if (notificationScope != scope || (automatic && !isReplyChecksAuthorized)) return@account false
+                val retained = (replies + cachedNotifications(scope)).distinctBy { it.commentId }.take(100)
+                val inbox = JSONArray()
+                retained.forEach { reply -> inbox.put(JSONObject()
+                    .put("comment_id", reply.commentId.toString()).put("work_id", reply.workId.toString())
+                    .put("chapter_id", reply.chapterId?.toString()).put("parent_id", reply.parentId?.toString())
+                    .put("author", reply.author.take(256)).put("preview", reply.preview.take(2_000))
+                    .put("created_at", reply.createdAt.take(128))) }
+                replyPrefs.edit().putString("notification_inbox_" + scope, inbox.toString()).apply {
+                    response.optString("cursor").takeIf(String::isNotBlank)?.let { putString(cursorKey, it) }
+                }.apply()
+                prefs.edit().remove(KEY_NOTIFICATION_CURSOR).apply()
+                true
+            }
+        }
+    }
 
-	/** Record only coarse source health data; no titles, URLs, or reading history are retained. */
-	fun recordProbe(
-		source: String,
-		operation: String,
-		ok: Boolean,
-		empty: Boolean = false,
-		latencyMs: Long = 0L,
-		cfBlocked: Boolean = false,
-	) = processLifecycleScope.launch(Dispatchers.IO) {
-		telemetryMutex.withLock {
-			if (!isEnabled || !isTelemetryEnabled || !hasIdentity || source.isBlank()) return@withLock
-			val normalizedOperation = operation.uppercase(Locale.ROOT)
-			if (normalizedOperation !in TELEMETRY_OPERATIONS) return@withLock
-			val now = System.currentTimeMillis()
-			val pending = synchronized(telemetryLock) {
-				val rows = prefs.getString(KEY_TELEMETRY_PENDING, null).orEmpty()
-					.let { runCatching { JSONArray(it) }.getOrElse { JSONArray() } }
-				val existing = (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
-					.firstOrNull { it.optString("source") == source && it.optString("op") == normalizedOperation }
-				if (existing == null) {
-					rows.put(JSONObject().put("source", source).put("op", normalizedOperation)
-						.put("ok", if (ok) 1 else 0).put("fail", if (ok) 0 else 1)
-						.put("empty", if (empty) 1 else 0).put("cf_blocked", if (cfBlocked) 1 else 0)
-						.put("p50_ms", latencyMs.coerceIn(0L, 120_000L)).put("p90_ms", latencyMs.coerceIn(0L, 120_000L)))
-				} else {
-					existing.put("ok", existing.optInt("ok") + if (ok) 1 else 0)
-					existing.put("fail", existing.optInt("fail") + if (ok) 0 else 1)
-					existing.put("empty", existing.optInt("empty") + if (empty) 1 else 0)
-					existing.put("cf_blocked", existing.optInt("cf_blocked") + if (cfBlocked) 1 else 0)
-					val bounded = latencyMs.coerceIn(0L, 120_000L).toInt()
-					existing.put("p50_ms", maxOf(existing.optInt("p50_ms"), bounded))
-					existing.put("p90_ms", maxOf(existing.optInt("p90_ms"), bounded))
-				}
-				prefs.edit().putString(KEY_TELEMETRY_PENDING, rows.toString()).apply()
-				rows
-			}
-			if (pending.length() > 0 && now - prefs.getLong(KEY_TELEMETRY_SENT_AT, 0L) >= TELEMETRY_INTERVAL_MS) {
-				flushTelemetry(pending)
-			}
-		}
-	}
+    private fun cachedNotifications(scope: String?): List<CommunityNotification> = if (scope == null) emptyList() else
+        runCatching { JSONArray(replyPrefs.getString("notification_inbox_" + scope, "[]")).toNotifications() }.getOrDefault(emptyList())
 
-	private suspend fun flushTelemetry(rows: JSONArray) {
-		val probes = JSONArray()
-		for (index in 0 until rows.length()) {
-			val row = rows.optJSONObject(index) ?: continue
-			probes.put(
-				JSONObject().put("source", row.optString("source")).put("op", row.optString("op"))
-					.put("ok", row.optInt("ok")).put("fail", row.optInt("fail"))
-					.put("empty", row.optInt("empty")).put("cf_blocked", row.optInt("cf_blocked"))
-					.put("p50_ms", row.optInt("p50_ms")).put("p90_ms", row.optInt("p90_ms")),
-			)
-		}
-		if (probes.length() == 0) return
-		runCatching {
-			request(
-				path = "/v1/telemetry/probes",
-				method = "POST",
-				body = JSONObject().put("region", regionCode()).put("probes", probes),
-				secret = requireSecret(),
-			)
-		}.onSuccess {
-			synchronized(telemetryLock) {
-				prefs.edit().remove(KEY_TELEMETRY_PENDING).putLong(KEY_TELEMETRY_SENT_AT, System.currentTimeMillis()).apply()
-			}
-		}
-	}
+    /** Item-to-item lookup only: no library, history, statistics or identity-registration request. */
+    suspend fun getSimilarTitles(manga: Manga, networkAllowed: Boolean = true): List<CommunitySimilarTitle> = withContext(Dispatchers.IO) {
+        if (!settings.isCommunitySimilarEnabled || settings.useLegacySuggestions || !manga.isCommunitySimilarSeed) return@withContext emptyList()
+        val server = serverUrl
+        val key = "$server|${manga.source.name}|${manga.url}"
+        similarMutex.withLock {
+            if (!settings.isCommunitySimilarEnabled || settings.useLegacySuggestions || serverUrl != server) return@withLock emptyList()
+            val now = System.currentTimeMillis()
+            similarCache[key]?.takeIf { now - it.first in 0..6 * 60 * 60 * 1_000L }?.let { return@withLock it.second }
+            check(networkAllowed) { "A connection permitted by recommendation settings is required" }
+            val url = server.toHttpUrl().newBuilder().addPathSegments("v1/public/similar")
+                .addQueryParameter("source", manga.source.name).addQueryParameter("key", manga.url).build()
+            val response = kotlinx.coroutines.withTimeout(20_000) { request(url.toString(), maxResponseBytes = 2_097_152L) }
+            if (!settings.isCommunitySimilarEnabled || settings.useLegacySuggestions || serverUrl != server) return@withLock emptyList()
+            val result = parseCommunitySimilarTitles(response)
+            similarCache[key] = now to result
+            while (similarCache.size > 16) similarCache.remove(similarCache.keys.first())
+            result
+        }
+    }
 
-	private fun regionCode(): String = when (Locale.getDefault().country.uppercase(Locale.ROOT)) {
-		"RU", "UA", "BY", "KZ", "AM", "AZ", "GE", "MD" -> "OTHER"
-		"US", "CA" -> "NA"
-		"MX", "BR", "AR", "CL", "CO", "PE" -> "LATAM"
-		"JP", "KR", "CN", "TW", "HK", "AU", "NZ" -> "APAC"
-		"IN", "PK", "BD", "LK", "NP" -> "SOUTH_ASIA"
-		"AE", "SA", "IL", "TR", "IR" -> "MENA"
-		"ZA", "NG", "EG", "MA" -> "AFRICA"
-		else -> "EU"
-	}
+    suspend fun exportData(): String = withContext(Dispatchers.IO) {
+        requestText("/v1/identity/export", secret = requireSecret())
+    }
 
-	private fun requireSecret(): String = prefs.getString(KEY_SECRET, null)?.takeIf { it.isNotBlank() }
-		?: error("Community identity is not initialized")
+    suspend fun disputeFilterBlock(blockId: Long) = withContext(Dispatchers.IO) {
+        request("/v1/filter/blocks/$blockId/dispute", method = "POST", secret = requireSecret())
+        Unit
+    }
 
-	private fun getOrCreateSecret(): String {
-		prefs.getString(KEY_SECRET, null)?.takeIf { it.isNotBlank() }?.let { return it }
-		val bytes = ByteArray(SECRET_BYTES).also(SecureRandom()::nextBytes)
-		return Base64.encodeToString(bytes, Base64.NO_WRAP).also {
-			prefs.edit().putString(KEY_SECRET, it).apply()
-		}
-	}
+    suspend fun refreshScores(force: Boolean = false): Map<String, CommunitySourceScore> = withContext(Dispatchers.IO) {
+        if (!isEnabled) return@withContext emptyMap()
+        scoreCache.refresh(force) {
+            val response = request("/v1/sources/scores?region=${regionCode()}")
+            (response.optJSONArray("sources") ?: response.optJSONArray("scores")).orEmpty()
+                .toScores().associateBy { it.source }
+        }
+    }
 
-	private suspend fun request(
-		path: String,
-		method: String = "GET",
-		body: JSONObject? = null,
-		secret: String? = null,
-	): JSONObject {
-		val cooldownKey = cooldownKey(path, secret)
-		val cooldownUntil = prefs.getLong(cooldownKey, 0L)
-		if (cooldownUntil > System.currentTimeMillis()) {
-			throw CommunityApiException.RateLimited((cooldownUntil - System.currentTimeMillis() + 999L) / 1000L, pathBucket(path))
-		}
-		val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
-			.header("Accept", "application/json")
-			.header("X-Kaisoku-Client", CLIENT_MARKER)
-			.header("User-Agent", CLIENT_USER_AGENT)
-			.apply { secret?.let { header("Authorization", "Bearer $it") } }
-			.apply {
-				when (method) {
-					"POST" -> post((body ?: JSONObject()).toString().toRequestBody(jsonType))
-					"PUT" -> put((body ?: JSONObject()).toString().toRequestBody(jsonType))
-					"PATCH" -> patch((body ?: JSONObject()).toString().toRequestBody(jsonType))
-					"DELETE" -> delete()
-				}
-			}
-			.build()
-		return client.newCall(request).await().use { response ->
-			val raw = response.body?.string().orEmpty()
-			val json = runCatching { JSONObject(raw) }.getOrNull()
-			if (!response.isSuccessful) {
-				throwApiError(response.code, response.header("Retry-After"), json)
-			}
-			json ?: throw java.io.IOException("Community server returned malformed JSON")
-		}
-	}
+    fun scoreFor(source: String): CommunitySourceScore? = scoreCache.get(source)
 
-	private fun identityMarker(secret: String): String = "$serverUrl:${secret.encodeUtf8().sha256().hex()}"
+    suspend fun rankSources(sources: List<org.koitharu.kotatsu.core.model.MangaSourceInfo>): List<org.koitharu.kotatsu.core.model.MangaSourceInfo> {
+        if (!isEnabled || sources.size < 2) return sources
+        val sourceScores = refreshScores()
+        if (sourceScores.isEmpty() || sources.none { sourceScores.containsKey(it.name) }) return sources
+        val order = sources.withIndex().associate { it.value.name to it.index }
+        return sources.sortedWith(
+            compareBy<org.koitharu.kotatsu.core.model.MangaSourceInfo> { !it.isPinned }
+                .thenByDescending { sourceScores[it.name]?.composite ?: Double.NEGATIVE_INFINITY }
+                .thenBy { order[it.name] ?: Int.MAX_VALUE },
+        )
+    }
 
-	private fun cooldownKey(path: String, secret: String?): String {
-		val account = secret.orEmpty().encodeUtf8().sha256().hex()
-		return KEY_COOLDOWN_PREFIX + ("$serverUrl|$account|${pathBucket(path)}".encodeUtf8().sha256().hex())
-	}
+    /** Record only coarse source health data; no titles, URLs, or reading history are retained. */
+    fun recordProbe(
+        source: String,
+        operation: String,
+        ok: Boolean,
+        empty: Boolean = false,
+        latencyMs: Long = 0L,
+        cfBlocked: Boolean = false,
+    ) = processLifecycleScope.launch(Dispatchers.IO) {
+        telemetryMutex.withLock {
+            if (!isEnabled || !isTelemetryEnabled || !hasIdentity || source.isBlank()) return@withLock
+            val normalizedOperation = operation.uppercase(Locale.ROOT)
+            if (normalizedOperation !in TELEMETRY_OPERATIONS) return@withLock
+            val now = System.currentTimeMillis()
+            val pending = synchronized(telemetryLock) {
+                val rows = prefs.getString(KEY_TELEMETRY_PENDING, null).orEmpty()
+                    .let { runCatching { JSONArray(it) }.getOrElse { JSONArray() } }
+                val existing = (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
+                    .firstOrNull { it.optString("source") == source && it.optString("op") == normalizedOperation }
+                if (existing == null) {
+                    rows.put(JSONObject().put("source", source).put("op", normalizedOperation)
+                        .put("ok", if (ok) 1 else 0).put("fail", if (ok) 0 else 1)
+                        .put("empty", if (empty) 1 else 0).put("cf_blocked", if (cfBlocked) 1 else 0)
+                        .put("p50_ms", latencyMs.coerceIn(0L, 120_000L)).put("p90_ms", latencyMs.coerceIn(0L, 120_000L)))
+                } else {
+                    existing.put("ok", existing.optInt("ok") + if (ok) 1 else 0)
+                    existing.put("fail", existing.optInt("fail") + if (ok) 0 else 1)
+                    existing.put("empty", existing.optInt("empty") + if (empty) 1 else 0)
+                    existing.put("cf_blocked", existing.optInt("cf_blocked") + if (cfBlocked) 1 else 0)
+                    val bounded = latencyMs.coerceIn(0L, 120_000L).toInt()
+                    existing.put("p50_ms", maxOf(existing.optInt("p50_ms"), bounded))
+                    existing.put("p90_ms", maxOf(existing.optInt("p90_ms"), bounded))
+                }
+                prefs.edit().putString(KEY_TELEMETRY_PENDING, rows.toString()).apply()
+                rows
+            }
+            if (pending.length() > 0 && now - prefs.getLong(KEY_TELEMETRY_SENT_AT, 0L) >= TELEMETRY_INTERVAL_MS) {
+                flushTelemetry(pending)
+            }
+        }
+    }
 
-	private fun pathBucket(path: String): String = when {
-		path.contains("/identity/hello") -> "identity"
-		path.contains("/works/resolve") -> "resolve"
-		path.contains("/comments") -> "comments"
-		path.contains("/rating") -> "ratings"
-		path.contains("/telemetry") -> "telemetry"
-		else -> path.substringBefore('?').substringAfterLast('/').ifBlank { "request" }
-	}
+    private suspend fun flushTelemetry(rows: JSONArray) {
+        val probes = JSONArray()
+        for (index in 0 until rows.length()) {
+            val row = rows.optJSONObject(index) ?: continue
+            probes.put(
+                JSONObject().put("source", row.optString("source")).put("op", row.optString("op"))
+                    .put("ok", row.optInt("ok")).put("fail", row.optInt("fail"))
+                    .put("empty", row.optInt("empty")).put("cf_blocked", row.optInt("cf_blocked"))
+                    .put("p50_ms", row.optInt("p50_ms")).put("p90_ms", row.optInt("p90_ms")),
+            )
+        }
+        if (probes.length() == 0) return
+        runCatching {
+            request(
+                path = "/v1/telemetry/probes",
+                method = "POST",
+                body = JSONObject().put("region", regionCode()).put("probes", probes),
+                secret = requireSecret(),
+            )
+        }.onSuccess {
+            synchronized(telemetryLock) {
+                prefs.edit().remove(KEY_TELEMETRY_PENDING).putLong(KEY_TELEMETRY_SENT_AT, System.currentTimeMillis()).apply()
+            }
+        }
+    }
 
-	private fun rememberIdentity(secret: String, identity: CommunityIdentity) {
-		prefs.edit().putString(KEY_REGISTERED_IDENTITY, identityMarker(secret))
-			.putString(KEY_REGISTERED_IDENTITY_JSON, identity.toJson().toString()).apply()
-	}
+    private fun regionCode(): String = when (Locale.getDefault().country.uppercase(Locale.ROOT)) {
+        "RU", "UA", "BY", "KZ", "AM", "AZ", "GE", "MD" -> "OTHER"
+        "US", "CA" -> "NA"
+        "MX", "BR", "AR", "CL", "CO", "PE" -> "LATAM"
+        "JP", "KR", "CN", "TW", "HK", "AU", "NZ" -> "APAC"
+        "IN", "PK", "BD", "LK", "NP" -> "SOUTH_ASIA"
+        "AE", "SA", "IL", "TR", "IR" -> "MENA"
+        "ZA", "NG", "EG", "MA" -> "AFRICA"
+        else -> "EU"
+    }
 
-	private fun CommunityIdentity.toJson() = JSONObject()
-		.put("user_id", userId).put("display_name", displayName)
-		.put("nickname", nickname).put("tier", tier)
+    private fun requireSecret(): String = prefs.getString(KEY_SECRET, null)?.takeIf { it.isNotBlank() }
+        ?: error("Community identity is not initialized")
 
-	private suspend fun requestText(path: String, secret: String? = null): String {
-		val cooldownKey = cooldownKey(path, secret)
-		val cooldownUntil = prefs.getLong(cooldownKey, 0L)
-		if (cooldownUntil > System.currentTimeMillis()) {
-			throw CommunityApiException.RateLimited((cooldownUntil - System.currentTimeMillis() + 999L) / 1000L, pathBucket(path))
-		}
-		val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
-			.header("Accept", "application/json")
-			.header("X-Kaisoku-Client", CLIENT_MARKER)
-			.header("User-Agent", CLIENT_USER_AGENT)
-			.apply { secret?.let { header("Authorization", "Bearer $it") } }
-			.get()
-			.build()
-		return client.newCall(request).await().use { response ->
-			if (!response.isSuccessful) {
-				val raw = response.body?.string().orEmpty()
-				val json = runCatching { JSONObject(raw) }.getOrNull()
-				if (response.code == 429) {
-					val seconds = json?.optLong("retry_after_s", -1L)?.takeIf { it >= 0L }
-						?: response.header("Retry-After")?.toLongOrNull() ?: 60L
-					prefs.edit().putLong(cooldownKey(path, secret), System.currentTimeMillis() + seconds * 1000L).apply()
-				}
-				throwApiError(response.code, response.header("Retry-After"), json)
-			}
-			response.body?.string().orEmpty()
-		}
-	}
+    private fun getOrCreateSecret(): String {
+        prefs.getString(KEY_SECRET, null)?.takeIf { it.isNotBlank() }?.let { return it }
+        val bytes = ByteArray(SECRET_BYTES).also(SecureRandom()::nextBytes)
+        return Base64.encodeToString(bytes, Base64.NO_WRAP).also {
+            prefs.edit().putString(KEY_SECRET, it).apply()
+        }
+    }
 
-	private fun throwApiError(code: Int, retryHeader: String?, json: JSONObject?): Nothing {
-		val retryAfter = json?.optLong("retry_after_s", -1L)?.takeIf { it >= 0L }
-			?: retryHeader?.toLongOrNull()?.takeIf { it >= 0L } ?: 60L
-		val kind = listOf("error", "code", "type", "name").joinToString(" ") { json?.optString(it).orEmpty() }
-		val typed = CommunityHttpErrorPolicy.typedError(code, kind, retryAfter, json?.optString("limit"))
-		if (typed != null) throw typed
-		else throw java.io.IOException(
-				"Community server HTTP $code" + json?.optString("message")?.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(),
-			)
-	}
+    private suspend fun request(
+        path: String,
+        method: String = "GET",
+        body: JSONObject? = null,
+        secret: String? = null,
+        maxResponseBytes: Long? = null,
+    ): JSONObject {
+        val cooldownKey = cooldownKey(path, secret)
+        val cooldownUntil = prefs.getLong(cooldownKey, 0L)
+        if (cooldownUntil > System.currentTimeMillis()) {
+            throw CommunityApiException.RateLimited((cooldownUntil - System.currentTimeMillis() + 999L) / 1000L, pathBucket(path))
+        }
+        val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
+            .header("Accept", "application/json")
+            .header("X-Kaisoku-Client", CLIENT_MARKER)
+            .header("User-Agent", CLIENT_USER_AGENT)
+            .apply { secret?.let { header("Authorization", "Bearer $it") } }
+            .apply {
+                when (method) {
+                    "POST" -> post((body ?: JSONObject()).toString().toRequestBody(jsonType))
+                    "PUT" -> put((body ?: JSONObject()).toString().toRequestBody(jsonType))
+                    "PATCH" -> patch((body ?: JSONObject()).toString().toRequestBody(jsonType))
+                    "DELETE" -> delete()
+                }
+            }
+            .build()
+        return client.newCall(request).await().use { response ->
+            maxResponseBytes?.let { limit ->
+                val responseBody = response.body
+                if (responseBody.contentLength() > limit || responseBody.source().request(limit + 1)) {
+                    throw java.io.IOException("Community response exceeds its safe size limit")
+                }
+            }
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful) {
+                throwApiError(response.code, response.header("Retry-After"), json)
+            }
+            json ?: throw java.io.IOException("Community server returned malformed JSON")
+        }
+    }
 
-	private fun parseIdentity(json: JSONObject): CommunityIdentity {
-		check(json.optString("user_id").isNotBlank()) { "Community server returned no identity" }
-		return CommunityIdentity(
-		userId = json.optString("user_id"),
-		displayName = json.optString("display_name"),
-		nickname = json.optString("nickname").takeIf { it.isNotBlank() },
-		tier = json.optInt("tier"),
-	)
+    private fun identityMarker(secret: String): String = "$serverUrl:${secret.encodeUtf8().sha256().hex()}"
 
-	}
+    private fun cooldownKey(path: String, secret: String?): String {
+        val account = secret.orEmpty().encodeUtf8().sha256().hex()
+        return KEY_COOLDOWN_PREFIX + ("$serverUrl|$account|${pathBucket(path)}".encodeUtf8().sha256().hex())
+    }
 
-	private fun JSONObject.toComment() = CommunityComment(
-		id = optString("id").toLongOrNull() ?: 0L,
-		workId = optString("work_id").toLongOrNull() ?: 0L,
-		chapterId = optString("chapter_id").toLongOrNull(),
-		parentId = optString("parent_id").toLongOrNull(),
-		depth = optInt("depth"),
-		author = optString("author"),
-		body = optString("body"),
-		createdAt = optString("created_at"),
-		score = optDouble("score", 0.0),
-		up = optInt("up"),
-		down = optInt("down"),
-		myVote = optInt("my_vote"),
-		isMine = optBoolean("is_mine"),
-		isSpoiler = optBoolean("is_spoiler"),
-		lang = optString("lang").takeIf { it.isNotBlank() },
-		deleted = optBoolean("deleted"),
-	)
+    private fun pathBucket(path: String): String = when {
+        path.contains("/identity/hello") -> "identity"
+        path.contains("/works/resolve") -> "resolve"
+        path.contains("/comments") -> "comments"
+        path.contains("/rating") -> "ratings"
+        path.contains("/telemetry") -> "telemetry"
+        else -> path.substringBefore('?').substringAfterLast('/').ifBlank { "request" }
+    }
 
-	private fun JSONArray.toComments(): List<CommunityComment> = (0 until length()).mapNotNull { optJSONObject(it)?.toComment() }
+    private fun rememberIdentity(secret: String, identity: CommunityIdentity) {
+        prefs.edit().putString(KEY_REGISTERED_IDENTITY, identityMarker(secret))
+            .putString(KEY_REGISTERED_IDENTITY_JSON, identity.toJson().toString()).apply()
+    }
 
-	private fun JSONArray.toNotifications(): List<CommunityNotification> = (0 until length()).mapNotNull { index ->
-		val json = optJSONObject(index) ?: return@mapNotNull null
-		val commentId = json.optString("comment_id").toLongOrNull() ?: return@mapNotNull null
-		val workId = json.optString("work_id").toLongOrNull() ?: return@mapNotNull null
-		CommunityNotification(
-			commentId = commentId,
-			workId = workId,
-			chapterId = json.optString("chapter_id").toLongOrNull(),
-			parentId = json.optString("parent_id").toLongOrNull(),
-			author = json.optString("author"),
-			preview = json.optString("preview"),
-			createdAt = json.optString("created_at"),
-		)
-	}
+    private fun CommunityIdentity.toJson() = JSONObject()
+        .put("user_id", userId).put("display_name", displayName)
+        .put("nickname", nickname).put("tier", tier)
 
-	private fun JSONObject.toIntMap(): Map<String, Int> = keys().asSequence().associateWith { optInt(it) }
+    private suspend fun requestText(path: String, secret: String? = null): String {
+        val cooldownKey = cooldownKey(path, secret)
+        val cooldownUntil = prefs.getLong(cooldownKey, 0L)
+        if (cooldownUntil > System.currentTimeMillis()) {
+            throw CommunityApiException.RateLimited((cooldownUntil - System.currentTimeMillis() + 999L) / 1000L, pathBucket(path))
+        }
+        val request = Request.Builder().url(if (path.startsWith("http")) path else serverUrl + path)
+            .header("Accept", "application/json")
+            .header("X-Kaisoku-Client", CLIENT_MARKER)
+            .header("User-Agent", CLIENT_USER_AGENT)
+            .apply { secret?.let { header("Authorization", "Bearer $it") } }
+            .get()
+            .build()
+        return client.newCall(request).await().use { response ->
+            if (!response.isSuccessful) {
+                val raw = response.body?.string().orEmpty()
+                val json = runCatching { JSONObject(raw) }.getOrNull()
+                if (response.code == 429) {
+                    val seconds = json?.optLong("retry_after_s", -1L)?.takeIf { it >= 0L }
+                        ?: response.header("Retry-After")?.toLongOrNull() ?: 60L
+                    prefs.edit().putLong(cooldownKey(path, secret), System.currentTimeMillis() + seconds * 1000L).apply()
+                }
+                throwApiError(response.code, response.header("Retry-After"), json)
+            }
+            response.body?.string().orEmpty()
+        }
+    }
 
-	private fun JSONArray.toScores(): List<CommunitySourceScore> = (0 until length()).mapNotNull { item ->
-		val json = optJSONObject(item) ?: return@mapNotNull null
-		CommunitySourceScore(
-			source = json.optString("source"),
-			composite = json.optDouble("composite", 0.0),
-			stability = json.optDouble("stability", 0.0),
-			popularity = json.optDouble("popularity", 0.0),
-			samples = json.optInt("samples"),
-		)
-	}
+    private fun throwApiError(code: Int, retryHeader: String?, json: JSONObject?): Nothing {
+        val retryAfter = json?.optLong("retry_after_s", -1L)?.takeIf { it >= 0L }
+            ?: retryHeader?.toLongOrNull()?.takeIf { it >= 0L } ?: 60L
+        val kind = listOf("error", "code", "type", "name").joinToString(" ") { json?.optString(it).orEmpty() }
+        val typed = CommunityHttpErrorPolicy.typedError(code, kind, retryAfter, json?.optString("limit"))
+        if (typed != null) throw typed
+        else throw java.io.IOException(
+                "Community server HTTP $code" + json?.optString("message")?.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(),
+            )
+    }
 
-	private fun JSONArray?.orEmpty(): JSONArray = this ?: JSONArray()
+    private fun parseIdentity(json: JSONObject): CommunityIdentity {
+        check(json.optString("user_id").isNotBlank()) { "Community server returned no identity" }
+        return CommunityIdentity(
+        userId = json.optString("user_id"),
+        displayName = json.optString("display_name"),
+        nickname = json.optString("nickname").takeIf { it.isNotBlank() },
+        tier = json.optInt("tier"),
+    )
 
-	companion object {
-		const val DEFAULT_SERVER = "https://community.kotatsuredo.app"
-		private const val PREFS = "community_identity"
-		private const val KEY_SECRET = "secret"
-		private const val KEY_REGISTERED_IDENTITY = "registered_identity"
-		private const val KEY_REGISTERED_IDENTITY_JSON = "registered_identity_json"
-		private const val KEY_SERVER = "server"
-		private const val KEY_WORK_PREFIX = "work_"
-		private const val KEY_COOLDOWN_PREFIX = "cooldown_"
-		private const val KEY_TELEMETRY_PENDING = "telemetry_pending"
-		private const val KEY_TELEMETRY_SENT_AT = "telemetry_sent_at"
-		private const val KEY_NOTIFICATION_CURSOR = "notification_cursor"
-		private const val SECRET_BYTES = 32
-		private const val TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000L
-		private const val SUMMARY_TTL_MS = 5 * 60 * 1000L
-		private const val CLIENT_MARKER = "kaisoku"
-		private val CLIENT_USER_AGENT = "Kaisoku/${BuildConfig.VERSION_NAME} (Kotatsu-Redo community client)"
-		private val TELEMETRY_OPERATIONS = setOf("SEARCH", "DETAILS", "PAGES")
-	}
+    }
+
+    private fun JSONObject.toComment() = CommunityComment(
+        id = optString("id").toLongOrNull() ?: 0L,
+        workId = optString("work_id").toLongOrNull() ?: 0L,
+        chapterId = optString("chapter_id").toLongOrNull(),
+        parentId = optString("parent_id").toLongOrNull(),
+        depth = optInt("depth"),
+        author = optString("author"),
+        body = optString("body"),
+        createdAt = optString("created_at"),
+        score = optDouble("score", 0.0),
+        up = optInt("up"),
+        down = optInt("down"),
+        myVote = optInt("my_vote"),
+        isMine = optBoolean("is_mine"),
+        isSpoiler = optBoolean("is_spoiler"),
+        lang = optString("lang").takeIf { it.isNotBlank() },
+        deleted = optBoolean("deleted"),
+    )
+
+    private fun JSONArray.toComments(): List<CommunityComment> = (0 until length()).mapNotNull { optJSONObject(it)?.toComment() }
+
+    private fun JSONArray.toNotifications(): List<CommunityNotification> = (0 until length()).mapNotNull { index ->
+        val json = optJSONObject(index) ?: return@mapNotNull null
+        val commentId = json.optString("comment_id").toLongOrNull() ?: return@mapNotNull null
+        val workId = json.optString("work_id").toLongOrNull() ?: return@mapNotNull null
+        CommunityNotification(
+            commentId = commentId,
+            workId = workId,
+            chapterId = json.optString("chapter_id").toLongOrNull(),
+            parentId = json.optString("parent_id").toLongOrNull(),
+            author = json.optString("author"),
+            preview = json.optString("preview"),
+            createdAt = json.optString("created_at"),
+        )
+    }
+
+    private fun JSONObject.toIntMap(): Map<String, Int> = keys().asSequence().associateWith { optInt(it) }
+
+    private fun JSONArray.toScores(): List<CommunitySourceScore> = (0 until length()).mapNotNull { item ->
+        val json = optJSONObject(item) ?: return@mapNotNull null
+        CommunitySourceScore(
+            source = json.optString("source"),
+            composite = json.optDouble("composite", 0.0),
+            stability = json.optDouble("stability", 0.0),
+            popularity = json.optDouble("popularity", 0.0),
+            samples = json.optInt("samples"),
+        )
+    }
+
+    private fun JSONArray?.orEmpty(): JSONArray = this ?: JSONArray()
+
+    companion object {
+        const val DEFAULT_SERVER = "https://community.kotatsuredo.app"
+        private const val PREFS = "community_identity"
+        private const val KEY_SECRET = "secret"
+        private const val KEY_REGISTERED_IDENTITY = "registered_identity"
+        private const val KEY_REGISTERED_IDENTITY_JSON = "registered_identity_json"
+        private const val KEY_SERVER = "server"
+        private const val KEY_WORK_PREFIX = "work_"
+        private const val KEY_COOLDOWN_PREFIX = "cooldown_"
+        private const val KEY_TELEMETRY_PENDING = "telemetry_pending"
+        private const val KEY_TELEMETRY_SENT_AT = "telemetry_sent_at"
+        private const val KEY_NOTIFICATION_CURSOR = "notification_cursor"
+        private const val SECRET_BYTES = 32
+        private const val TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000L
+        private const val SUMMARY_TTL_MS = 5 * 60 * 1000L
+        private const val CLIENT_MARKER = "kaisoku"
+        private val CLIENT_USER_AGENT = "Kaisoku/${BuildConfig.VERSION_NAME} (Kotatsu-Redo community client)"
+        private val TELEMETRY_OPERATIONS = setOf("SEARCH", "DETAILS", "PAGES")
+    }
 }

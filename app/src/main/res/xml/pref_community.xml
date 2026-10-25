@@ -17,8 +17,20 @@
 		android:title="@string/community_telemetry" />
 	<Preference
 		android:key="community_identity"
-		android:summary="@string/community_identity_summary"
-		android:title="@string/community_identity" />
+        android:summary="@string/community_identity_summary"
+        android:title="@string/community_identity" />
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:dependency="community_enabled"
+        android:key="community_reply_checks"
+        android:summary="@string/community_reply_checks_summary"
+        android:title="@string/community_reply_checks" />
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:dependency="community_enabled"
+        android:key="community_similar"
+		android:summary="@string/community_similar_summary"
+		android:title="@string/community_similar" />
 	<Preference
 		android:key="community_nickname"
 		android:summary="@string/community_nickname_summary"
