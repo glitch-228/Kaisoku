@@ -177,7 +177,7 @@ android {
 		applicationId 'io.github.glitch228.kaisoku'
 		minSdk = 26
 		targetSdk = 36
-		versionCode = 2086
+		versionCode = 2087
 		versionName = '9.8.7-beta5'
 		generatedDensities = []
 		testInstrumentationRunner 'org.koitharu.kotatsu.HiltTestRunner'

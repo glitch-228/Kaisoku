@@ -1,0 +1,10 @@
+- Add prompt muting and exact chapter completion
+- Add reviewed progress imports and tracker tools
+- Add EPUB and encrypted archives
+- Add WebDAV backups and OPDS/Komga libraries
+- Add optional extended sync and Community tools
+- Add optional image, sorting and appearance controls
+- Improve library scans and image reuse
+- Fix extension initialization and protected content
+- Add and repair sources
+- Move public matching below source replacement
