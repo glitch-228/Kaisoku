@@ -113,6 +113,9 @@ class ReaderActivity :
     ScrollTimerControlView.OnVisibilityChangeListener {
 
     @Inject
+    lateinit var sourcePromptStore: org.koitharu.kotatsu.reader.data.SourceSwitchPromptStore
+
+    @Inject
     lateinit var trackerMatching: org.koitharu.kotatsu.scrobbling.common.data.TrackerMatchingCoordinator
 
     @Inject
@@ -181,6 +184,7 @@ class ReaderActivity :
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.enforceBeforeDisplay()
         super.onCreate(savedInstanceState)
         ContextCompat.registerReceiver(
             this,
@@ -190,6 +194,21 @@ class ReaderActivity :
         )
         setContentView(ActivityReaderBinding.inflate(layoutInflater))
         readerManager = ReaderManager(supportFragmentManager, viewBinding.container, settings)
+        val archiveListener = org.koitharu.kotatsu.core.archive.ArchiveAccess.get(this).sessions.addLockListener { paths ->
+            val file = org.koitharu.kotatsu.core.archive.ArchivePrivacy.file(viewModel.getMangaOrNull())
+            if (file?.canonicalPath in paths) runOnUiThread {
+                // Existing lifecycle saves retain the last confirmed viewport. Removing this Activity
+                // releases reader bitmaps/jobs without inventing a position or a new save-suppression flag.
+                viewBinding.root.alpha = 0f
+                (supportFragmentManager.findFragmentByTag(org.koitharu.kotatsu.reader.translate.OcrBottomSheet.TAG) as? androidx.fragment.app.DialogFragment)
+                    ?.dismissAllowingStateLoss()
+                finish()
+            }
+        }
+        lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) { archiveListener.close() }
+        })
+        supportFragmentManager.setFragmentResultListener(org.koitharu.kotatsu.core.archive.ArchiveUnlockDialog.RESULT_UNLOCKED, this) { _, _ -> viewModel.reload() }
         chapterBrowser = ReaderChapterBrowser(this, viewBinding.root, mangaRepositoryFactory, ::chapterBrowserTarget)
         ReaderChapterHaptics(viewBinding.root, lifecycle, { settings.isReaderChapterHapticsEnabled }) {
             val chapter = confirmedVisibleChapter() ?: return@ReaderChapterHaptics null
@@ -252,9 +271,7 @@ class ReaderActivity :
             }
         }
 
-        viewModel.onLoadingError.observeEvent(
-            this,
-            DialogErrorObserver(
+        val loadingErrorObserver = DialogErrorObserver(
                 host = viewBinding.container,
                 fragment = null,
                 resolver = exceptionResolver,
@@ -265,18 +282,22 @@ class ReaderActivity :
                         dispatchNavigateUp()
                     }
                 },
-            ),
-        )
-        viewModel.onError.observeEvent(
-            this,
-            SnackbarErrorObserver(
+            )
+        viewModel.onLoadingError.observeEvent(this) { error ->
+            if (!showArchiveUnlock(error)) loadingErrorObserver.emit(error)
+        }
+        val readerErrorObserver = SnackbarErrorObserver(
                 host = viewBinding.container,
                 fragment = null,
                 resolver = exceptionResolver,
                 onResolved = null,
-            ),
-        )
+            )
+        viewModel.onError.observeEvent(this) { error ->
+            if (!showArchiveUnlock(error)) readerErrorObserver.emit(error)
+        }
         viewModel.onSourceSwitchSuggestion.observeEvent(this, ::onSourceSwitchSuggestion)
+        sourcePromptStore.revision.observe(this) { dismissSuppressedSourcePrompt() }
+        viewModel.mangaDetails.observe(this) { dismissSuppressedSourcePrompt() }
         viewModel.sourceSwitchTarget.observe(this) { candidate ->
             val dialog = supportFragmentManager.findFragmentByTag(SourceSwitchProgressDialog.TAG)
                 as? SourceSwitchProgressDialog
@@ -415,6 +436,7 @@ class ReaderActivity :
     }
 
     override fun onResume() {
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.enforceBeforeDisplay()
         viewModel.onResume()
         super.onResume()
         UpscaleEffect.refreshPowerSaveState(getSystemService(PowerManager::class.java)?.isPowerSaveMode == true)
@@ -434,9 +456,21 @@ class ReaderActivity :
     }
 
     override fun onDestroy() {
+        sourceSwitchDialog?.dismiss()
+        sourceSwitchDialog = null
+        slowSourceSnackbar?.dismiss()
+        activeSourceSwitchSuggestion = null
         settings.unsubscribe(readerBarsPrefListener)
         unregisterReceiver(powerSaveReceiver)
         super.onDestroy()
+    }
+
+    private fun showArchiveUnlock(error: Throwable): Boolean {
+        if (error !is org.koitharu.kotatsu.core.archive.ArchiveAccessException.Locked) return false
+        val file = org.koitharu.kotatsu.core.archive.ArchivePrivacy.file(viewModel.getMangaOrNull()
+            ?: org.koitharu.kotatsu.core.nav.MangaIntent(intent).manga) ?: return false
+        org.koitharu.kotatsu.core.archive.ArchiveUnlockDialog.show(supportFragmentManager, file)
+        return true
     }
 
     override fun onStop() {
@@ -476,25 +510,32 @@ class ReaderActivity :
     }
 
     private fun onSourceSwitchSuggestion(suggestion: SourceSwitchSuggestion) {
-        if (isFinishing || isDestroyed || !settings.isSourceSwitchSuggestionEnabled ||
+        if (isFinishing || isDestroyed || !viewModel.isSourceSwitchPromptAllowed(suggestion, requireUnchangedPolicy = true) ||
             viewModel.sourceSwitchTarget.value != null
         ) return
+        activeSourceSwitchSuggestion = suggestion
         val showDialog = {
-            SourceSwitchDialog.show(
-                context = this,
-                suggestion = suggestion,
-                onSwitch = { candidate ->
-                    viewModel.saveVisibleState(readerManager.currentReader?.getCurrentStateSnapshot())
-                    Toast.makeText(
-                        this,
-                        getString(R.string.source_switch_progress, candidate.title),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    viewModel.switchSource(candidate)
-                },
-                onAlternatives = { router.openAlternatives(suggestion.manga) },
-                onMute = { viewModel.muteSourceSwitchSuggestion(suggestion.manga.source) },
-            )
+            if (!isFinishing && !isDestroyed && viewModel.isSourceSwitchPromptAllowed(suggestion)) {
+                sourceSwitchDialog?.dismiss()
+                sourceSwitchDialog = SourceSwitchDialog.show(
+                    context = this,
+                    suggestion = suggestion,
+                    onSwitch = { candidate ->
+                        if (!viewModel.isSourceSwitchPromptAllowed(suggestion)) return@show
+                        viewModel.saveVisibleState(readerManager.currentReader?.getCurrentStateSnapshot())
+                        Toast.makeText(
+                            this,
+                            getString(R.string.source_switch_progress, candidate.title),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                        viewModel.switchSource(candidate)
+                    },
+                    onAlternatives = {
+                        if (viewModel.isSourceSwitchPromptAllowed(suggestion)) router.openAlternatives(suggestion.manga)
+                    },
+                    onMute = { SourceSwitchMuteDialog.show(supportFragmentManager, suggestion.manga.source.name) },
+                )
+            }
         }
         if (suggestion.trigger == SourceHealthMonitor.Trigger.SLOW) {
             slowSourceSnackbar = Snackbar.make(
@@ -506,6 +547,16 @@ class ReaderActivity :
         } else {
             showDialog()
         }
+    }
+
+    private fun dismissSuppressedSourcePrompt() {
+        val suggestion = activeSourceSwitchSuggestion ?: return
+        if (viewModel.isSourceSwitchPromptAllowed(suggestion)) return
+        slowSourceSnackbar?.dismiss()
+        slowSourceSnackbar = null
+        sourceSwitchDialog?.dismiss()
+        sourceSwitchDialog = null
+        activeSourceSwitchSuggestion = null
     }
     private fun onInitReader(mode: ReaderMode?) {
         if (mode == null) {
@@ -551,6 +602,8 @@ class ReaderActivity :
 
     private var touchedActionPage: ReaderPage? = null
     private var slowSourceSnackbar: Snackbar? = null
+    private var sourceSwitchDialog: androidx.appcompat.app.AlertDialog? = null
+    private var activeSourceSwitchSuggestion: SourceSwitchSuggestion? = null
     private var actionTouchX = 0f
     private var actionTouchY = 0f
 

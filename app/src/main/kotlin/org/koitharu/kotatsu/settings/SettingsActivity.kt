@@ -145,6 +145,9 @@ class SettingsActivity :
 	private fun openDefaultFragment() {
 		val fragment = when (intent?.action) {
 			AppRouter.ACTION_READER -> ReaderSettingsFragment()
+            org.koitharu.kotatsu.community.work.CommunityReplyWorker.ACTION_INBOX -> CommunitySettingsFragment().apply {
+                arguments = android.os.Bundle().apply { putBoolean("open_cached_notifications", true) }
+            }
 			AppRouter.ACTION_SUGGESTIONS -> SuggestionsSettingsFragment()
 			AppRouter.ACTION_HISTORY -> BackupsSettingsFragment()
 			AppRouter.ACTION_TRACKER -> TrackerSettingsFragment()

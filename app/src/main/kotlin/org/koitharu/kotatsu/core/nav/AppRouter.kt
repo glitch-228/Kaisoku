@@ -139,6 +139,12 @@ class AppRouter private constructor(
     /** Activities **/
 
     fun openList(source: MangaSource, filter: MangaListFilter?, sortOrder: SortOrder?) {
+        (source.unwrap() as? org.koitharu.kotatsu.remote.library.RemoteLibrarySource)?.let { library ->
+            startActivity(org.koitharu.kotatsu.remote.library.LibraryBrowserActivity.intent(
+                contextOrNull() ?: return, library.connectionId,
+            ))
+            return
+        }
         if ((source.unwrap() as? MihonMangaSource)?.resolved()?.isCatalogue == false) {
             openSourceSettings(source)
             return
@@ -358,6 +364,12 @@ class AppRouter private constructor(
     }
 
     fun openSourceSettings(source: MangaSource) {
+        (source.unwrap() as? org.koitharu.kotatsu.remote.library.RemoteLibrarySource)?.let { library ->
+            startActivity(org.koitharu.kotatsu.remote.library.LibraryBrowserActivity.intent(
+                contextOrNull() ?: return, library.connectionId,
+            ))
+            return
+        }
         startActivity(sourceSettingsIntent(contextOrNull() ?: return, source))
     }
 

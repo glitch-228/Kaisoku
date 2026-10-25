@@ -83,7 +83,8 @@ class PublicRecommendationProviders @Inject constructor(
         }
     }
 
-    internal suspend fun readingStates(values: List<Recommendation>): Map<String, List<RecommendationReadingState>> {
+    internal suspend fun readingStates(values: List<Recommendation>,
+        baselines: Map<String, ChapterBaseline?> = emptyMap()): Map<String, List<RecommendationReadingState>> {
         val workKeys = values.flatMapTo(mutableSetOf(), RecommendationIdentity::feedbackKeys)
         val trackers = library.getScrobblingDao().observeAll(2).first()
             .filter { "work:MANGA:ANILIST:${it.targetId}" in workKeys || "work:NOVEL:ANILIST:${it.targetId}" in workKeys }
@@ -91,14 +92,18 @@ class PublicRecommendationProviders @Inject constructor(
         val ids = (values.filter { it.target is RecommendationTarget.SourceTitle }.map { it.manga.id } +
             trackers.map { it.mangaId } + confirmations.mapNotNull { it.key.substringAfterLast(':').toLongOrNull() })
             .distinct().toLongArray()
-        val titles = library.getMangaDao().findAll(ids)
+        val titles = ids.asList().chunked(400).flatMap { library.getMangaDao().findAll(it.toLongArray()) }
             .map { it.manga.toManga(it.tags.toMangaTags(), null) }
         val enriched = withTrustedIdentities(titles.map { Recommendation(RecommendationTarget.SourceTitle(it)) })
-        val histories = library.getHistoryDao().findAllByIds(ids).associateBy { it.mangaId }
+        val histories = ids.asList().chunked(400).flatMap { library.getHistoryDao().findAllByIds(it.toLongArray()) }.associateBy { it.mangaId }
+        val exactStates = RecommendationExactProgress(library).read(ids.asList(), baselines)
         val byIdentity = mutableMapOf<String, MutableList<RecommendationReadingState>>()
         enriched.forEach { title ->
-            histories[title.manga.id]?.let { history ->
-                val state = RecommendationReadingState(title.key, history.updatedAt, history.percent, history.chaptersCount)
+            val history = histories[title.manga.id]
+            val exact = exactStates[title.manga.id]
+            if (history != null || exact != null) {
+                val state = RecommendationReadingState(title.key, history?.updatedAt ?: 0L,
+                    history?.percent ?: 0f, history?.chaptersCount ?: 0, exact)
                 RecommendationIdentity.feedbackKeys(title).forEach { identity -> byIdentity.getOrPut(identity, ::mutableListOf).add(state) }
             }
         }

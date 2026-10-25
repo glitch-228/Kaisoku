@@ -9,6 +9,12 @@
         android:key="sync_settings"
         android:title="@string/sync" />
 
+    <Preference
+        android:key="remote_libraries_beta"
+        android:persistent="false"
+        android:title="@string/remote_library_title"
+        android:summary="@string/remote_library_summary" />
+
     <PreferenceScreen
         android:fragment="org.koitharu.kotatsu.settings.CommunitySettingsFragment"
         android:key="community"
@@ -41,6 +47,21 @@
         android:title="@string/reading_time_estimation" />
 
     <PreferenceCategory android:title="@string/tracking">
+        <Preference
+            android:key="tracker_link_review"
+            android:persistent="false"
+            android:title="@string/tracker_link_review"
+            android:summary="@string/tracker_link_review_notice" />
+        <Preference
+            android:key="tracker_categories_beta"
+            android:persistent="false"
+            android:title="@string/tracker_categories_beta"
+            android:summary="@string/tracker_categories_summary" />
+        <Preference
+            android:key="tracker_tools_beta"
+            android:title="@string/tracker_tools_beta"
+            android:summary="@string/tracker_tools_summary" />
+
         <SwitchPreferenceCompat
             android:key="tracker_auto_match"
             android:defaultValue="false"

@@ -49,18 +49,30 @@ class PreviewViewModel @Inject constructor(
 		manga,
 		historyRepository.observeOne(manga.value.id),
 		manga.flatMapLatest { historyRepository.observeShouldSkip(it) }.distinctUntilChanged(),
-	) { m, history, incognito ->
+        historyRepository.chapterReads.observe(manga.value.id),
+	) { m, history, incognito, exact ->
 		if (m.chapters == null) {
 			return@combine null
 		}
 		val b = m.getPreferredBranch(history)
 		val chapters = m.getChapters(b)
+        val savedCounterparts = exact.isActive && exact.policy?.source != "LOCAL" &&
+            (m.source.name == "LOCAL" || chapters.any { it.source.name == "LOCAL" })
+        val cached = exact.counts.singleOrNull {
+            it.branchKey == org.koitharu.kotatsu.history.exact.encodeReadBranch(b)
+        }
+        if (savedCounterparts && cached == null) return@combine null
+        val explicitRead = if (exact.isActive) exact.readIds(chapters)?.size else null
 		FooterInfo(
-			percent = history?.percent ?: PROGRESS_NONE,
+			percent = if (savedCounterparts) checkNotNull(cached).percent else if (explicitRead != null) {
+                if (chapters.isEmpty()) 0f else explicitRead.toFloat() / chapters.size
+            } else history?.percent ?: PROGRESS_NONE,
 			currentChapter = history?.chapterId?.let {
-				chapters.indexOfFirst { x -> x.id == it }
+                if (savedCounterparts) org.koitharu.kotatsu.history.exact.ChapterReadTransfer.references(checkNotNull(cached))
+                    .indexOfFirst { chapter -> chapter.chapterId == it }
+				else chapters.indexOfFirst { x -> x.id == it }
 			} ?: -1,
-			totalChapters = chapters.size,
+			totalChapters = if (savedCounterparts) checkNotNull(cached).totalCount else chapters.size,
 			isIncognito = incognito,
 		)
 	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Lazily, null)

@@ -4,6 +4,8 @@ import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
 import org.koitharu.kotatsu.parsers.model.ContentRating
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaSource
+import org.koitharu.kotatsu.remote.library.RemoteLibrarySource
+import org.koitharu.kotatsu.remote.library.RemoteLibraryContent
 
 enum class SourceContentClass { SAFE, MIXED, ADULT }
 
@@ -16,6 +18,20 @@ data class SourceContentPolicy(
         if (separateClasses) contentClass in selectedClasses else !legacyRestricted || !legacyNsfw
 
     fun allows(source: MangaSource): Boolean = allows(source.contentClass(), source.isNsfw())
+
+    fun allows(manga: Manga): Boolean = allows(manga.contentClassForFiltering(), manga.isNsfw())
+}
+
+/** A local acquisition retains its source rating even after its server has been disconnected. */
+fun Manga.contentClassForFiltering(): SourceContentClass {
+    if (contentRating == ContentRating.ADULT) return SourceContentClass.ADULT
+    val acquired = org.koitharu.kotatsu.remote.library.RemoteLibrarySourceRegistry.acquiredMetadata(id, url)
+    return when (acquired?.content) {
+        RemoteLibraryContent.SAFE -> SourceContentClass.SAFE
+        RemoteLibraryContent.ADULT -> SourceContentClass.ADULT
+        RemoteLibraryContent.MIXED, RemoteLibraryContent.UNKNOWN -> SourceContentClass.MIXED
+        null -> source.contentClass()
+    }
 }
 
 fun MangaSource.contentClass(): SourceContentClass {
@@ -25,13 +41,18 @@ fun MangaSource.contentClass(): SourceContentClass {
     }
     return when (source) {
         is MihonMangaSource -> source.resolved().contentClass
+        is RemoteLibrarySource -> when (source.resolved().content) {
+            RemoteLibraryContent.SAFE -> SourceContentClass.SAFE
+            RemoteLibraryContent.ADULT -> SourceContentClass.ADULT
+            RemoteLibraryContent.MIXED, RemoteLibraryContent.UNKNOWN -> SourceContentClass.MIXED
+        }
         else -> if (source.intrinsicIsNsfw()) SourceContentClass.ADULT else SourceContentClass.SAFE
     }
 }
 
 /** Content filtering may distinguish mixed sources; incognito and notification privacy keep isNsfw(). */
 fun Manga.isNsfwForFiltering(separateSourceClasses: Boolean): Boolean =
-    if (separateSourceClasses) contentRating == ContentRating.ADULT || source.contentClass() == SourceContentClass.ADULT
+    if (separateSourceClasses) contentClassForFiltering() == SourceContentClass.ADULT
     else isNsfw()
 
 internal fun parseContentWarning(value: Any?): SourceContentClass? = when (value) {

@@ -75,6 +75,7 @@ abstract class MangaListFragment :
 
     @Inject
     lateinit var settings: AppSettings
+    @Inject lateinit var coverNetworkState: org.koitharu.kotatsu.core.os.NetworkState
     @Inject lateinit var recommendationUi: org.koitharu.kotatsu.suggestions.local.RecommendationUi
 
     private var listAdapter: MangaListAdapter? = null
@@ -83,6 +84,7 @@ abstract class MangaListFragment :
     private var spanResolver: GridSpanResolver? = null
     private var currentListMode: ListMode? = null
     private var checkpoint: ListCheckpoint? = null
+    private var coverPreloader: CoverPreloader? = null
     private val spanSizeLookup = SpanSizeLookup()
     open val isSwipeRefreshEnabled = true
 
@@ -133,6 +135,9 @@ abstract class MangaListFragment :
             isEnabled = isSwipeRefreshEnabled
         }
         addMenuProvider(MangaListMenuProvider(this))
+        coverPreloader = CoverPreloader(viewLifecycleOwner, binding.recyclerView, coil, settings, coverNetworkState) {
+            listAdapter?.items.orEmpty()
+        }
         checkpointScope?.let { scope ->
             checkpoint = ListCheckpoint(scope, settings).also {
                 it.attach(
@@ -169,6 +174,7 @@ abstract class MangaListFragment :
     }
 
     override fun onDestroyView() {
+        coverPreloader = null
         checkpoint?.detach()
         checkpoint = null
         viewBinding?.recyclerView?.fastScroller?.setFastScrollListener(null)
@@ -250,6 +256,7 @@ abstract class MangaListFragment :
             paginationListener?.postInvalidate(it)
         }
         checkpoint?.onContentChanged()
+        viewBinding?.recyclerView?.post { coverPreloader?.schedule() }
     }
 
     private fun confirmDisableCheckpoint() {

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="remote_library_summary">Подключение OPDS или Komga. Просмотр и загрузка запускаются вручную; прогресс на сервере не меняется.</string>
     <string name="keep_android_open_title">Сохраним Android открытым</string>
     <string name="keep_android_open_message">Поддержите свободу устанавливать приложения и расширения из выбранных вами источников.</string>
     <string name="learn_more">Подробнее</string>
@@ -990,14 +991,14 @@
     <string name="source_switch_suggest">Предлагать другой источник при ошибках</string>
     <string name="source_switch_suggest_summary">Если источник медленный или постоянно выдаёт ошибки, предлагать плагин или расширение для того же сайта</string>
     <string name="source_switch_title_errors">%s не отвечает</string>
-    <string name="source_switch_title_slow">%s работает медленно</string>
+    <string name="source_switch_title_slow">Загрузка из %s занимает больше времени, чем обычно</string>
     <string name="source_switch_to">Перейти на %1$s (%2$s)</string>
     <string name="source_switch_install">Установить и перейти на %1$s (%2$s)</string>
     <string name="source_switch_kind_plugin">плагин %s</string>
     <string name="source_switch_kind_builtin">встроенный</string>
     <string name="source_switch_kind_extension">расширение</string>
     <string name="source_switch_mute">Не предлагать для этого источника</string>
-    <string name="source_switch_slow">Источник работает медленно</string>
+    <string name="source_switch_slow">Загрузка занимает больше времени, чем обычно</string>
     <string name="source_switch_action">Сменить источник</string>
     <string name="source_switch_progress">Переход на %s…</string>
     <string name="source_switched">Перенесено на %s</string>

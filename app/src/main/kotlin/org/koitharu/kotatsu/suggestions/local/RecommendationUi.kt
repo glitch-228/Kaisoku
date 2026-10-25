@@ -62,13 +62,17 @@ class RecommendationUi @Inject constructor(
     }
 
     fun findReadableSource(manga: Manga, host: View, scope: CoroutineScope, router: AppRouter) {
+        findReadableSource(manga.title, manga.recommendationKind() == RecommendationKind.NOVEL, host, scope, router)
+    }
+
+    fun findReadableSource(title: String, novel: Boolean, host: View, scope: CoroutineScope, router: AppRouter) {
         scope.launch {
             try {
             val choices = engine.availableSources()
-                .filter { it.hasChapterText() == (manga.recommendationKind() == RecommendationKind.NOVEL) }
+                .filter { it.hasChapterText() == novel }
             MaterialAlertDialogBuilder(host.context).setTitle(R.string.recommendation_find_source)
                 .setMessage(if (choices.isEmpty()) host.context.getString(R.string.recommendation_no_sources) else null)
-                .setItems(choices.map { it.getTitle(host.context) }.toTypedArray()) { _, index -> router.openSearch(choices[index], manga.title) }
+                .setItems(choices.map { it.getTitle(host.context) }.toTypedArray()) { _, index -> router.openSearch(choices[index], title) }
                 .setNegativeButton(android.R.string.cancel, null).show()
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { showError(host, e) }

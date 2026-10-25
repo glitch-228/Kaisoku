@@ -35,251 +35,255 @@ fun Collection<Manga>.distinctById() = distinctBy { it.id }
 fun Collection<MangaChapter>.ids() = mapToSet { it.id }
 
 fun Collection<ChapterListItem>.countChaptersByBranch(): Int {
-	if (size <= 1) {
-		return size
-	}
-	val acc = MutableObjectIntMap<String?>()
-	for (item in this) {
-		val branch = item.chapter.branch
-		acc[branch] = acc.getOrDefault(branch, 0) + 1
-	}
-	var max = 0
-	acc.forEachValue { x -> if (x > max) max = x }
-	return max
+    if (size <= 1) {
+        return size
+    }
+    val acc = MutableObjectIntMap<String?>()
+    for (item in this) {
+        val branch = item.chapter.branch
+        acc[branch] = acc.getOrDefault(branch, 0) + 1
+    }
+    var max = 0
+    acc.forEachValue { x -> if (x > max) max = x }
+    return max
 }
 
 @get:StringRes
 val MangaState.titleResId: Int
-	get() = when (this) {
-		MangaState.ONGOING -> R.string.state_ongoing
-		MangaState.FINISHED -> R.string.state_finished
-		MangaState.ABANDONED -> R.string.state_abandoned
-		MangaState.PAUSED -> R.string.state_paused
-		MangaState.UPCOMING -> R.string.state_upcoming
-		MangaState.RESTRICTED -> R.string.unavailable
-	}
+    get() = when (this) {
+        MangaState.ONGOING -> R.string.state_ongoing
+        MangaState.FINISHED -> R.string.state_finished
+        MangaState.ABANDONED -> R.string.state_abandoned
+        MangaState.PAUSED -> R.string.state_paused
+        MangaState.UPCOMING -> R.string.state_upcoming
+        MangaState.RESTRICTED -> R.string.unavailable
+    }
 
 @get:DrawableRes
 val MangaState.iconResId: Int
-	get() = when (this) {
-		MangaState.ONGOING -> R.drawable.ic_play
-		MangaState.FINISHED -> R.drawable.ic_state_finished
-		MangaState.ABANDONED -> R.drawable.ic_state_abandoned
-		MangaState.PAUSED -> R.drawable.ic_action_pause
-		MangaState.UPCOMING -> materialR.drawable.ic_clock_black_24dp
-		MangaState.RESTRICTED -> R.drawable.ic_disable
-	}
+    get() = when (this) {
+        MangaState.ONGOING -> R.drawable.ic_play
+        MangaState.FINISHED -> R.drawable.ic_state_finished
+        MangaState.ABANDONED -> R.drawable.ic_state_abandoned
+        MangaState.PAUSED -> R.drawable.ic_action_pause
+        MangaState.UPCOMING -> materialR.drawable.ic_clock_black_24dp
+        MangaState.RESTRICTED -> R.drawable.ic_disable
+    }
 
 @get:StringRes
 val ContentRating.titleResId: Int
-	get() = when (this) {
-		ContentRating.SAFE -> R.string.rating_safe
-		ContentRating.SUGGESTIVE -> R.string.rating_suggestive
-		ContentRating.ADULT -> R.string.rating_adult
-	}
+    get() = when (this) {
+        ContentRating.SAFE -> R.string.rating_safe
+        ContentRating.SUGGESTIVE -> R.string.rating_suggestive
+        ContentRating.ADULT -> R.string.rating_adult
+    }
 
 @get:StringRes
 val Demographic.titleResId: Int
-	get() = when (this) {
-		Demographic.SHOUNEN -> R.string.demographic_shounen
-		Demographic.SHOUJO -> R.string.demographic_shoujo
-		Demographic.SEINEN -> R.string.demographic_seinen
-		Demographic.JOSEI -> R.string.demographic_josei
-		Demographic.KODOMO -> R.string.demographic_kodomo
-		Demographic.NONE -> R.string.none
-	}
+    get() = when (this) {
+        Demographic.SHOUNEN -> R.string.demographic_shounen
+        Demographic.SHOUJO -> R.string.demographic_shoujo
+        Demographic.SEINEN -> R.string.demographic_seinen
+        Demographic.JOSEI -> R.string.demographic_josei
+        Demographic.KODOMO -> R.string.demographic_kodomo
+        Demographic.NONE -> R.string.none
+    }
 
 fun Manga.getPreferredBranch(history: MangaHistory?): String? {
-	val ch = chapters
-	if (ch.isNullOrEmpty()) {
-		return null
-	}
-	if (history != null) {
-		val currentChapter = ch.findById(history.chapterId)
-		if (currentChapter != null) {
-			return currentChapter.branch
-		}
-	}
-	val groups = ch.groupBy { it.branch }
-	if (groups.size == 1) {
-		return groups.keys.first()
-	}
-	for (locale in LocaleListCompat.getAdjustedDefault()) {
-		val displayLanguage = locale.getDisplayLanguage(locale)
-		val displayName = locale.getDisplayName(locale)
-		val candidates = HashMap<String?, List<MangaChapter>>(3)
-		for (branch in groups.keys) {
-			if (branch != null && (
-					branch.contains(displayLanguage, ignoreCase = true) ||
-						branch.contains(displayName, ignoreCase = true)
-					)
-			) {
-				candidates[branch] = groups[branch] ?: continue
-			}
-		}
-		if (candidates.isNotEmpty()) {
-			return candidates.maxBy { it.value.size }.key
-		}
-	}
-	return groups.maxByOrNull { it.value.size }?.key
+    val ch = chapters
+    if (ch.isNullOrEmpty()) {
+        return null
+    }
+    if (history != null) {
+        val currentChapter = ch.findById(history.chapterId)
+        if (currentChapter != null) {
+            return currentChapter.branch
+        }
+    }
+    val groups = ch.groupBy { it.branch }
+    if (groups.size == 1) {
+        return groups.keys.first()
+    }
+    for (locale in LocaleListCompat.getAdjustedDefault()) {
+        val displayLanguage = locale.getDisplayLanguage(locale)
+        val displayName = locale.getDisplayName(locale)
+        val candidates = HashMap<String?, List<MangaChapter>>(3)
+        for (branch in groups.keys) {
+            if (branch != null && (
+                    branch.contains(displayLanguage, ignoreCase = true) ||
+                        branch.contains(displayName, ignoreCase = true)
+                    )
+            ) {
+                candidates[branch] = groups[branch] ?: continue
+            }
+        }
+        if (candidates.isNotEmpty()) {
+            return candidates.maxBy { it.value.size }.key
+        }
+    }
+    return groups.maxByOrNull { it.value.size }?.key
 }
 
 val Manga.isLocal: Boolean
-	get() = source == LocalMangaSource
+    get() = source == LocalMangaSource
 
 val Manga.isBroken: Boolean
-	get() = source == UnknownMangaSource
+    get() = source == UnknownMangaSource
 
 val Manga.appUrl: Uri
-	get() = "kaisoku://manga".toUri()
-		.buildUpon()
-		.appendQueryParameter("source", source.name)
-		.appendQueryParameter("name", title)
-		.appendQueryParameter("url", url)
-		.build()
+    get() = "kaisoku://manga".toUri()
+        .buildUpon()
+        .appendQueryParameter("source", source.name)
+        .appendQueryParameter("name", title)
+        .appendQueryParameter("url", url)
+        .build()
 
 fun Manga.chaptersCount(): Int {
-	if (chapters.isNullOrEmpty()) {
-		return 0
-	}
-	val counters = MutableObjectIntMap<String?>()
-	var max = 0
-	chapters?.forEach { x ->
-		val c = counters.getOrDefault(x.branch, 0) + 1
-		counters[x.branch] = c
-		if (max < c) {
-			max = c
-		}
-	}
-	return max
+    if (chapters.isNullOrEmpty()) {
+        return 0
+    }
+    val counters = MutableObjectIntMap<String?>()
+    var max = 0
+    chapters?.forEach { x ->
+        val c = counters.getOrDefault(x.branch, 0) + 1
+        counters[x.branch] = c
+        if (max < c) {
+            max = c
+        }
+    }
+    return max
 }
 
 fun Manga.isSameEntryAs(other: Manga): Boolean {
-	if (source.identityName() != other.source.identityName()) {
-		return false
-	}
-	if (id != 0L && id == other.id) {
-		return true
-	}
-	return identityValues().intersect(other.identityValues()).isNotEmpty()
+    if (source.identityName() != other.source.identityName()) {
+        return false
+    }
+    if (id != 0L && id == other.id) {
+        return true
+    }
+    return identityValues().intersect(other.identityValues()).isNotEmpty()
 }
 
 fun Manga.isSameStoredEntryAs(other: Manga): Boolean {
-	if (source.unwrap().name != other.source.unwrap().name) {
-		return false
-	}
-	if (id != 0L && other.id != 0L) {
-		return id == other.id
-	}
-	return url == other.url && publicUrl == other.publicUrl
+    if (source.unwrap().name != other.source.unwrap().name) {
+        return false
+    }
+    if (id != 0L && other.id != 0L) {
+        return id == other.id
+    }
+    return url == other.url && publicUrl == other.publicUrl
 }
 
 fun Manga.identityKeys(): Set<MangaIdentityKey> = identityValues(includeId = true).mapTo(LinkedHashSet()) {
-	MangaIdentityKey(source.identityName(), it)
+    MangaIdentityKey(source.identityName(), it)
 }
 
 private fun Manga.identityValues(includeId: Boolean = false): Set<String> = buildSet {
-	url.toIdentityValue(source.identityName()).takeIf(String::isNotBlank)?.let(::add)
-	publicUrl.toIdentityValue(source.identityName()).takeIf(String::isNotBlank)?.let(::add)
-	if (includeId && id != 0L) {
-		add(id.toString())
-	}
+    url.toIdentityValue(source.identityName()).takeIf(String::isNotBlank)?.let(::add)
+    publicUrl.toIdentityValue(source.identityName()).takeIf(String::isNotBlank)?.let(::add)
+    if (includeId && id != 0L) {
+        add(id.toString())
+    }
 }
 
 private fun String.toIdentityValue(sourceName: String): String {
-	var result = trim().substringBefore('#').substringBefore('?').trimEnd('/')
-	val schemeIndex = result.indexOf("://")
-	if (schemeIndex >= 0) {
-		val pathStart = result.indexOf('/', startIndex = schemeIndex + 3)
-		result = if (pathStart >= 0) {
-			result.substring(pathStart)
-		} else {
-			""
-		}
-	}
-	result = result.trimEnd('/')
-	when (sourceName) {
-		MangaParserSource.MANGA_OVH.name -> if (result.startsWith("/manga/")) {
-			result = "/content/" + result.removePrefix("/manga/")
-		}
+    var result = trim().substringBefore('#').substringBefore('?').trimEnd('/')
+    val schemeIndex = result.indexOf("://")
+    if (schemeIndex >= 0) {
+        val pathStart = result.indexOf('/', startIndex = schemeIndex + 3)
+        result = if (pathStart >= 0) {
+            result.substring(pathStart)
+        } else {
+            ""
+        }
+    }
+    result = result.trimEnd('/')
+    when (sourceName) {
+        MangaParserSource.MANGA_OVH.name -> if (result.startsWith("/manga/")) {
+            result = "/content/" + result.removePrefix("/manga/")
+        }
 
-		MangaParserSource.REMANGA.name -> result = result.trimEnd('_')
-	}
-	return result
+        MangaParserSource.REMANGA.name -> result = result.trimEnd('_')
+    }
+    return result
 }
 
 data class MangaIdentityKey(
-	val sourceName: String,
-	val value: String,
+    val sourceName: String,
+    val value: String,
 )
 
-fun Manga.isNsfw(): Boolean = contentRating == ContentRating.ADULT || source.isNsfw()
+fun Manga.isNsfw(): Boolean = contentRating == ContentRating.ADULT || source.isNsfw() ||
+    org.koitharu.kotatsu.remote.library.RemoteLibrarySourceRegistry.acquiredMetadata(id, url)?.content?.let {
+        it != org.koitharu.kotatsu.remote.library.RemoteLibraryContent.SAFE
+    } == true
 
 fun MangaListFilter.getSummary() = buildSpannedString {
-	if (!query.isNullOrEmpty()) {
-		append(query)
-		if (tags.isNotEmpty() || tagsExclude.isNotEmpty()) {
-			append(' ')
-			append('(')
-			appendTagsSummary(this@getSummary)
-			append(')')
-		}
-	} else {
-		appendTagsSummary(this@getSummary)
-	}
+    if (!query.isNullOrEmpty()) {
+        append(query)
+        if (tags.isNotEmpty() || tagsExclude.isNotEmpty()) {
+            append(' ')
+            append('(')
+            appendTagsSummary(this@getSummary)
+            append(')')
+        }
+    } else {
+        appendTagsSummary(this@getSummary)
+    }
 }
 
 private fun SpannableStringBuilder.appendTagsSummary(filter: MangaListFilter) {
-	var isFirst = true
-	val separator = ", "
-	for (tag in filter.tags) {
-		if (isFirst) {
-			isFirst = false
-		} else {
-			append(separator)
-		}
-		append(tag.title)
-	}
-	for (tag in filter.tagsExclude) {
-		if (isFirst) {
-			isFirst = false
-		} else {
-			append(separator)
-		}
-		strikeThrough {
-			append(tag.title)
-		}
-	}
+    var isFirst = true
+    val separator = ", "
+    for (tag in filter.tags) {
+        if (isFirst) {
+            isFirst = false
+        } else {
+            append(separator)
+        }
+        append(tag.title)
+    }
+    for (tag in filter.tagsExclude) {
+        if (isFirst) {
+            isFirst = false
+        } else {
+            append(separator)
+        }
+        strikeThrough {
+            append(tag.title)
+        }
+    }
 }
 
 fun MangaChapter.getLocalizedTitle(resources: Resources, index: Int = -1): String {
-	title?.let {
-		if (it.isNotBlank()) {
-			return it
-		}
-	}
-	val num = numberString()
-	val vol = volumeString()
-	return when {
-		num != null && vol != null -> resources.getString(R.string.chapter_volume_number, vol, num)
-		num != null -> resources.getString(R.string.chapter_number, num)
-		index > 0 -> resources.getString(
-			R.string.chapters_time_pattern,
-			resources.getString(R.string.unnamed_chapter),
-			index.toString(),
-		)
+    title?.let {
+        if (it.isNotBlank()) {
+            return it
+        }
+    }
+    val num = numberString()
+    val vol = volumeString()
+    return when {
+        num != null && vol != null -> resources.getString(R.string.chapter_volume_number, vol, num)
+        num != null -> resources.getString(R.string.chapter_number, num)
+        index > 0 -> resources.getString(
+            R.string.chapters_time_pattern,
+            resources.getString(R.string.unnamed_chapter),
+            index.toString(),
+        )
 
-		else -> resources.getString(R.string.unnamed_chapter)
-	}
+        else -> resources.getString(R.string.unnamed_chapter)
+    }
 }
 
 fun Manga.withOverride(override: MangaOverride?) = if (override != null) {
-	copy(
-		title = override.title.ifNullOrEmpty { title },
-		coverUrl = override.coverUrl.ifNullOrEmpty { coverUrl },
-		largeCoverUrl = override.coverUrl.ifNullOrEmpty { largeCoverUrl },
-		contentRating = override.contentRating ?: contentRating,
-	)
+    copy(
+        title = override.title.ifNullOrEmpty { title },
+        coverUrl = override.coverUrl.ifNullOrEmpty { coverUrl },
+        largeCoverUrl = override.coverUrl.ifNullOrEmpty { largeCoverUrl },
+        contentRating = override.contentRating ?: contentRating,
+        description = override.description.ifNullOrEmpty { description },
+    )
 } else {
-	this
+    this
 }

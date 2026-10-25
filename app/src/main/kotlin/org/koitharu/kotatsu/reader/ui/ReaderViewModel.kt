@@ -145,6 +145,7 @@ class ReaderViewModel @Inject constructor(
     private val networkState: NetworkState,
     private val sourceSwitchCandidatesUseCase: SourceSwitchCandidatesUseCase,
     private val sourceSwitchUseCase: SourceSwitchUseCase,
+    private val sourcePromptStore: org.koitharu.kotatsu.reader.data.SourceSwitchPromptStore,
 ) : ChaptersPagesViewModel(
     appContext = context,
     settings = settings,
@@ -183,6 +184,15 @@ class ReaderViewModel @Inject constructor(
 
     init {
         mangaDetails.value = intent.manga?.let { MangaDetails(it) }
+        viewModelScope.launch {
+            var revision = sourcePromptStore.revision.value
+            sourcePromptStore.revision.collect { updated ->
+                if (updated != revision) {
+                    sourceSuggestionJob?.cancel()
+                    revision = updated
+                }
+            }
+        }
         launchJob(Dispatchers.Default) {
             pageLoader.pageResults.collect { result ->
                 if (result is PageLoadResult.Failed && result.source != LocalMangaSource) {
@@ -1063,6 +1073,13 @@ class ReaderViewModel @Inject constructor(
         settings.muteSourceSwitchSuggestion(source.name)
     }
 
+    fun isSourceSwitchPromptAllowed(suggestion: SourceSwitchSuggestion, requireUnchangedPolicy: Boolean = false): Boolean {
+        val current = getMangaOrNull() ?: return false
+        return current.id == suggestion.manga.id && current.source.name == suggestion.manga.source.name &&
+            sourcePromptStore.allows(current.source.name, suggestion.trigger) &&
+            (!requireUnchangedPolicy || suggestion.policyRevision == sourcePromptStore.revision.value)
+    }
+
     private fun watchSlowLoad(job: Job) {
         val watchdog = viewModelScope.launch(Dispatchers.Default) {
             delay(SourceHealthMonitor.SLOW_LOAD_TIMEOUT_MS)
@@ -1079,23 +1096,37 @@ class ReaderViewModel @Inject constructor(
         if (!settings.isSourceSwitchSuggestionEnabled || sourceSuggestionJob?.isActive == true) return
         val manga = mangaDetails.value?.toManga() ?: intent.manga ?: return
         val source = manga.source
-        if (source == LocalMangaSource || settings.isSourceSwitchSuggestionMuted(source.name)) return
+        if (source == LocalMangaSource || !sourcePromptStore.allows(source.name, trigger)) return
+        val policyRevision = sourcePromptStore.revision.value
         sourceSuggestionJob = viewModelScope.launch(Dispatchers.Default) {
-            val candidates = runCatchingCancellable { sourceSwitchCandidatesUseCase(source) }
-                .onFailure { it.printStackTraceDebug() }
-                .getOrDefault(emptyList())
+            val candidates = org.koitharu.kotatsu.reader.domain.discoverSourceSwitchPrompt(
+                expectedRevision = policyRevision,
+                currentRevision = { sourcePromptStore.revision.value },
+                isEligible = {
+                    val current = getMangaOrNull()
+                    current?.id == manga.id && current.source.name == source.name && sourcePromptStore.allows(source.name, trigger)
+                },
+                discover = {
+                    runCatchingCancellable { sourceSwitchCandidatesUseCase(source) }
+                        .onFailure { it.printStackTraceDebug() }
+                        .getOrDefault(emptyList())
+                },
+            ) ?: return@launch
             // The error dialog already offers Alternatives for these.
             val offerAlternatives = !(error is UnsupportedSourceException ||
                 error is EmptyMangaException && error.reason == EmptyMangaReason.NO_CHAPTERS)
             if (candidates.isEmpty() && !offerAlternatives) return@launch
-            onSourceSwitchSuggestion.call(
-                SourceSwitchSuggestion(
-                    manga = manga,
-                    trigger = trigger,
-                    candidates = candidates.take(MAX_SWITCH_CANDIDATES),
-                    offerAlternatives = offerAlternatives,
-                ),
+            val suggestion = SourceSwitchSuggestion(
+                manga = manga,
+                trigger = trigger,
+                candidates = candidates.take(MAX_SWITCH_CANDIDATES),
+                offerAlternatives = offerAlternatives,
+                policyRevision = policyRevision,
             )
+            ensureActive()
+            if (isSourceSwitchPromptAllowed(suggestion, requireUnchangedPolicy = true)) {
+                onSourceSwitchSuggestion.call(suggestion)
+            }
         }
     }
 

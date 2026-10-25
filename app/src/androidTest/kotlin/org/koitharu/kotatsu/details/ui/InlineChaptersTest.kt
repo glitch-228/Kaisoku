@@ -77,6 +77,9 @@ class InlineChaptersTest {
         size(rv)
         (rv.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(4000, 13)
         size(rv)
+        val originalManager = rv.layoutManager as LinearLayoutManager
+        val originalFirstVisible = originalManager.findFirstVisibleItemPosition()
+        assertEquals(13, originalManager.findViewByPosition(4000)!!.top)
         val state = SparseArray<Parcelable>()
         rv.saveHierarchyState(state)
         val second = ChaptersAdapter(clicks).apply {
@@ -91,7 +94,9 @@ class InlineChaptersTest {
         second.stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.ALLOW
         size(restored)
         val manager = restored.layoutManager as LinearLayoutManager
-        assertEquals(4000, manager.findFirstVisibleItemPosition())
+        // The positive offset intentionally leaves the preceding row partly visible.
+        assertEquals(originalFirstVisible, manager.findFirstVisibleItemPosition())
+        assertEquals(4000, manager.findFirstCompletelyVisibleItemPosition())
         assertEquals(13, manager.findViewByPosition(4000)!!.top)
         rv.adapter = null
         restored.adapter = null

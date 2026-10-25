@@ -80,6 +80,13 @@ class AppWorkerFactory @Inject constructor(
     private val aniListRepository: Provider<AniListRepository>,
     private val trackerLibrary: Provider<org.koitharu.kotatsu.scrobbling.common.data.TrackerLibraryRepository>,
     private val recommendationEngine: Provider<org.koitharu.kotatsu.suggestions.local.RecommendationEngine>,
+    private val remoteLibraries: Provider<org.koitharu.kotatsu.remote.library.RemoteLibraryManager>,
+    private val libraryImages: Provider<org.koitharu.kotatsu.remote.library.RemoteLibraryImageCache>,
+    private val serverExtendedRepository: Provider<org.koitharu.kotatsu.sync.extended.appserver.ServerExtendedSyncRepository>,
+    private val extendedDriveRepository: Provider<org.koitharu.kotatsu.sync.extended.drive.ExtendedDriveRepository>,
+    private val outgoingProgress: Provider<org.koitharu.kotatsu.scrobbling.v2.progress.OutgoingProgressEngine>,
+    private val outgoingCoordinator: Provider<org.koitharu.kotatsu.scrobbling.v2.progress.OutgoingProgressCoordinator>,
+    private val community: Provider<org.koitharu.kotatsu.community.data.CommunityRepository>,
 ) : WorkerFactory() {
 
     override fun createWorker(
@@ -87,6 +94,8 @@ class AppWorkerFactory @Inject constructor(
         workerClassName: String,
         workerParameters: WorkerParameters,
     ): ListenableWorker? = when (workerClassName) {
+        org.koitharu.kotatsu.community.work.CommunityReplyWorker::class.java.name ->
+            org.koitharu.kotatsu.community.work.CommunityReplyWorker(appContext, workerParameters, community.get())
         DownloadWorker::class.java.name -> DownloadWorker(
             appContext = appContext,
             params = workerParameters,
@@ -101,6 +110,8 @@ class AppWorkerFactory @Inject constructor(
             slowdownDispatcher = slowdownDispatcher.get(),
             chapterDispatcher = chapterDispatcher.get(),
             imageProxyInterceptor = imageProxyInterceptor.get(),
+            remoteLibraries = remoteLibraries.get(),
+            libraryImages = libraryImages.get(),
             notificationFactoryFactory = downloadNotificationFactoryFactory.get(),
         )
 
@@ -150,14 +161,27 @@ class AppWorkerFactory @Inject constructor(
             settings = syncBackendSettings.get(),
         )
 
+        org.koitharu.kotatsu.sync.extended.appserver.ServerExtendedWorker::class.java.name ->
+            org.koitharu.kotatsu.sync.extended.appserver.ServerExtendedWorker(
+                appContext, workerParameters, serverExtendedRepository.get(), syncBackendSettings.get(),
+            )
+
+        org.koitharu.kotatsu.sync.extended.drive.ExtendedDriveWorker::class.java.name ->
+            org.koitharu.kotatsu.sync.extended.drive.ExtendedDriveWorker(
+                appContext, workerParameters, extendedDriveRepository.get(),
+            )
+
         AniListProgressWorker::class.java.name -> AniListProgressWorker(
             context = appContext,
             params = workerParameters,
             repository = aniListRepository.get(),
         )
 
+        org.koitharu.kotatsu.scrobbling.v2.progress.OutgoingProgressWorker::class.java.name ->
+            org.koitharu.kotatsu.scrobbling.v2.progress.OutgoingProgressWorker(appContext, workerParameters, outgoingProgress.get())
+
         org.koitharu.kotatsu.scrobbling.common.work.TrackerProgressWorker::class.java.name ->
-            org.koitharu.kotatsu.scrobbling.common.work.TrackerProgressWorker(appContext, workerParameters, trackerLibrary.get())
+            org.koitharu.kotatsu.scrobbling.common.work.TrackerProgressWorker(appContext, workerParameters, trackerLibrary.get(), outgoingCoordinator)
 
         else -> null
     }

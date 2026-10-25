@@ -42,6 +42,25 @@ class FavoritesAppearanceTest {
         }
     }
 
+    @Test fun fixedColumnsApplyBeforeMeasurementAndAdaptiveColumnsFollowLaterLayout() {
+        val context = isolatedContext()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = RecyclerView(context)
+            val layout = GridLayoutManager(context, 3)
+            view.layoutManager = layout
+            val resolver = GridSpanResolver(context.resources)
+            resolver.setGridSize(1f, view, 1)
+            assertEquals(1, layout.spanCount)
+            view.layout(0, 0, 1080, 1000)
+            resolver.setGridSize(1f, view)
+            assertTrue(layout.spanCount >= 2)
+            resolver.setGridSize(1f, view, 5)
+            resolver.onLayoutChange(view, 0, 0, 720, 1000, 0, 0, 1080, 1000)
+            assertEquals(5, layout.spanCount)
+            assertEquals(5, resolver.spanCount)
+        }
+    }
+
     @Test fun customLongPressCancelsClicksOnScrollAndRebindingWhileSystemTimingIsUntouched() {
         val context = isolatedContext()
         InstrumentationRegistry.getInstrumentation().runOnMainSync {

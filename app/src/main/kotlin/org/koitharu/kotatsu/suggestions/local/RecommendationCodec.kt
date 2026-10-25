@@ -65,10 +65,22 @@ object RecommendationCodec {
         put("branch", value.branch); put("total", value.total); put("digest", value.digest)
         put("number", value.terminalNumber); put("date", value.terminalDate); put("observed", value.observedAt)
         put("releases", value.releases); put("read", value.lastReadingAt)
+        put("releaseIds", JSONArray(value.releaseChapterIds.sorted()))
+        put("readerBoundary", value.confirmedReadingBoundary); put("exactGeneration", value.exactGeneration)
+        put("releaseIdentityVersion", value.releaseIdentityVersion)
+        put("chapterListIdentity", value.chapterListIdentity)
     }.toString()
     fun decodeBaseline(raw: String): ChapterBaseline? = runCatching {
-        JSONObject(raw).let { ChapterBaseline(it.optString("branch").takeIf(String::isNotEmpty), it.getInt("total"),
-            it.getString("digest"), it.getDouble("number").toFloat(), it.getLong("date"), it.getLong("observed"),
-            it.getInt("releases"), it.getLong("read")) }
+        require(raw.length <= 512 * 1024)
+        JSONObject(raw).let { json ->
+            val ids = json.optJSONArray("releaseIds")
+            require((ids?.length() ?: 0) <= ChapterReleaseEvidence.MAX_RELEASE_IDENTITIES)
+            ChapterBaseline(json.optString("branch").takeIf(String::isNotEmpty), json.getInt("total"),
+            json.getString("digest"), json.getDouble("number").toFloat(), json.getLong("date"), json.getLong("observed"),
+            json.getInt("releases"), json.getLong("read"),
+            (0 until (ids?.length() ?: 0)).mapTo(linkedSetOf()) { ids!!.getLong(it) },
+            json.optBoolean("readerBoundary", false),
+            json.optString("exactGeneration").takeIf { it.isNotEmpty() && it != "null" && it.length <= 128 },
+            json.optInt("releaseIdentityVersion", 0), json.optString("chapterListIdentity")) }
     }.getOrNull()
 }

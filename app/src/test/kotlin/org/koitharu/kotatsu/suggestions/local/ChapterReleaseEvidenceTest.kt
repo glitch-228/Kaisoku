@@ -85,6 +85,21 @@ class ChapterReleaseEvidenceTest {
         val replaced = chapters(134).map { if (it.id == 50L) it.copy(id = 5000) else it }
         assertEquals(0, ChapterReleaseEvidence.update(base, replaced, null, 12_000).releases)
     }
+    @Test fun releaseIdentityProofAccumulatesAndResetsWithoutCountingTwice() {
+        val first = update(120)
+        val next = ChapterReleaseEvidence.update(first, chapters(134).map {
+            if (it.number > 120) it.copy(uploadDate = 12_000) else it
+        }, null, 13_000)
+        assertTrue(next.confirmedReadingBoundary)
+        assertEquals((101L..134L).toSet(), next.releaseChapterIds)
+        assertEquals(1, next.releaseIdentityVersion)
+        assertEquals(next, ChapterReleaseEvidence.update(next, chapters(134), null, 15_000))
+        assertTrue(ChapterReleaseEvidence.reading(next, chapters(134), null, 16_000).releaseChapterIds.isEmpty())
+        assertTrue(ChapterReleaseEvidence.update(next, chapters(134).map { it.copy(url = it.url + "changed") }, null, 16_000)
+            .releaseChapterIds.isEmpty())
+        assertFalse(ChapterReleaseEvidence.update(next, chapters(134).map { it.copy(branch = "other") }, "other", 16_000)
+            .confirmedReadingBoundary)
+    }
 
     private fun eligible(baseline: ChapterBaseline) = ChapterReleaseEvidence.eligible(baseline, true, false, 25, true)
     private fun update(total: Int) = ChapterReleaseEvidence.update(base, chapters(total), null, 11_000)

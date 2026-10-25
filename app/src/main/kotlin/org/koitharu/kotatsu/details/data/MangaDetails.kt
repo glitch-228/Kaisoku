@@ -76,6 +76,7 @@ data class MangaDetails(
                 coverUrl = override?.coverUrl.ifNullOrEmpty { manga.coverUrl },
                 largeCoverUrl = override?.coverUrl.ifNullOrEmpty { manga.largeCoverUrl },
                 contentRating = override?.contentRating ?: manga.contentRating,
+                description = override?.description.ifNullOrEmpty { manga.description },
                 chapters = allChapters,
             )
         }

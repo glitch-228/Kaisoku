@@ -1,82 +1,93 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen
-	xmlns:android="http://schemas.android.com/apk/res/android"
-	xmlns:app="http://schemas.android.com/apk/res-auto">
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
-	<ListPreference
-		android:entries="@array/sync_backends"
-		android:entryValues="@array/sync_backend_values"
-		android:key="sync_backend"
-		android:persistent="false"
-		android:title="@string/sync_provider"
-		app:useSimpleSummaryProvider="true" />
+    <ListPreference
+        android:entries="@array/sync_backends"
+        android:entryValues="@array/sync_backend_values"
+        android:key="sync_backend"
+        android:persistent="false"
+        android:title="@string/sync_provider"
+        app:useSimpleSummaryProvider="true" />
 
-	<PreferenceCategory
-		android:key="sync_server_category"
-		android:title="@string/kaisoku_server">
+    <PreferenceCategory
+        android:key="sync_server_category"
+        android:title="@string/kaisoku_server">
 
-		<Preference
-			android:enabled="@bool/is_sync_enabled"
-			android:key="sync"
-			android:persistent="false"
-			android:summary="@string/sync_title"
-			android:title="@string/sync" />
+        <Preference
+            android:enabled="@bool/is_sync_enabled"
+            android:key="sync"
+            android:persistent="false"
+            android:summary="@string/sync_title"
+            android:title="@string/sync" />
 
-		<Preference
-			android:enabled="false"
-			android:key="host"
-			android:title="@string/server_address" />
+        <Preference
+            android:enabled="false"
+            android:key="host"
+            android:title="@string/server_address" />
 
-		<Preference
-			android:enabled="false"
-			android:key="logout"
-			android:title="@string/logout" />
-	</PreferenceCategory>
+        <Preference
+            android:enabled="@bool/is_sync_enabled"
+            android:fragment="org.koitharu.kotatsu.sync.extended.appserver.ServerExtendedSettingsFragment"
+            android:key="server_extended_settings"
+            android:title="@string/server_extended_title" />
 
-	<PreferenceCategory
-		android:key="sync_drive_category"
-		android:title="@string/google_drive">
+        <Preference
+            android:enabled="false"
+            android:key="logout"
+            android:title="@string/logout" />
+    </PreferenceCategory>
 
-		<Preference
-			android:key="drive_authorize"
-			android:persistent="false"
-			android:title="@string/drive_connect" />
+    <PreferenceCategory
+        android:key="sync_drive_category"
+        android:title="@string/google_drive">
 
-		<Preference
-			android:key="drive_sync_now"
-			android:persistent="false"
-			android:title="@string/sync_now" />
+        <Preference
+            android:key="extended_drive_settings"
+            android:fragment="org.koitharu.kotatsu.sync.extended.drive.ExtendedDriveSettingsFragment"
+            android:title="@string/extended_drive_title" />
 
-		<ListPreference
-			android:entries="@array/drive_sync_intervals"
-			android:entryValues="@array/drive_sync_interval_values"
-			android:key="drive_interval"
-			android:persistent="false"
-			android:title="@string/sync_interval"
-			app:useSimpleSummaryProvider="true" />
+        <Preference
+            android:key="drive_authorize"
+            android:persistent="false"
+            android:title="@string/drive_connect" />
 
-		<MultiSelectListPreference
-			android:entries="@array/drive_content_sections"
-			android:entryValues="@array/drive_content_section_values"
-			android:key="drive_content"
-			android:persistent="false"
-			android:title="@string/sync_content" />
+        <Preference
+            android:key="drive_sync_now"
+            android:persistent="false"
+            android:title="@string/sync_now" />
 
-		<SwitchPreferenceCompat
-			android:key="drive_wifi_only"
-			android:persistent="false"
-			android:title="@string/wifi_only" />
+        <ListPreference
+            android:entries="@array/drive_sync_intervals"
+            android:entryValues="@array/drive_sync_interval_values"
+            android:key="drive_interval"
+            android:persistent="false"
+            android:title="@string/sync_interval"
+            app:useSimpleSummaryProvider="true" />
 
-		<SwitchPreferenceCompat
-			android:key="drive_sync_on_start"
-			android:persistent="false"
-			android:title="@string/sync_on_start" />
+        <MultiSelectListPreference
+            android:entries="@array/drive_content_sections"
+            android:entryValues="@array/drive_content_section_values"
+            android:key="drive_content"
+            android:persistent="false"
+            android:title="@string/sync_content" />
 
-		<Preference
-			android:key="drive_disconnect"
-			android:persistent="false"
-			android:summary="@string/drive_disconnect_summary"
-			android:title="@string/disconnect" />
-	</PreferenceCategory>
+        <SwitchPreferenceCompat
+            android:key="drive_wifi_only"
+            android:persistent="false"
+            android:title="@string/wifi_only" />
+
+        <SwitchPreferenceCompat
+            android:key="drive_sync_on_start"
+            android:persistent="false"
+            android:title="@string/sync_on_start" />
+
+        <Preference
+            android:key="drive_disconnect"
+            android:persistent="false"
+            android:summary="@string/drive_disconnect_summary"
+            android:title="@string/disconnect" />
+    </PreferenceCategory>
 
 </PreferenceScreen>

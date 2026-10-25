@@ -3,6 +3,9 @@
 	xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <item android:id="@+id/action_refresh_cover" android:title="@string/refresh_cover" app:showAsAction="never" />
+    <item android:id="@+id/action_community_similar" android:title="@string/community_similar" app:showAsAction="never" />
+
 	<item
 		android:id="@+id/action_favourite"
 		android:icon="@drawable/ic_heart_outline"
@@ -37,6 +40,26 @@
 		android:orderInCategory="40"
 		android:title="@string/edit"
 		app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_translate_synopsis"
+        android:orderInCategory="45"
+        android:title="@string/synopsis_translate_beta"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_archive_unlock"
+        android:orderInCategory="46"
+        android:title="@string/archive_unlock_beta"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_archive_export"
+        android:orderInCategory="47"
+        android:title="@string/archive_export_beta"
+        android:visible="false"
+        app:showAsAction="never" />
 
 	<item
 		android:id="@+id/action_scrobbling"

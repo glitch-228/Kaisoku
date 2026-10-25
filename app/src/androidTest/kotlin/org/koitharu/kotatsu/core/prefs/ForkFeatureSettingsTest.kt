@@ -30,7 +30,7 @@ class ForkFeatureSettingsTest {
             settings.setUsesDefaultFavoritesOrder(1, false)
             assertFalse(settings.usesDefaultFavoritesOrder(1))
             settings.gridColumns = 99; assertEquals(12, settings.gridColumns)
-            settings.gridColumns = -1; assertEquals(2, settings.gridColumns)
+            settings.gridColumns = -1; assertEquals(1, settings.gridColumns)
             prefs.edit().putBoolean(AppSettings.KEY_NEW_CHAPTER_COUNTER, false).putString(AppSettings.KEY_WIDE_PAGE_ROTATION, "270").commit()
             assertTrue(settings.isFavoritesCategoryStripVisible); assertFalse(settings.isNewChapterCounterVisible)
             assertEquals(270, settings.widePageRotation)

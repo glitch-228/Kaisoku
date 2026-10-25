@@ -118,6 +118,15 @@ class ReaderSettingsFragment :
 
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         return when (preference.key) {
+            "archive_lock_all" -> {
+                org.koitharu.kotatsu.core.archive.ArchiveAccess.get(requireContext()).sessions.lockAll()
+                true
+            }
+            "source_switch_prompt_settings" -> {
+                org.koitharu.kotatsu.reader.ui.SourceSwitchMuteDialog.show(parentFragmentManager)
+                true
+            }
+
             AppSettings.KEY_READER_UPSCALE -> {
                 org.koitharu.kotatsu.reader.ui.upscale.UpscaleSettingsDialog().show(parentFragmentManager, "upscaleSettings")
                 true

@@ -1,5 +1,7 @@
 package org.koitharu.kotatsu.details.ui
 
+import org.koitharu.kotatsu.core.util.ext.isHttpUrl
+
 import android.app.assist.AssistContent
 import android.content.Context
 import android.content.Intent
@@ -154,6 +156,7 @@ class DetailsActivity :
     @Inject
     lateinit var settings: AppSettings
     @Inject lateinit var recommendationUi: org.koitharu.kotatsu.suggestions.local.RecommendationUi
+    @Inject lateinit var communitySimilarUi: org.koitharu.kotatsu.community.ui.CommunitySimilarUi
 
     @Inject
     lateinit var community: CommunityRepository
@@ -176,6 +179,7 @@ class DetailsActivity :
         get() = viewBinding.containerBottomSheet
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.enforceBeforeDisplay()
         super.onCreate(savedInstanceState)
         setContentView(ActivityDetailsBinding.inflate(layoutInflater))
         infoBinding = LayoutDetailsTableBinding.bind(viewBinding.root)
@@ -281,6 +285,7 @@ class DetailsActivity :
     }
 
     override fun onResume() {
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.enforceBeforeDisplay()
         super.onResume()
         if (inlineChaptersEnabled != settings.isDetailsChaptersInline) {
             inlineChapters?.collapseSearch()
@@ -405,6 +410,13 @@ class DetailsActivity :
 
     override fun onRefresh() {
         viewModel.reload()
+    }
+
+    fun refreshCover() {
+        if (settings.isCoverRefreshActionEnabled && viewModel.coverUrl.value?.isHttpUrl() == true &&
+            viewModel.localArchiveFile == null) {
+            viewBinding.imageViewCover.reload(skipCache = true)
+        }
     }
 
     override fun onDraw() {

@@ -9,4 +9,5 @@ data class SourceSwitchSuggestion(
 	val trigger: SourceHealthMonitor.Trigger,
 	val candidates: List<SourceSwitchCandidate>,
 	val offerAlternatives: Boolean,
+	val policyRevision: Long,
 )

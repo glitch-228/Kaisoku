@@ -110,7 +110,8 @@ class RecommendationEngine @Inject constructor(
             listOf(it.manga, it.tags, it.favorite, it.lastRead / 86400000, it.durationMillis / 300000, it.progress >= 1f, it.historyChapters)
         } },
         store.dao.dismissals(),
-        combine(store.changes, library.invalidationTracker.createFlow("manga", "manga_tags", "preferences")) { change, _ -> change },
+        combine(store.changes, library.invalidationTracker.createFlow("manga", "manga_tags", "preferences",
+            "chapter_read_policy", "chapter_read_count")) { change, _ -> change },
         settings.observe(*KEYS).onStart { emit(null) },
     ) { row, taste, dismissed, _, _ -> Triple(row, taste, dismissed.toSet()) }
         .mapLatest { (row, taste, dismissed) ->
@@ -124,7 +125,7 @@ class RecommendationEngine @Inject constructor(
                     .ifEmpty { store.cachedCandidates(versions) },
             ))
             val baselines = store.dao.baselines().associate { it.key to RecommendationCodec.decodeBaseline(it.payload) }
-            val progress = publicProviders.readingStates(input)
+            val progress = publicProviders.readingStates(input, baselines)
             val candidates = input.mapNotNull { item ->
                 val current = (item.target as? RecommendationTarget.SourceTitle)?.let { target ->
                     available[target.manga.source.name]?.let { source -> item.copy(target = RecommendationTarget.SourceTitle(target.manga.copy(source = source))) }

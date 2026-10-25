@@ -85,6 +85,9 @@ abstract class BaseActivity<B : ViewBinding> :
             if (isAmoledTheme) {
                 setTheme(R.style.ThemeOverlay_Kotatsu_Amoled)
             }
+            if (settings.isAnimatedMenusEnabled && android.animation.ValueAnimator.areAnimatorsEnabled()) {
+                theme.applyStyle(R.style.ThemeOverlay_Kaisoku_AnimatedMenus, true)
+            }
         }
         putDataToExtras(intent)
         exceptionResolver = entryPoint.exceptionResolverFactory.create(this)

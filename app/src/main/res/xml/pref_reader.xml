@@ -4,6 +4,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:title="@string/reader_settings">
 
+    <SwitchPreferenceCompat
+        android:key="extra_page_retention"
+        android:defaultValue="false"
+        android:title="@string/extra_page_retention"
+        android:summary="@string/extra_page_retention_summary" />
+
     <ListPreference
         android:entries="@array/reader_modes"
         android:key="reader_mode"
@@ -149,6 +155,11 @@
         android:key="source_switch_suggest"
         android:summary="@string/source_switch_suggest_summary"
         android:title="@string/source_switch_suggest" />
+
+    <Preference
+        android:key="source_switch_prompt_settings"
+        android:summary="@string/source_prompt_settings_summary"
+        android:title="@string/source_prompt_settings" />
 
     <SwitchPreferenceCompat
         android:defaultValue="true"
@@ -391,6 +402,13 @@
             android:key="translate_clear_cache"
             android:title="@string/translate_clear_cache" />
 
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/archive_session_settings_beta">
+        <ListPreference android:key="archive_session_timeout_minutes" android:defaultValue="5"
+            android:title="@string/archive_session_timeout" android:summary="@string/archive_session_timeout_summary"
+            android:entries="@array/archive_timeout_labels" android:entryValues="@array/archive_timeout_values" />
+        <Preference android:key="archive_lock_all" android:persistent="false" android:title="@string/archive_lock_all" />
     </PreferenceCategory>
 
 </PreferenceScreen>

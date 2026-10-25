@@ -1,5 +1,7 @@
 package org.koitharu.kotatsu.main.ui
 
+import org.koitharu.kotatsu.core.prefs.observeAsFlow
+
 import android.Manifest
 import android.app.BackgroundServiceStartNotAllowedException
 import android.app.ServiceStartNotAllowedException
@@ -95,487 +97,507 @@ import com.google.android.material.R as materialR
 
 @AndroidEntryPoint
 class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNavOwner,
-	ListCheckpointOwner,
-	View.OnClickListener,
-	SearchSuggestionItemCallback.SuggestionItemListener,
-	MainNavigationDelegate.OnFragmentChangedListener,
-	View.OnLayoutChangeListener,
-	SearchView.TransitionListener {
+    ListCheckpointOwner,
+    View.OnClickListener,
+    SearchSuggestionItemCallback.SuggestionItemListener,
+    MainNavigationDelegate.OnFragmentChangedListener,
+    View.OnLayoutChangeListener,
+    SearchView.TransitionListener {
 
-	@Inject
-	lateinit var settings: AppSettings
+    @Inject
+    lateinit var settings: AppSettings
 
-	@Inject
-	lateinit var updatePluginsProvider: UpdatePluginsProvider
+    private var barBlur: BarBlur? = null
+    private var barBlurStatusZone = 0f
 
-	private val viewModel by viewModels<MainViewModel>()
-	private val searchSuggestionViewModel by viewModels<SearchSuggestionViewModel>()
-	private val voiceInputLauncher = registerForActivityResult(VoiceInputContract()) { result ->
-		if (result != null) {
-			viewBinding.searchView.setText(result)
-		}
-	}
-	private lateinit var navigationDelegate: MainNavigationDelegate
-	private lateinit var fadingAppbarMediator: FadingAppbarMediator
+    @Inject
+    lateinit var updatePluginsProvider: UpdatePluginsProvider
 
-	override val appBar: AppBarLayout
-		get() = viewBinding.appbar
+    private val viewModel by viewModels<MainViewModel>()
+    private val searchSuggestionViewModel by viewModels<SearchSuggestionViewModel>()
+    private val voiceInputLauncher = registerForActivityResult(VoiceInputContract()) { result ->
+        if (result != null) {
+            viewBinding.searchView.setText(result)
+        }
+    }
+    private lateinit var navigationDelegate: MainNavigationDelegate
+    private lateinit var fadingAppbarMediator: FadingAppbarMediator
 
-	override val bottomNav: SlidingBottomNavigationView?
-		get() = viewBinding.bottomNav
+    override val appBar: AppBarLayout
+        get() = viewBinding.appbar
 
-	override val listCheckpointButton: View?
-		get() = viewBinding.buttonCheckpoint.root
+    override val bottomNav: SlidingBottomNavigationView?
+        get() = viewBinding.bottomNav
 
-	private var lastBottomInset = 0
+    override val listCheckpointButton: View?
+        get() = viewBinding.buttonCheckpoint.root
 
-	override fun onCreate(savedInstanceState: Bundle?) {
-		super.onCreate(savedInstanceState)
-		setContentView(ActivityMainBinding.inflate(layoutInflater))
-		setSupportActionBar(viewBinding.searchBar)
+    private var lastBottomInset = 0
 
-		viewBinding.fab?.setOnClickListener(this)
-		viewBinding.navRail?.headerView?.findViewById<View>(R.id.railFab)?.setOnClickListener(this)
-		fadingAppbarMediator =
-			FadingAppbarMediator(viewBinding.appbar, viewBinding.layoutSearch ?: viewBinding.searchBar)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(ActivityMainBinding.inflate(layoutInflater))
+        setSupportActionBar(viewBinding.searchBar)
 
-		navigationDelegate = MainNavigationDelegate(
-			navBar = checkNotNull(bottomNav ?: viewBinding.navRail),
-			fragmentManager = supportFragmentManager,
-			settings = settings,
-		)
-		navigationDelegate.addOnFragmentChangedListener(this)
-		navigationDelegate.onCreate(this, savedInstanceState)
-		viewBinding.textViewTitle?.let { tv ->
-			navigationDelegate.observeTitle().observe(this) { tv.text = it }
-		}
+        viewBinding.fab?.setOnClickListener(this)
+        viewBinding.navRail?.headerView?.findViewById<View>(R.id.railFab)?.setOnClickListener(this)
+        fadingAppbarMediator =
+            FadingAppbarMediator(viewBinding.appbar, viewBinding.layoutSearch ?: viewBinding.searchBar)
 
-		addMenuProvider(MainMenuProvider(this, settings, router, viewModel))
+        navigationDelegate = MainNavigationDelegate(
+            navBar = checkNotNull(bottomNav ?: viewBinding.navRail),
+            fragmentManager = supportFragmentManager,
+            settings = settings,
+        )
+        navigationDelegate.addOnFragmentChangedListener(this)
+        navigationDelegate.onCreate(this, savedInstanceState)
+        viewBinding.textViewTitle?.let { tv ->
+            navigationDelegate.observeTitle().observe(this) { tv.text = it }
+        }
 
-		val exitCallback = ExitCallback(this, viewBinding.container)
-		onBackPressedDispatcher.addCallback(exitCallback)
-		onBackPressedDispatcher.addCallback(navigationDelegate)
+        addMenuProvider(MainMenuProvider(this, settings, router, viewModel))
 
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !resources.getBoolean(R.bool.is_predictive_back_enabled)) {
-			val legacySearchCallback = SearchViewLegacyBackCallback(viewBinding.searchView)
-			viewBinding.searchView.addTransitionListener(legacySearchCallback)
-			onBackPressedDispatcher.addCallback(legacySearchCallback)
-		}
+        val exitCallback = ExitCallback(this, viewBinding.container)
+        onBackPressedDispatcher.addCallback(exitCallback)
+        onBackPressedDispatcher.addCallback(navigationDelegate)
 
-		if (savedInstanceState == null) {
-			onFirstStart()
-		}
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !resources.getBoolean(R.bool.is_predictive_back_enabled)) {
+            val legacySearchCallback = SearchViewLegacyBackCallback(viewBinding.searchView)
+            viewBinding.searchView.addTransitionListener(legacySearchCallback)
+            onBackPressedDispatcher.addCallback(legacySearchCallback)
+        }
 
-		viewModel.onOpenReader.observeEvent(this, this::onOpenReader)
-		viewModel.onError.observeEvent(this, SnackbarErrorObserver(viewBinding.container, null))
-		viewModel.isLoading.observe(this, this::onLoadingStateChanged)
-		viewModel.isResumeEnabled.observe(this, this::onResumeEnabledChanged)
-		viewModel.feedCounter.observe(this, ::onFeedCounterChanged)
-		viewModel.appUpdate.observe(this, MenuInvalidator(this))
-		viewModel.onFirstStart.observeEvent(this) { router.showWelcomeSheet() }
-		viewModel.isBottomNavPinned.observe(this, ::setNavbarPinned)
-		viewModel.bottomNavStyle.observe(this, ::setNavbarStyle)
-		searchSuggestionViewModel.isIncognitoModeEnabled.observe(this, this::onIncognitoModeChanged)
-		viewBinding.bottomNav?.addOnLayoutChangeListener(this)
-		applyAmoledNavbarTintIfNeeded()
-		viewBinding.searchView.addTransitionListener(this)
-		viewBinding.searchView.addTransitionListener(exitCallback)
-		initSearch()
-	}
+        if (savedInstanceState == null) {
+            onFirstStart()
+        }
 
-	override fun onRestoreInstanceState(savedInstanceState: Bundle) {
-		super.onRestoreInstanceState(savedInstanceState)
-		adjustSearchUI(viewBinding.searchView.isShowing)
-		navigationDelegate.syncSelectedItem()
-	}
+        viewModel.onOpenReader.observeEvent(this, this::onOpenReader)
+        viewModel.onError.observeEvent(this, SnackbarErrorObserver(viewBinding.container, null))
+        viewModel.isLoading.observe(this, this::onLoadingStateChanged)
+        viewModel.isResumeEnabled.observe(this, this::onResumeEnabledChanged)
+        viewModel.feedCounter.observe(this, ::onFeedCounterChanged)
+        viewModel.appUpdate.observe(this, MenuInvalidator(this))
+        viewModel.onFirstStart.observeEvent(this) { router.showWelcomeSheet() }
+        viewModel.isBottomNavPinned.observe(this, ::setNavbarPinned)
+        viewModel.bottomNavStyle.observe(this, ::setNavbarStyle)
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            settings.observeAsFlow(AppSettings.KEY_BAR_BLUR) { isBarBlurEnabled }.observe(this) {
+                if (it && barBlur == null) {
+                    barBlur = try { BarBlur(viewBinding.container, viewBinding.bottomNav).also { blur ->
+                        blur.statusBarZone = barBlurStatusZone
+                    } } catch (_: Exception) { null }
+                }
+                barBlur?.isEnabled = it
+            }
+            lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+                override fun onDestroy(owner: LifecycleOwner) { barBlur?.isEnabled = false; barBlur = null }
+            })
+        }
+        searchSuggestionViewModel.isIncognitoModeEnabled.observe(this, this::onIncognitoModeChanged)
+        viewBinding.bottomNav?.addOnLayoutChangeListener(this)
+        applyAmoledNavbarTintIfNeeded()
+        viewBinding.searchView.addTransitionListener(this)
+        viewBinding.searchView.addTransitionListener(exitCallback)
+        initSearch()
+    }
 
-	override fun onResume() {
-		super.onResume()
-		maybeShowKeepAndroidOpenNotice()
-		lifecycleScope.launch(Dispatchers.Default) {
-			updatePluginsProvider.runAutoUpdate(settings)
-		}
-	}
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        adjustSearchUI(viewBinding.searchView.isShowing)
+        navigationDelegate.syncSelectedItem()
+    }
 
-	private fun maybeShowKeepAndroidOpenNotice() {
-		if (isFinishing || isDestroyed || supportFragmentManager.isStateSaved) return
-		val prefs = getSharedPreferences("campaign_notice", MODE_PRIVATE)
-		if (prefs.getBoolean("keep_android_open_shown", false)) return
-		// Wait for the initial screen, onboarding sheet, and any permission prompt to settle.
-		lifecycleScope.launch {
-			delay(1_200)
-			if (prefs.getBoolean("keep_android_open_shown", false)) return@launch
-			if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || isFinishing || isDestroyed) return@launch
-			if (navigationDelegate.primaryFragment !is org.koitharu.kotatsu.explore.ui.ExploreFragment) return@launch
-			if (viewBinding.searchView.isShowing || supportFragmentManager.isStateSaved ||
-				supportFragmentManager.fragments.any { it is DialogFragment && it.dialog?.isShowing == true }
-			) return@launch
-			val url = KeepAndroidOpenCampaign.url(resources.configuration.locales[0].language)
-			val dialog = MaterialAlertDialogBuilder(this@MainActivity)
-				.setTitle(R.string.keep_android_open_title)
-				.setMessage(R.string.keep_android_open_message)
-				.setPositiveButton(R.string.learn_more) { _, _ ->
-					if (!router.openExternalBrowser(url, getString(R.string.keep_android_open_title))) {
-						com.google.android.material.snackbar.Snackbar.make(viewBinding.container, R.string.operation_not_supported, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
-					}
-				}
-				.setNegativeButton(R.string.dismiss, null)
-				.create()
-			dialog.setOnShowListener { prefs.edit().putBoolean("keep_android_open_shown", true).apply() }
-			dialog.show()
-		}
-	}
+    override fun onResume() {
+        super.onResume()
+        maybeShowKeepAndroidOpenNotice()
+        lifecycleScope.launch(Dispatchers.Default) {
+            updatePluginsProvider.runAutoUpdate(settings)
+        }
+    }
+
+    private fun maybeShowKeepAndroidOpenNotice() {
+        if (isFinishing || isDestroyed || supportFragmentManager.isStateSaved) return
+        val prefs = getSharedPreferences("campaign_notice", MODE_PRIVATE)
+        if (prefs.getBoolean("keep_android_open_shown", false)) return
+        // Wait for the initial screen, onboarding sheet, and any permission prompt to settle.
+        lifecycleScope.launch {
+            delay(1_200)
+            if (prefs.getBoolean("keep_android_open_shown", false)) return@launch
+            if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || isFinishing || isDestroyed) return@launch
+            if (navigationDelegate.primaryFragment !is org.koitharu.kotatsu.explore.ui.ExploreFragment) return@launch
+            if (viewBinding.searchView.isShowing || supportFragmentManager.isStateSaved ||
+                supportFragmentManager.fragments.any { it is DialogFragment && it.dialog?.isShowing == true }
+            ) return@launch
+            val url = KeepAndroidOpenCampaign.url(resources.configuration.locales[0].language)
+            val dialog = MaterialAlertDialogBuilder(this@MainActivity)
+                .setTitle(R.string.keep_android_open_title)
+                .setMessage(R.string.keep_android_open_message)
+                .setPositiveButton(R.string.learn_more) { _, _ ->
+                    if (!router.openExternalBrowser(url, getString(R.string.keep_android_open_title))) {
+                        com.google.android.material.snackbar.Snackbar.make(viewBinding.container, R.string.operation_not_supported, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton(R.string.dismiss, null)
+                .create()
+            dialog.setOnShowListener { prefs.edit().putBoolean("keep_android_open_shown", true).apply() }
+            dialog.show()
+        }
+    }
 
 
-	override fun onFragmentChanged(fragment: Fragment, fromUser: Boolean) {
-		adjustFabVisibility(topFragment = fragment)
-		adjustAppbar(topFragment = fragment)
-		if (fromUser) {
-			actionModeDelegate.finishActionMode()
-			viewBinding.appbar.setExpanded(true)
-		}
-	}
+    override fun onFragmentChanged(fragment: Fragment, fromUser: Boolean) {
+        adjustFabVisibility(topFragment = fragment)
+        adjustAppbar(topFragment = fragment)
+        if (fromUser) {
+            actionModeDelegate.finishActionMode()
+            viewBinding.appbar.setExpanded(true)
+        }
+    }
 
-	override fun addMenuProvider(provider: MenuProvider, owner: LifecycleOwner, state: Lifecycle.State) {
-		if (provider !is MangaSearchMenuProvider) { // do not duplicate search menu item
-			super.addMenuProvider(provider, owner, state)
-		}
-	}
+    override fun addMenuProvider(provider: MenuProvider, owner: LifecycleOwner, state: Lifecycle.State) {
+        if (provider !is MangaSearchMenuProvider) { // do not duplicate search menu item
+            super.addMenuProvider(provider, owner, state)
+        }
+    }
 
-	override fun onClick(v: View) {
-		when (v.id) {
-			R.id.fab, R.id.railFab -> viewModel.openLastReader()
-		}
-	}
+    override fun onClick(v: View) {
+        when (v.id) {
+            R.id.fab, R.id.railFab -> viewModel.openLastReader()
+        }
+    }
 
-	override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
-		val typeMask = WindowInsetsCompat.Type.systemBars()
-		val barsInsets = insets.getInsets(typeMask)
-		val searchBarDefaultMargin = resources.getDimensionPixelOffset(materialR.dimen.m3_searchbar_margin_horizontal)
-		viewBinding.searchBar.updateLayoutParams<MarginLayoutParams> {
-			marginEnd = searchBarDefaultMargin + barsInsets.end(v)
-			marginStart = if (viewBinding.navRail != null) {
-				searchBarDefaultMargin
-			} else {
-				searchBarDefaultMargin + barsInsets.start(v)
-			}
-		}
-		viewBinding.bottomNav?.let { bottomNav ->
-			// A floating bar keeps clear of the system bars through its own margins, so the insets
-			// must not also become padding inside the pill.
-			if (bottomNav.isFloating) {
-				val gap = resources.getDimensionPixelOffset(R.dimen.nav_floating_margin)
-				bottomNav.updatePadding(left = 0, right = 0, bottom = 0)
-				bottomNav.updateLayoutParams<MarginLayoutParams> {
-					leftMargin = barsInsets.left + gap
-					rightMargin = barsInsets.right + gap
-					bottomMargin = barsInsets.bottom + gap
-				}
-			} else {
-				bottomNav.updatePadding(
-					left = barsInsets.left,
-					right = barsInsets.right,
-					bottom = barsInsets.bottom,
-				)
-				bottomNav.updateLayoutParams<MarginLayoutParams> {
-					leftMargin = 0
-					rightMargin = 0
-					bottomMargin = 0
-				}
-			}
-		}
-		viewBinding.navRail?.updateLayoutParams<MarginLayoutParams> {
-			marginStart = barsInsets.start(v)
-			topMargin = barsInsets.top
-			bottomMargin = barsInsets.bottom
-		}
-		updateContainerBottomMargin()
-		updateCheckpointMargin(barsInsets.bottom)
-		return insets.consume(v, typeMask, start = viewBinding.navRail != null).also {
-			handleSearchSuggestionsInsets(it)
-		}
-	}
+    override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
+        val typeMask = WindowInsetsCompat.Type.systemBars()
+        val barsInsets = insets.getInsets(typeMask)
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            barBlurStatusZone = if (barsInsets.top > 0) barsInsets.top + 16f * resources.displayMetrics.density else 0f
+            barBlur?.statusBarZone = barBlurStatusZone
+        }
+        val searchBarDefaultMargin = resources.getDimensionPixelOffset(materialR.dimen.m3_searchbar_margin_horizontal)
+        viewBinding.searchBar.updateLayoutParams<MarginLayoutParams> {
+            marginEnd = searchBarDefaultMargin + barsInsets.end(v)
+            marginStart = if (viewBinding.navRail != null) {
+                searchBarDefaultMargin
+            } else {
+                searchBarDefaultMargin + barsInsets.start(v)
+            }
+        }
+        viewBinding.bottomNav?.let { bottomNav ->
+            // A floating bar keeps clear of the system bars through its own margins, so the insets
+            // must not also become padding inside the pill.
+            if (bottomNav.isFloating) {
+                val gap = resources.getDimensionPixelOffset(R.dimen.nav_floating_margin)
+                bottomNav.updatePadding(left = 0, right = 0, bottom = 0)
+                bottomNav.updateLayoutParams<MarginLayoutParams> {
+                    leftMargin = barsInsets.left + gap
+                    rightMargin = barsInsets.right + gap
+                    bottomMargin = barsInsets.bottom + gap
+                }
+            } else {
+                bottomNav.updatePadding(
+                    left = barsInsets.left,
+                    right = barsInsets.right,
+                    bottom = barsInsets.bottom,
+                )
+                bottomNav.updateLayoutParams<MarginLayoutParams> {
+                    leftMargin = 0
+                    rightMargin = 0
+                    bottomMargin = 0
+                }
+            }
+        }
+        viewBinding.navRail?.updateLayoutParams<MarginLayoutParams> {
+            marginStart = barsInsets.start(v)
+            topMargin = barsInsets.top
+            bottomMargin = barsInsets.bottom
+        }
+        updateContainerBottomMargin()
+        updateCheckpointMargin(barsInsets.bottom)
+        return insets.consume(v, typeMask, start = viewBinding.navRail != null).also {
+            handleSearchSuggestionsInsets(it)
+        }
+    }
 
-	override fun onLayoutChange(
-		v: View?,
-		left: Int,
-		top: Int,
-		right: Int,
-		bottom: Int,
-		oldLeft: Int,
-		oldTop: Int,
-		oldRight: Int,
-		oldBottom: Int
-	) {
-		if (top != oldTop || bottom != oldBottom) {
-			updateContainerBottomMargin()
-			updateCheckpointMargin()
-		}
-	}
+    override fun onLayoutChange(
+        v: View?,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+        oldLeft: Int,
+        oldTop: Int,
+        oldRight: Int,
+        oldBottom: Int
+    ) {
+        if (top != oldTop || bottom != oldBottom) {
+            updateContainerBottomMargin()
+            updateCheckpointMargin()
+        }
+    }
 
-	override fun onStateChanged(
-		searchView: SearchView,
-		previousState: SearchView.TransitionState,
-		newState: SearchView.TransitionState,
-	) {
-		val wasOpened = previousState >= SearchView.TransitionState.SHOWING
-		val isOpened = newState >= SearchView.TransitionState.SHOWING
-		if (isOpened != wasOpened) {
-			adjustSearchUI(isOpened)
-		}
-	}
+    override fun onStateChanged(
+        searchView: SearchView,
+        previousState: SearchView.TransitionState,
+        newState: SearchView.TransitionState,
+    ) {
+        val wasOpened = previousState >= SearchView.TransitionState.SHOWING
+        val isOpened = newState >= SearchView.TransitionState.SHOWING
+        if (isOpened != wasOpened) {
+            adjustSearchUI(isOpened)
+        }
+    }
 
-	override fun onRemoveQuery(query: String) {
-		searchSuggestionViewModel.deleteQuery(query)
-	}
+    override fun onRemoveQuery(query: String) {
+        searchSuggestionViewModel.deleteQuery(query)
+    }
 
-	override fun onSupportActionModeStarted(mode: ActionMode) {
-		super.onSupportActionModeStarted(mode)
-		adjustFabVisibility()
-		bottomNav?.hide()
-		(viewBinding.layoutSearch ?: viewBinding.searchBar).isInvisible = true
-		updateContainerBottomMargin()
-	}
+    override fun onSupportActionModeStarted(mode: ActionMode) {
+        super.onSupportActionModeStarted(mode)
+        adjustFabVisibility()
+        bottomNav?.hide()
+        (viewBinding.layoutSearch ?: viewBinding.searchBar).isInvisible = true
+        updateContainerBottomMargin()
+    }
 
-	override fun onSupportActionModeFinished(mode: ActionMode) {
-		super.onSupportActionModeFinished(mode)
-		adjustFabVisibility()
-		bottomNav?.show()
-		(viewBinding.layoutSearch ?: viewBinding.searchBar).isInvisible = false
-		updateContainerBottomMargin()
-	}
+    override fun onSupportActionModeFinished(mode: ActionMode) {
+        super.onSupportActionModeFinished(mode)
+        adjustFabVisibility()
+        bottomNav?.show()
+        (viewBinding.layoutSearch ?: viewBinding.searchBar).isInvisible = false
+        updateContainerBottomMargin()
+    }
 
-	private fun onOpenReader(manga: Manga) {
-		val fab = viewBinding.fab ?: viewBinding.navRail?.headerView
-		router.openReader(manga, fab)
-	}
+    private fun onOpenReader(manga: Manga) {
+        val fab = viewBinding.fab ?: viewBinding.navRail?.headerView
+        router.openReader(manga, fab)
+    }
 
-	private fun onFeedCounterChanged(counter: Int) {
-		navigationDelegate.setCounter(NavItem.FEED, counter)
-	}
+    private fun onFeedCounterChanged(counter: Int) {
+        navigationDelegate.setCounter(NavItem.FEED, counter)
+    }
 
-	private fun onIncognitoModeChanged(isIncognito: Boolean) {
-		var options = viewBinding.searchView.getEditText().imeOptions
-		options = if (isIncognito) {
-			options or EditorInfoCompat.IME_FLAG_NO_PERSONALIZED_LEARNING
-		} else {
-			options and EditorInfoCompat.IME_FLAG_NO_PERSONALIZED_LEARNING.inv()
-		}
-		viewBinding.searchView.getEditText().imeOptions = options
-		invalidateOptionsMenu()
-	}
+    private fun onIncognitoModeChanged(isIncognito: Boolean) {
+        var options = viewBinding.searchView.getEditText().imeOptions
+        options = if (isIncognito) {
+            options or EditorInfoCompat.IME_FLAG_NO_PERSONALIZED_LEARNING
+        } else {
+            options and EditorInfoCompat.IME_FLAG_NO_PERSONALIZED_LEARNING.inv()
+        }
+        viewBinding.searchView.getEditText().imeOptions = options
+        invalidateOptionsMenu()
+    }
 
-	private fun onLoadingStateChanged(isLoading: Boolean) {
-		val fab = viewBinding.fab ?: viewBinding.navRail?.headerView ?: return
-		fab.isEnabled = !isLoading
-	}
+    private fun onLoadingStateChanged(isLoading: Boolean) {
+        val fab = viewBinding.fab ?: viewBinding.navRail?.headerView ?: return
+        fab.isEnabled = !isLoading
+    }
 
-	private fun onResumeEnabledChanged(isEnabled: Boolean) {
-		adjustFabVisibility(isResumeEnabled = isEnabled)
-	}
+    private fun onResumeEnabledChanged(isEnabled: Boolean) {
+        adjustFabVisibility(isResumeEnabled = isEnabled)
+    }
 
-	private fun onFirstStart() = try {
-		lifecycleScope.launch(Dispatchers.Main) { // not a default `Main.immediate` dispatcher
-			withContext(Dispatchers.Default) {
-				LocalStorageCleanupWorker.enqueue(applicationContext)
-			}
-			withResumed {
-				MangaPrefetchService.prefetchLast(this@MainActivity)
-				requestNotificationsPermission()
-				startService(Intent(this@MainActivity, LocalIndexUpdateService::class.java))
-				startService(Intent(this@MainActivity, PeriodicalBackupService::class.java))
-				if (settings.isAdBlockEnabled) {
-					startService(Intent(this@MainActivity, AdListUpdateService::class.java))
-				}
-			}
-		}
-	} catch (e: IllegalStateException) {
-		e.printStackTraceDebug()
-	}
+    private fun onFirstStart() = try {
+        lifecycleScope.launch(Dispatchers.Main) { // not a default `Main.immediate` dispatcher
+            withContext(Dispatchers.Default) {
+                LocalStorageCleanupWorker.enqueue(applicationContext)
+            }
+            withResumed {
+                MangaPrefetchService.prefetchLast(this@MainActivity)
+                requestNotificationsPermission()
+                startService(Intent(this@MainActivity, LocalIndexUpdateService::class.java))
+                startService(Intent(this@MainActivity, PeriodicalBackupService::class.java))
+                if (settings.isAdBlockEnabled) {
+                    startService(Intent(this@MainActivity, AdListUpdateService::class.java))
+                }
+            }
+        }
+    } catch (e: IllegalStateException) {
+        e.printStackTraceDebug()
+    }
 
-	private fun adjustAppbar(topFragment: Fragment) {
-		if (topFragment is FavouritesContainerFragment) {
-			viewBinding.appbar.fitsSystemWindows = true
-			fadingAppbarMediator.bind()
-		} else {
-			viewBinding.appbar.fitsSystemWindows = false
-			fadingAppbarMediator.unbind()
-		}
-	}
+    private fun adjustAppbar(topFragment: Fragment) {
+        if (topFragment is FavouritesContainerFragment) {
+            viewBinding.appbar.fitsSystemWindows = true
+            fadingAppbarMediator.bind()
+        } else {
+            viewBinding.appbar.fitsSystemWindows = false
+            fadingAppbarMediator.unbind()
+        }
+    }
 
-	private fun adjustFabVisibility(
-		isResumeEnabled: Boolean = viewModel.isResumeEnabled.value,
-		topFragment: Fragment? = navigationDelegate.primaryFragment,
-		isSearchOpened: Boolean = viewBinding.searchView.isShowing,
-	) {
-		navigationDelegate.navRailHeader?.railFab?.isVisible = isResumeEnabled
-		val fab = viewBinding.fab ?: return
-		if (isResumeEnabled && !actionModeDelegate.isActionModeStarted && !isSearchOpened && topFragment is HistoryListFragment) {
-			if (!fab.isVisible) {
-				fab.show()
-			}
-		} else {
-			if (fab.isVisible) {
-				fab.hide()
-			}
-		}
-	}
+    private fun adjustFabVisibility(
+        isResumeEnabled: Boolean = viewModel.isResumeEnabled.value,
+        topFragment: Fragment? = navigationDelegate.primaryFragment,
+        isSearchOpened: Boolean = viewBinding.searchView.isShowing,
+    ) {
+        navigationDelegate.navRailHeader?.railFab?.isVisible = isResumeEnabled
+        val fab = viewBinding.fab ?: return
+        if (isResumeEnabled && !actionModeDelegate.isActionModeStarted && !isSearchOpened && topFragment is HistoryListFragment) {
+            if (!fab.isVisible) {
+                fab.show()
+            }
+        } else {
+            if (fab.isVisible) {
+                fab.hide()
+            }
+        }
+    }
 
-	private fun adjustSearchUI(isOpened: Boolean) {
-		val appBarScrollFlags = if (isOpened) {
-			SCROLL_FLAG_NO_SCROLL
-		} else {
-			SCROLL_FLAG_SCROLL or SCROLL_FLAG_ENTER_ALWAYS or SCROLL_FLAG_SNAP
-		}
-		viewBinding.insetsHolder.updateLayoutParams<AppBarLayout.LayoutParams> {
-			scrollFlags = appBarScrollFlags
-		}
-		adjustFabVisibility(isSearchOpened = isOpened)
-		bottomNav?.showOrHide(!isOpened)
-		updateContainerBottomMargin()
-	}
+    private fun adjustSearchUI(isOpened: Boolean) {
+        val appBarScrollFlags = if (isOpened) {
+            SCROLL_FLAG_NO_SCROLL
+        } else {
+            SCROLL_FLAG_SCROLL or SCROLL_FLAG_ENTER_ALWAYS or SCROLL_FLAG_SNAP
+        }
+        viewBinding.insetsHolder.updateLayoutParams<AppBarLayout.LayoutParams> {
+            scrollFlags = appBarScrollFlags
+        }
+        adjustFabVisibility(isSearchOpened = isOpened)
+        bottomNav?.showOrHide(!isOpened)
+        updateContainerBottomMargin()
+    }
 
-	private fun requestNotificationsPermission() {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(
-				this,
-				Manifest.permission.POST_NOTIFICATIONS,
-			) != PERMISSION_GRANTED
-		) {
-			ActivityCompat.requestPermissions(
-				this,
-				arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-				1,
-			)
-		}
-	}
+    private fun requestNotificationsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                1,
+            )
+        }
+    }
 
-	private fun handleSearchSuggestionsInsets(insets: WindowInsetsCompat) {
-		val typeMask = WindowInsetsCompat.Type.ime() or WindowInsetsCompat.Type.systemBars()
-		val barsInsets = insets.getInsets(typeMask)
-		viewBinding.recyclerViewSearch.setPadding(barsInsets.left, 0, barsInsets.right, barsInsets.bottom)
-	}
+    private fun handleSearchSuggestionsInsets(insets: WindowInsetsCompat) {
+        val typeMask = WindowInsetsCompat.Type.ime() or WindowInsetsCompat.Type.systemBars()
+        val barsInsets = insets.getInsets(typeMask)
+        viewBinding.recyclerViewSearch.setPadding(barsInsets.left, 0, barsInsets.right, barsInsets.bottom)
+    }
 
-	private fun initSearch() {
-		val listener = SearchSuggestionListenerImpl(router, viewBinding.searchView, searchSuggestionViewModel)
-		val adapter = SearchSuggestionAdapter(listener)
-		viewBinding.searchView.toolbar.addMenuProvider(
-			SearchSuggestionMenuProvider(this, voiceInputLauncher, searchSuggestionViewModel),
-		)
-		viewBinding.searchView.editText.addTextChangedListener(listener)
-		viewBinding.recyclerViewSearch.adapter = adapter
-		viewBinding.searchView.editText.setOnEditorActionListener(listener)
+    private fun initSearch() {
+        val listener = SearchSuggestionListenerImpl(router, viewBinding.searchView, searchSuggestionViewModel)
+        val adapter = SearchSuggestionAdapter(listener)
+        viewBinding.searchView.toolbar.addMenuProvider(
+            SearchSuggestionMenuProvider(this, voiceInputLauncher, searchSuggestionViewModel),
+        )
+        viewBinding.searchView.editText.addTextChangedListener(listener)
+        viewBinding.recyclerViewSearch.adapter = adapter
+        viewBinding.searchView.editText.setOnEditorActionListener(listener)
 
-		viewBinding.searchView.observeState()
-			.map { it >= SearchView.TransitionState.SHOWING }
-			.distinctUntilChanged()
-			.flatMapLatest { isShowing ->
-				if (isShowing) {
-					searchSuggestionViewModel.suggestion
-				} else {
-					emptyFlow()
-				}
-			}.observe(this, adapter)
-		searchSuggestionViewModel.onError.observeEvent(
-			this,
-			SnackbarErrorObserver(viewBinding.recyclerViewSearch, null),
-		)
-		ItemTouchHelper(SearchSuggestionItemCallback(this))
-			.attachToRecyclerView(viewBinding.recyclerViewSearch)
-	}
+        viewBinding.searchView.observeState()
+            .map { it >= SearchView.TransitionState.SHOWING }
+            .distinctUntilChanged()
+            .flatMapLatest { isShowing ->
+                if (isShowing) {
+                    searchSuggestionViewModel.suggestion
+                } else {
+                    emptyFlow()
+                }
+            }.observe(this, adapter)
+        searchSuggestionViewModel.onError.observeEvent(
+            this,
+            SnackbarErrorObserver(viewBinding.recyclerViewSearch, null),
+        )
+        ItemTouchHelper(SearchSuggestionItemCallback(this))
+            .attachToRecyclerView(viewBinding.recyclerViewSearch)
+    }
 
-	/**
-	 * When the user picked the AMOLED dark theme, force the bottom-nav background to pure black
-	 * (instead of the Material surface tint that bleeds gray at the bottom of the screen on AMOLED
-	 * panels) and tint the items so a selection is still visible against the black background.
-	 * Active item / icon use the theme's primary color; inactive items use a translucent white so
-	 * they don't disappear entirely.
-	 */
-	private fun applyAmoledNavbarTintIfNeeded() {
-		if (!isDarkAmoledTheme()) return
-		if (!settings.isAmoledNavBarEnabled) return
-		val bottomNav = viewBinding.bottomNav ?: return
-		val primary = MaterialColors.getColor(bottomNav, appcompatR.attr.colorPrimary, Color.WHITE)
-		bottomNav.setBackgroundColor(Color.BLACK)
-		val itemTint = ColorStateList(
-			arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
-			intArrayOf(primary, "#99FFFFFF".toColorInt()),
-		)
-		bottomNav.itemTextColor = itemTint
-		bottomNav.itemIconTintList = itemTint
-		bottomNav.itemActiveIndicatorColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(primary, 38))
-	}
+    /**
+     * When the user picked the AMOLED dark theme, force the bottom-nav background to pure black
+     * (instead of the Material surface tint that bleeds gray at the bottom of the screen on AMOLED
+     * panels) and tint the items so a selection is still visible against the black background.
+     * Active item / icon use the theme's primary color; inactive items use a translucent white so
+     * they don't disappear entirely.
+     */
+    private fun applyAmoledNavbarTintIfNeeded() {
+        if (!isDarkAmoledTheme()) return
+        if (!settings.isAmoledNavBarEnabled) return
+        val bottomNav = viewBinding.bottomNav ?: return
+        val primary = MaterialColors.getColor(bottomNav, appcompatR.attr.colorPrimary, Color.WHITE)
+        bottomNav.setBackgroundColor(Color.BLACK)
+        val itemTint = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
+            intArrayOf(primary, "#99FFFFFF".toColorInt()),
+        )
+        bottomNav.itemTextColor = itemTint
+        bottomNav.itemIconTintList = itemTint
+        bottomNav.itemActiveIndicatorColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(primary, 38))
+    }
 
-	private fun setNavbarPinned(isPinned: Boolean) {
-		val bottomNavBar = viewBinding.bottomNav
-		bottomNavBar?.isPinned = isPinned
-		for (view in viewBinding.appbar.children) {
-			val lp = view.layoutParams as? AppBarLayout.LayoutParams ?: continue
-			val scrollFlags = if (isPinned) {
-				lp.scrollFlags and SCROLL_FLAG_SCROLL.inv()
-			} else {
-				lp.scrollFlags or SCROLL_FLAG_SCROLL
-			}
-			if (scrollFlags != lp.scrollFlags) {
-				lp.scrollFlags = scrollFlags
-				view.layoutParams = lp
-			}
-		}
-		updateContainerBottomMargin()
-	}
+    private fun setNavbarPinned(isPinned: Boolean) {
+        val bottomNavBar = viewBinding.bottomNav
+        bottomNavBar?.isPinned = isPinned
+        for (view in viewBinding.appbar.children) {
+            val lp = view.layoutParams as? AppBarLayout.LayoutParams ?: continue
+            val scrollFlags = if (isPinned) {
+                lp.scrollFlags and SCROLL_FLAG_SCROLL.inv()
+            } else {
+                lp.scrollFlags or SCROLL_FLAG_SCROLL
+            }
+            if (scrollFlags != lp.scrollFlags) {
+                lp.scrollFlags = scrollFlags
+                view.layoutParams = lp
+            }
+        }
+        updateContainerBottomMargin()
+    }
 
-	private fun setNavbarStyle(style: BottomNavStyle) {
-		val bottomNavBar = viewBinding.bottomNav ?: return
-		bottomNavBar.elevation = if (style.isFloating) {
-			resources.getDimension(R.dimen.nav_floating_elevation)
-		} else {
-			0f
-		}
-		bottomNavBar.floatingCornerRadius = style.cornerRadiusDp * resources.displayMetrics.density
-		bottomNavBar.isFloating = style.isFloating
-		// The insets listener lives on the activity root, and it is what turns the style into the
-		// bar's padding/margins, so the style change has to go through a fresh insets pass.
-		ViewCompat.requestApplyInsets(viewBinding.root)
-		updateContainerBottomMargin()
-	}
+    private fun setNavbarStyle(style: BottomNavStyle) {
+        val bottomNavBar = viewBinding.bottomNav ?: return
+        bottomNavBar.elevation = if (style.isFloating) {
+            resources.getDimension(R.dimen.nav_floating_elevation)
+        } else {
+            0f
+        }
+        bottomNavBar.floatingCornerRadius = style.cornerRadiusDp * resources.displayMetrics.density
+        bottomNavBar.isFloating = style.isFloating
+        // The insets listener lives on the activity root, and it is what turns the style into the
+        // bar's padding/margins, so the style change has to go through a fresh insets pass.
+        ViewCompat.requestApplyInsets(viewBinding.root)
+        updateContainerBottomMargin()
+    }
 
-	private fun updateContainerBottomMargin() {
-		val bottomNavBar = viewBinding.bottomNav ?: return
-		val bottomNavSize = bottomNavBar.height +
-			((bottomNavBar.layoutParams as? MarginLayoutParams)?.bottomMargin ?: 0)
-		val newMargin = if (bottomNavBar.isPinned && bottomNavBar.isShownOrShowing) bottomNavSize else 0
-		with(viewBinding.container) {
-			val params = layoutParams as MarginLayoutParams
-			if (params.bottomMargin != newMargin) {
-				params.bottomMargin = newMargin
-				layoutParams = params
-			}
-		}
-	}
+    private fun updateContainerBottomMargin() {
+        val bottomNavBar = viewBinding.bottomNav ?: return
+        val bottomNavSize = bottomNavBar.height +
+            ((bottomNavBar.layoutParams as? MarginLayoutParams)?.bottomMargin ?: 0)
+        val newMargin = if (bottomNavBar.isPinned && bottomNavBar.isShownOrShowing) bottomNavSize else 0
+        with(viewBinding.container) {
+            val params = layoutParams as MarginLayoutParams
+            if (params.bottomMargin != newMargin) {
+                params.bottomMargin = newMargin
+                layoutParams = params
+            }
+        }
+    }
 
-	/**
-	 * Lifts the "jump back" pill clear of the floating navigation bar. The bar's own bottom margin is
-	 * what keeps it off the system bars in floating mode, so the pill has to clear the margin as well
-	 * as the bar itself.
-	 */
-	private fun updateCheckpointMargin(bottomInset: Int = lastBottomInset) {
-		lastBottomInset = bottomInset
-		val gap = resources.getDimensionPixelOffset(R.dimen.margin_small)
-		val bottomNav = viewBinding.bottomNav
-		val navHeight = if (bottomNav != null) {
-			bottomNav.height + ((bottomNav.layoutParams as? MarginLayoutParams)?.bottomMargin ?: 0)
-		} else {
-			0
-		}
-		viewBinding.buttonCheckpoint.root.updateLayoutParams<MarginLayoutParams> {
-			bottomMargin = bottomInset + navHeight + gap
-		}
-	}
+    /**
+     * Lifts the "jump back" pill clear of the floating navigation bar. The bar's own bottom margin is
+     * what keeps it off the system bars in floating mode, so the pill has to clear the margin as well
+     * as the bar itself.
+     */
+    private fun updateCheckpointMargin(bottomInset: Int = lastBottomInset) {
+        lastBottomInset = bottomInset
+        val gap = resources.getDimensionPixelOffset(R.dimen.margin_small)
+        val bottomNav = viewBinding.bottomNav
+        val navHeight = if (bottomNav != null) {
+            bottomNav.height + ((bottomNav.layoutParams as? MarginLayoutParams)?.bottomMargin ?: 0)
+        } else {
+            0
+        }
+        viewBinding.buttonCheckpoint.root.updateLayoutParams<MarginLayoutParams> {
+            bottomMargin = bottomInset + navHeight + gap
+        }
+    }
 
-	private fun SearchView.observeState() = callbackFlow {
-		val listener = SearchView.TransitionListener { _, _, state ->
-			trySendBlocking(state)
-		}
-		addTransitionListener(listener)
-		awaitClose { removeTransitionListener(listener) }
-	}
+    private fun SearchView.observeState() = callbackFlow {
+        val listener = SearchView.TransitionListener { _, _, state ->
+            trySendBlocking(state)
+        }
+        addTransitionListener(listener)
+        awaitClose { removeTransitionListener(listener) }
+    }
 }

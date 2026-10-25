@@ -92,10 +92,15 @@ class RecommendationStore internal constructor(val database: RecommendationDatab
                 val next = when {
                     anchor != null && manga.chapters?.none { it.id == anchor } == true && knownBranch.size > 1 ->
                         ChapterBaseline(null, 0, "", 0f, 0, now)
-                    reading -> ChapterReleaseEvidence.reading(old, manga.chapters.orEmpty(), branch, now)
+                    reading -> ChapterReleaseEvidence.reading(old, manga.chapters.orEmpty(), branch, now, manga.source.name).copy(
+                        exactGeneration = library.getChapterReadDao().policy(manga.id)?.takeIf {
+                            it.enabled && !it.deleted && it.source == manga.source.name &&
+                                (it.editionUrl == manga.url || it.editionUrl == manga.publicUrl)
+                        }?.generation)
                     history != null && old != null && history.updatedAt > old.lastReadingAt ->
-                        ChapterReleaseEvidence.reading(old, manga.chapters.orEmpty(), branch, history.updatedAt)
-                    else -> ChapterReleaseEvidence.update(old, manga.chapters.orEmpty(), branch, now)
+                        ChapterReleaseEvidence.reading(old, manga.chapters.orEmpty(), branch, history.updatedAt, manga.source.name)
+                            .copy(confirmedReadingBoundary = false)
+                    else -> ChapterReleaseEvidence.update(old, manga.chapters.orEmpty(), branch, now, manga.source.name)
                         .let { if (old == null && history != null) it.copy(lastReadingAt = history.updatedAt) else it }
                 }
                 if (next != old) {
@@ -110,7 +115,8 @@ class RecommendationStore internal constructor(val database: RecommendationDatab
         runCatchingCancellable { mutex.withLock {
             val key = "source:${manga.source.name}:${manga.id}"
             val old = dao.baseline(key)?.payload?.let(RecommendationCodec::decodeBaseline) ?: return@withLock
-            dao.baseline(RecommendationBaselineEntity(key, RecommendationCodec.encodeBaseline(old.copy(releases = 0))))
+            dao.baseline(RecommendationBaselineEntity(key, RecommendationCodec.encodeBaseline(old.copy(releases = 0,
+                releaseChapterIds = emptySet(), confirmedReadingBoundary = false, exactGeneration = null))))
             changed()
         } }.onFailure { it.printStackTraceDebug() }
     }

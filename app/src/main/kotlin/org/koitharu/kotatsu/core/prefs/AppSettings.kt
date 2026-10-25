@@ -624,8 +624,49 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
     fun isChaptersSortedByName(mangaId: Long): Boolean =
         prefs.getBoolean(KEY_SORT_CHAPTERS_BY_NAME + mangaId, false)
 
+    val isChapterDateSortDefault: Boolean
+        get() = prefs.getBoolean(KEY_CHAPTER_DATE_SORT_DEFAULT, false)
+
+    val isFeedUnreadOnly: Boolean
+        get() = prefs.getBoolean(KEY_FEED_UNREAD_ONLY, false)
+
+    val isCoverPreloadEnabled: Boolean
+        get() = prefs.getBoolean(KEY_COVER_PRELOAD, false)
+
+    val isCoverRefreshActionEnabled: Boolean
+        get() = prefs.getBoolean(KEY_COVER_REFRESH_ACTION, false)
+
+    val isExtraPageRetentionEnabled: Boolean
+        get() = prefs.getBoolean(KEY_EXTRA_PAGE_RETENTION, false)
+
+    val isAnimatedMenusEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ANIMATED_MENUS, false)
+
+    val isBarBlurEnabled: Boolean
+        get() = prefs.getBoolean(KEY_BAR_BLUR, false)
+
+    val isTvLauncherEnabled: Boolean
+        get() = prefs.getBoolean(KEY_TV_LAUNCHER, false)
+
+    val isCommunityReplyChecksEnabled: Boolean
+        get() = isCommunityEnabled && prefs.getBoolean(KEY_COMMUNITY_REPLY_CHECKS, false)
+
+    val isCommunitySimilarEnabled: Boolean
+        get() = isCommunityEnabled && prefs.getBoolean(KEY_COMMUNITY_SIMILAR, false)
+
+    fun isChaptersSortedByDate(mangaId: Long): Boolean = !isChaptersSortedByName(mangaId) &&
+        prefs.getBoolean(KEY_SORT_CHAPTERS_BY_DATE + mangaId, isChapterDateSortDefault)
+
+    fun setChaptersSortedByDate(mangaId: Long, value: Boolean) {
+        prefs.edit {
+            putBoolean(KEY_SORT_CHAPTERS_BY_DATE + mangaId, value)
+            if (value) remove(KEY_SORT_CHAPTERS_BY_NAME + mangaId)
+        }
+    }
+
     fun setChaptersSortedByName(mangaId: Long, value: Boolean) {
         prefs.edit {
+            if (value) putBoolean(KEY_SORT_CHAPTERS_BY_DATE + mangaId, false)
             if (value) putBoolean(KEY_SORT_CHAPTERS_BY_NAME + mangaId, true)
             else remove(KEY_SORT_CHAPTERS_BY_NAME + mangaId)
         }
@@ -1370,6 +1411,17 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
         const val KEY_DEFAULT_BROWSE_SORT = "default_browse_sort"
         const val KEY_NOVEL_SOURCES_FIRST = "novel_sources_first"
         const val KEY_SORT_CHAPTERS_BY_NAME = "sort_chapters_by_name_"
+        const val KEY_SORT_CHAPTERS_BY_DATE = "sort_chapters_by_date_"
+        const val KEY_CHAPTER_DATE_SORT_DEFAULT = "chapter_date_sort_default"
+        const val KEY_FEED_UNREAD_ONLY = "feed_unread_only"
+        const val KEY_COVER_PRELOAD = "cover_preload"
+        const val KEY_COVER_REFRESH_ACTION = "cover_refresh_action"
+        const val KEY_EXTRA_PAGE_RETENTION = "extra_page_retention"
+        const val KEY_ANIMATED_MENUS = "animated_menus"
+        const val KEY_BAR_BLUR = "bar_blur"
+        const val KEY_TV_LAUNCHER = "tv_launcher"
+        const val KEY_COMMUNITY_REPLY_CHECKS = "community_reply_checks"
+        const val KEY_COMMUNITY_SIMILAR = "community_similar"
         const val KEY_SOURCES_CATALOG = "sources_catalog"
         const val KEY_CF_BRIGHTNESS = "cf_brightness"
         const val KEY_CF_CONTRAST = "cf_contrast"

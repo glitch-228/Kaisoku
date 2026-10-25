@@ -1,5 +1,7 @@
 package org.koitharu.kotatsu.reader.ui.pager.webtoon
 
+import org.koitharu.kotatsu.reader.ui.pager.retainedPageCount
+
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -83,7 +85,7 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
             setHasFixedSize(true)
             // Match the mature Mihon webtoon viewer: keep nearby decoded holders available across
             // direction changes and disable dataset animations that move variable-height pages.
-            setItemViewCacheSize(WEBTOON_VIEW_CACHE_SIZE)
+            setItemViewCacheSize(context.retainedPageCount(WEBTOON_VIEW_CACHE_SIZE))
             itemAnimator = null
             adapter = readerAdapter
             addOnPageScrollListener(this@WebtoonReaderFragment)

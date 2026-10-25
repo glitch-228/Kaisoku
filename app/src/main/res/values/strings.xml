@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="remote_library_summary">Connect to OPDS or Komga. Browsing and downloads are user initiated; server progress is not changed.</string>
     <string name="keep_android_open_title">Keep Android Open</string>
     <string name="keep_android_open_message">Support the freedom to install apps and extensions from the sources you choose.</string>
     <string name="learn_more">Learn more</string>
@@ -1454,14 +1455,14 @@
     <string name="source_switch_suggest">Suggest another source on errors</string>
     <string name="source_switch_suggest_summary">When a source is slow or keeps failing, offer a plugin or extension for the same site</string>
     <string name="source_switch_title_errors">%s is not responding</string>
-    <string name="source_switch_title_slow">%s is slow</string>
+    <string name="source_switch_title_slow">Loading from %s is taking longer than usual</string>
     <string name="source_switch_to">Switch to %1$s (%2$s)</string>
     <string name="source_switch_install">Install and switch to %1$s (%2$s)</string>
     <string name="source_switch_kind_plugin">plugin %s</string>
     <string name="source_switch_kind_builtin">built-in</string>
     <string name="source_switch_kind_extension">extension</string>
     <string name="source_switch_mute">Don\'t suggest for this source</string>
-    <string name="source_switch_slow">This source is slow</string>
+    <string name="source_switch_slow">Loading is taking longer than usual</string>
     <string name="source_switch_action">Switch source</string>
     <string name="source_switch_progress">Moving to %s…</string>
     <string name="source_switched">Moved to %s</string>

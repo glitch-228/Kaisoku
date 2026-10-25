@@ -47,6 +47,9 @@ class ChaptersSelectionCallback(
 		menu.findItem(R.id.action_delete).isVisible = canDelete
 		menu.findItem(R.id.action_select_all).isVisible = items.size < allItems.size
 		menu.findItem(R.id.action_mark_current).isVisible = items.size == 1
+        val exact = viewModel.exactChapterReads.value?.isActive == true
+        menu.findItem(R.id.action_exact_mark_read).isVisible = exact && items.any { it.value.isUnread }
+        menu.findItem(R.id.action_exact_mark_unread).isVisible = exact && items.any { !it.value.isUnread }
 		mode?.title = items.size.toString()
 		var hasGap = false
 		for (i in 0 until items.size - 1) {
@@ -61,6 +64,12 @@ class ChaptersSelectionCallback(
 
 	override fun onActionItemClicked(controller: ListSelectionController, mode: ActionMode?, item: MenuItem): Boolean {
 		return when (item.itemId) {
+            R.id.action_exact_mark_read, R.id.action_exact_mark_unread -> {
+                viewModel.markChaptersRead(controller.peekCheckedIds().toSet(), item.itemId == R.id.action_exact_mark_read)
+                mode?.finish()
+                true
+            }
+
 			R.id.action_save -> {
 				val snapshot = controller.snapshot()
 				mode?.finish()

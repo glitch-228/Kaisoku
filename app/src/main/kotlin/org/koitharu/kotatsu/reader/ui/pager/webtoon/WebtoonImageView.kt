@@ -100,6 +100,11 @@ class WebtoonImageView @JvmOverloads constructor(
 		val heightSpecMode = MeasureSpec.getMode(heightMeasureSpec)
 		val parentWidth = MeasureSpec.getSize(widthMeasureSpec)
 		val parentHeight = MeasureSpec.getSize(heightMeasureSpec)
+		val viewportHeight = parentHeight()
+		val maximumHeight = minOf(
+			viewportHeight.takeIf { it > 0 } ?: Int.MAX_VALUE,
+			if (heightSpecMode == MeasureSpec.UNSPECIFIED) Int.MAX_VALUE else parentHeight,
+		)
 		val resizeWidth = widthSpecMode != MeasureSpec.EXACTLY
 		val resizeHeight = heightSpecMode != MeasureSpec.EXACTLY
 		var desiredWidth = parentWidth
@@ -119,7 +124,7 @@ class WebtoonImageView @JvmOverloads constructor(
 					sourceWidth,
 					sourceHeight,
 					desiredWidth,
-					parentHeight(),
+					maximumHeight,
 				)
 			} else if (resizeWidth) {
 				desiredWidth = (sourceWidth.toDouble() / sourceHeight.toDouble() * desiredHeight).toInt()
@@ -131,7 +136,6 @@ class WebtoonImageView @JvmOverloads constructor(
 		// when the viewport height is actually known. parentHeight() is 0 whenever this view is
 		// measured without a RecyclerView above it (detached, or before being attached), and capping
 		// to that collapses the page to zero height, which reads as two pages running into each other.
-		val viewportHeight = parentHeight()
 		if (viewportHeight > 0) {
 			desiredHeight = desiredHeight.coerceAtMost(viewportHeight)
 		}

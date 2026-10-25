@@ -28,6 +28,7 @@ class ReaderPresentationTest {
         val bitmap = Bitmap.createBitmap(200, 100, Bitmap.Config.ARGB_8888)
         val canvasBitmap = Bitmap.createBitmap(400, 800, Bitmap.Config.ARGB_8888)
         try {
+            image.maxScale = 20f
             image.measure(exact(400), exact(800)); image.layout(0, 0, 400, 800)
             image.orientation = 90
             image.setImage(ImageSource.cachedBitmap(bitmap))
@@ -57,6 +58,12 @@ class ReaderPresentationTest {
             image.measure(exact(200), View.MeasureSpec.makeMeasureSpec(600, View.MeasureSpec.AT_MOST))
             assertEquals(400, image.measuredHeight)
             assertEquals(200, image.displaySourceWidth)
+            image.measure(exact(200), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            assertEquals(400, image.measuredHeight)
+            image.measure(exact(200), View.MeasureSpec.makeMeasureSpec(250, View.MeasureSpec.AT_MOST))
+            assertEquals(250, image.measuredHeight)
+            image.measure(exact(200), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.AT_MOST))
+            assertEquals(0, image.measuredHeight)
         } finally { image.recycle(); bitmap.recycle() }
     }
     @Test fun markerAndActionCoordinatesRoundTripThroughAncestorZoomAndTranslation() = onMain {

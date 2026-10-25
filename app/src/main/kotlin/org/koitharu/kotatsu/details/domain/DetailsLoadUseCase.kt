@@ -47,20 +47,23 @@ class DetailsLoadUseCase @Inject constructor(
             "Cannot resolve intent $intent"
         }
         val override = mangaDataRepository.getOverride(manga.id)
+        if (manga.isLocal) {
+            // An intent can still hold decrypted metadata from a previous unlock session.
+            // Keep only its public filename/source so the normal Unlock action stays reachable.
+            emit(MangaDetails(org.koitharu.kotatsu.core.archive.ArchivePrivacy.publicReference(manga)))
+            loadLocal(manga, override, force)
+            return@flow
+        }
         emit(
             MangaDetails(
                 manga = manga,
                 localManga = null,
                 override = override,
-                description = manga.description?.parseAsHtml(withImages = false),
+                description = (override?.description ?: manga.description)?.parseAsHtml(withImages = false),
                 isLoaded = false,
             ),
         )
-        if (manga.isLocal) {
-            loadLocal(manga, override, force)
-        } else {
-            loadRemote(manga, override, force)
-        }
+        loadRemote(manga, override, force)
     }.distinctUntilChanged()
         .flowOn(Dispatchers.Default)
 
@@ -76,7 +79,7 @@ class DetailsLoadUseCase @Inject constructor(
                 manga = localDetails,
                 localManga = null,
                 override = override,
-                description = localDetails.description?.parseAsHtml(withImages = false),
+                description = (override?.description ?: localDetails.description)?.parseAsHtml(withImages = false),
                 isLoaded = skipNetworkLoad,
             ),
         )
@@ -90,7 +93,7 @@ class DetailsLoadUseCase @Inject constructor(
                     manga = localDetails,
                     localManga = null,
                     override = override,
-                    description = localDetails.description?.parseAsHtml(
+                    description = (override?.description ?: localDetails.description)?.parseAsHtml(
                         withImages = !mangaRepositoryFactory.isMetadataRefreshPaused(manga),
                     ),
                     isLoaded = true,
@@ -102,7 +105,7 @@ class DetailsLoadUseCase @Inject constructor(
                 manga = remoteDetails ?: remoteManga,
                 localManga = LocalManga(localDetails),
                 override = override,
-                description = (remoteDetails ?: localDetails).description?.parseAsHtml(
+                description = (override?.description ?: (remoteDetails ?: localDetails).description)?.parseAsHtml(
                     withImages = !mangaRepositoryFactory.isMetadataRefreshPaused(remoteManga),
                 ),
                 isLoaded = true,
@@ -137,7 +140,7 @@ class DetailsLoadUseCase @Inject constructor(
                     manga = manga,
                     localManga = localManga,
                     override = override,
-                    description = localManga.manga.description?.parseAsHtml(
+                    description = (override?.description ?: localManga.manga.description)?.parseAsHtml(
                         withImages = !mangaRepositoryFactory.isMetadataRefreshPaused(manga),
                     ),
                     isLoaded = false,
@@ -149,7 +152,7 @@ class DetailsLoadUseCase @Inject constructor(
             manga = remoteDetails,
             localManga = localManga,
             override = override,
-            description = (remoteDetails.description
+            description = (override?.description ?: remoteDetails.description
                 ?: localManga?.manga?.description)?.parseAsHtml(
                     withImages = !mangaRepositoryFactory.isMetadataRefreshPaused(manga),
                 ),

@@ -7,6 +7,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
+import androidx.core.net.toUri
+import org.koitharu.kotatsu.core.model.LocalMangaSource
+import org.koitharu.kotatsu.local.data.isSupportedArchive
+import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -65,169 +73,197 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DetailsViewModel @Inject constructor(
-	@ApplicationContext context: Context,
-	private val historyRepository: HistoryRepository,
-	bookmarksRepository: BookmarksRepository,
-	settings: AppSettings,
-	private val scrobblers: Set<@JvmSuppressWildcards Scrobbler>,
-	@LocalStorageChanges localStorageChanges: SharedFlow<LocalManga?>,
-	downloadScheduler: DownloadWorker.Scheduler,
-	interactor: DetailsInteractor,
-	savedStateHandle: SavedStateHandle,
-	deleteLocalMangaUseCase: DeleteLocalMangaUseCase,
-	private val relatedMangaUseCase: RelatedMangaUseCase,
-	private val mangaListMapper: MangaListMapper,
-	private val detailsLoadUseCase: DetailsLoadUseCase,
-	private val progressUpdateUseCase: ProgressUpdateUseCase,
-	private val readingTimeUseCase: ReadingTimeUseCase,
-	statsRepository: StatsRepository,
+    @ApplicationContext context: Context,
+    private val historyRepository: HistoryRepository,
+    bookmarksRepository: BookmarksRepository,
+    settings: AppSettings,
+    private val scrobblers: Set<@JvmSuppressWildcards Scrobbler>,
+    @LocalStorageChanges localStorageChanges: SharedFlow<LocalManga?>,
+    downloadScheduler: DownloadWorker.Scheduler,
+    interactor: DetailsInteractor,
+    savedStateHandle: SavedStateHandle,
+    deleteLocalMangaUseCase: DeleteLocalMangaUseCase,
+    private val relatedMangaUseCase: RelatedMangaUseCase,
+    private val mangaListMapper: MangaListMapper,
+    private val detailsLoadUseCase: DetailsLoadUseCase,
+    private val progressUpdateUseCase: ProgressUpdateUseCase,
+    private val readingTimeUseCase: ReadingTimeUseCase,
+    statsRepository: StatsRepository,
     private val metadataRefreshSettings: MetadataRefreshSettings,
     private val mangaDataRepository: MangaDataRepository,
 ) : ChaptersPagesViewModel(
-	appContext = context,
-	settings = settings,
-	interactor = interactor,
-	bookmarksRepository = bookmarksRepository,
-	historyRepository = historyRepository,
-	downloadScheduler = downloadScheduler,
-	deleteLocalMangaUseCase = deleteLocalMangaUseCase,
-	localStorageChanges = localStorageChanges,
+    appContext = context,
+    settings = settings,
+    interactor = interactor,
+    bookmarksRepository = bookmarksRepository,
+    historyRepository = historyRepository,
+    downloadScheduler = downloadScheduler,
+    deleteLocalMangaUseCase = deleteLocalMangaUseCase,
+    localStorageChanges = localStorageChanges,
 ) {
 
-	private val intent = MangaIntent(savedStateHandle)
-	private var loadingJob: Job
-	private val detailsLoadFinished = MutableStateFlow(false)
-	val mangaId = intent.mangaId
+    private val intent = MangaIntent(savedStateHandle)
+    private val archiveSessionRetired = AtomicBoolean(false)
+    private val archiveDisplayLock = Any()
+    private var loadingJob: Job
+    private val detailsLoadFinished = MutableStateFlow(false)
+    val mangaId = intent.mangaId
 
     val isSavedMetadataOnly = metadataRefreshSettings.observeSavedMetadataOnly(mangaId)
         .stateIn(viewModelScope, SharingStarted.Eagerly, metadataRefreshSettings.isSavedMetadataOnly(mangaId))
 
-	init {
-		mangaDetails.value = intent.manga?.let { MangaDetails(it) }
-	}
+    init {
+        mangaDetails.value = intent.manga?.let {
+            MangaDetails(org.koitharu.kotatsu.core.archive.ArchivePrivacy.publicReference(it))
+        }
+    }
 
-	val history = historyRepository.observeOne(mangaId)
-		.onEach { h ->
-			readingState.value = h?.let(::ReaderState)
-		}.withErrorHandling()
-		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, null)
+    internal val localArchiveFile: File?
+        get() {
+            val local = mangaDetails.value?.local?.file
+            if (local != null) return local.takeIf { isSupportedArchive(it.name) }
+            val uri = intent.manga?.takeIf { it.source == LocalMangaSource }?.url?.toUri() ?: intent.uri
+            return uri?.takeIf { it.scheme == "file" }?.path?.let(::File)?.takeIf { isSupportedArchive(it.name) }
+        }
 
-	val favouriteCategories = interactor.observeFavourite(mangaId)
-		.withErrorHandling()
-		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptySet())
+    internal fun retireArchiveSession() {
+        synchronized(archiveDisplayLock) {
+            archiveSessionRetired.set(true)
+            mangaDetails.value = null
+        }
+        loadingJob.cancel()
+        viewModelScope.cancel()
+        remoteManga.value = null
+        readingState.value = null
+        selectedBranch.value = null
+    }
 
-	val favoriteDate = interactor.observeFavoriteDate(mangaId)
-		.withErrorHandling()
-		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, null)
+    val history = historyRepository.observeOne(mangaId)
+        .onEach { h ->
+            readingState.value = h?.let(::ReaderState)
+        }.withErrorHandling()
+        .stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, null)
 
-	val isStatsAvailable = statsRepository.observeHasStats(mangaId)
-		.withErrorHandling()
-		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, false)
+    val favouriteCategories = interactor.observeFavourite(mangaId)
+        .withErrorHandling()
+        .stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptySet())
 
-	val remoteManga = MutableStateFlow<Manga?>(null)
+    val favoriteDate = interactor.observeFavoriteDate(mangaId)
+        .withErrorHandling()
+        .stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, null)
 
-	val historyInfo: StateFlow<HistoryInfo> = combine(
-		mangaDetails,
-		selectedBranch,
-		history,
-		interactor.observeIncognitoMode(manga),
-	) { m, b, h, im ->
-		val estimatedTime = readingTimeUseCase.invoke(m, b, h)
-		HistoryInfo(m, b, h, im == TriStateOption.ENABLED, estimatedTime)
-	}.withErrorHandling()
-		.stateIn(
-			scope = viewModelScope + Dispatchers.Default,
-			started = SharingStarted.Eagerly,
-			initialValue = HistoryInfo(null, null, null, false, null),
-		)
+    val isStatsAvailable = statsRepository.observeHasStats(mangaId)
+        .withErrorHandling()
+        .stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, false)
 
-	val localSize = mangaDetails
-		.map { it?.local }
-		.distinctUntilChanged()
-		.combine(localStorageChanges.onStart { emit(null) }) { x, _ -> x }
-		.map { local ->
-			if (local != null) {
-				runCatchingCancellable {
-					local.file.computeSize()
-				}.getOrDefault(0L)
-			} else {
-				0L
-			}
-		}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), 0L)
+    val remoteManga = MutableStateFlow<Manga?>(null)
 
-	val isScrobblingAvailable: Boolean
-		get() = scrobblers.any { it.isEnabled }
+    val historyInfo: StateFlow<HistoryInfo> = combine(
+        mangaDetails,
+        selectedBranch,
+        history,
+        interactor.observeIncognitoMode(manga),
+        exactChapterReads,
+    ) { m, b, h, im, exact ->
+        val info = HistoryInfo(m, b, h, im == TriStateOption.ENABLED, null, exact)
+        val estimateHistory = if (h != null && info.completionPercent != null) h.copy(percent = info.percent) else h
+        val estimatedTime = readingTimeUseCase.invoke(m, b, estimateHistory)
+        info.copy(estimatedTime = estimatedTime)
+    }.withErrorHandling()
+        .stateIn(
+            scope = viewModelScope + Dispatchers.Default,
+            started = SharingStarted.Eagerly,
+            initialValue = HistoryInfo(null, null, null, false, null),
+        )
 
-	val scrobblingInfo: StateFlow<List<ScrobblingInfo>> = interactor.observeScrobblingInfo(mangaId)
-		.withErrorHandling()
-		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptyList())
+    val localSize = mangaDetails
+        .map { it?.local }
+        .distinctUntilChanged()
+        .combine(localStorageChanges.onStart { emit(null) }) { x, _ -> x }
+        .map { local ->
+            if (local != null) {
+                runCatchingCancellable {
+                    local.file.computeSize()
+                }.getOrDefault(0L)
+            } else {
+                0L
+            }
+        }.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), 0L)
 
-	private val relatedRequest = combine(
-		mangaDetails,
-		detailsLoadFinished,
-		settings.observe(AppSettings.KEY_RELATED_MANGA, AppSettings.KEY_DISABLE_NSFW).onStart { emit(null) },
-	) { details, finished, _ ->
-		relatedMangaRequest(details, finished, settings.isRelatedMangaEnabled, settings.isNsfwContentDisabled)
-	}.distinctUntilChanged { old, new -> old?.key == new?.key }
+    val isScrobblingAvailable: Boolean
+        get() = scrobblers.any { it.isEnabled }
 
-	private val recommendationState = relatedRequest.flatMapLatest { request ->
+    val scrobblingInfo: StateFlow<List<ScrobblingInfo>> = interactor.observeScrobblingInfo(mangaId)
+        .withErrorHandling()
+        .stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptyList())
+
+    private val relatedRequest = combine(
+        mangaDetails,
+        detailsLoadFinished,
+        settings.observe(AppSettings.KEY_RELATED_MANGA, AppSettings.KEY_DISABLE_NSFW).onStart { emit(null) },
+    ) { details, finished, _ ->
+        relatedMangaRequest(details, finished, settings.isRelatedMangaEnabled, settings.isNsfwContentDisabled)
+    }.distinctUntilChanged { old, new -> old?.key == new?.key }
+
+    private val recommendationState = relatedRequest.flatMapLatest { request ->
         if (request == null) kotlinx.coroutines.flow.flowOf(org.koitharu.kotatsu.suggestions.local.RecommendationSnapshot())
         else relatedMangaUseCase.observe(request.manga)
     }.shareRecommendations(viewModelScope + Dispatchers.Default, org.koitharu.kotatsu.suggestions.local.RecommendationSnapshot())
 
     val recommendationError = recommendationState.mapLatest { it.error }
 
-	val relatedManga: StateFlow<List<MangaListModel>> = recommendationState.mapLatest { snapshot ->
+    val relatedManga: StateFlow<List<MangaListModel>> = recommendationState.mapLatest { snapshot ->
         if (settings.useLegacySuggestions) mangaListMapper.toListModelList(snapshot.results.map { it.manga }, ListMode.GRID)
         else mangaListMapper.toRecommendationModels(snapshot.results, ListMode.GRID)
-	}.shareRecommendations(viewModelScope + Dispatchers.Default, emptyList())
+    }.shareRecommendations(viewModelScope + Dispatchers.Default, emptyList())
 
-	val tags = manga.mapLatest {
-		mangaListMapper.mapTags(it?.tags.orEmpty())
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptyList())
+    val tags = manga.mapLatest {
+        mangaListMapper.mapTags(it?.tags.orEmpty())
+    }.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptyList())
 
-	val branches: StateFlow<List<MangaBranch>> = combine(
-		mangaDetails,
-		selectedBranch,
-		history,
-	) { m, b, h ->
-		val c = m?.chapters
-		if (c.isNullOrEmpty()) {
-			return@combine emptyList()
-		}
-		val currentBranch = h?.let { m.allChapters.findById(it.chapterId) }?.branch
-		c.map { x ->
-			MangaBranch(
-				name = x.key,
-				count = x.value.size,
-				isSelected = x.key == b,
-				isCurrent = h != null && x.key == currentBranch,
-			)
-		}.sortedWith(BranchComparator())
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptyList())
+    val branches: StateFlow<List<MangaBranch>> = combine(
+        mangaDetails,
+        selectedBranch,
+        history,
+    ) { m, b, h ->
+        val c = m?.chapters
+        if (c.isNullOrEmpty()) {
+            return@combine emptyList()
+        }
+        val currentBranch = h?.let { m.allChapters.findById(it.chapterId) }?.branch
+        c.map { x ->
+            MangaBranch(
+                name = x.key,
+                count = x.value.size,
+                isSelected = x.key == b,
+                isCurrent = h != null && x.key == currentBranch,
+            )
+        }.sortedWith(BranchComparator())
+    }.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptyList())
 
-	val selectedBranchValue: String?
-		get() = selectedBranch.value
+    val selectedBranchValue: String?
+        get() = selectedBranch.value
 
-	init {
-		loadingJob = doLoad(force = false)
-		launchJob(Dispatchers.Default + SkipErrors) {
-			val manga = mangaDetails.firstOrNull { !it?.chapters.isNullOrEmpty() } ?: return@launchJob
-			val h = history.firstOrNull()
-			if (h != null) {
-				progressUpdateUseCase(manga.toManga())
-			}
-		}
-		launchJob(Dispatchers.Default) {
-			val manga = mangaDetails.firstOrNull { it != null && it.isLocal } ?: return@launchJob
-			remoteManga.value = interactor.findRemote(manga.toManga())
-		}
-	}
+    init {
+        loadingJob = doLoad(force = false)
+        launchJob(Dispatchers.Default + SkipErrors) {
+            val manga = mangaDetails.firstOrNull { !it?.chapters.isNullOrEmpty() } ?: return@launchJob
+            val h = history.firstOrNull()
+            if (h != null) {
+                progressUpdateUseCase(manga.toManga())
+            }
+        }
+        launchJob(Dispatchers.Default) {
+            val manga = mangaDetails.firstOrNull { it != null && it.isLocal } ?: return@launchJob
+            remoteManga.value = interactor.findRemote(manga.toManga())
+        }
+    }
 
-	fun reload(force: Boolean = true) {
-		loadingJob.cancel()
-		loadingJob = doLoad(force)
-	}
+    fun reload(force: Boolean = true) {
+        if (archiveSessionRetired.get()) return
+        loadingJob.cancel()
+        loadingJob = doLoad(force)
+    }
 
     fun setSavedMetadataOnly(enabled: Boolean) {
         val seed = getMangaOrNull() ?: return
@@ -242,64 +278,67 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
-	fun updateScrobbling(index: Int, rating: Float, status: ScrobblingStatus?) {
-		val scrobbler = getScrobbler(index) ?: return
-		launchJob(Dispatchers.Default) {
-			scrobbler.updateScrobblingInfo(
-				mangaId = mangaId,
-				rating = rating,
-				status = status,
-				comment = null,
-			)
-		}
-	}
+    fun updateScrobbling(index: Int, rating: Float, status: ScrobblingStatus?) {
+        val scrobbler = getScrobbler(index) ?: return
+        launchJob(Dispatchers.Default) {
+            scrobbler.updateScrobblingInfo(
+                mangaId = mangaId,
+                rating = rating,
+                status = status,
+                comment = null,
+            )
+        }
+    }
 
-	fun unregisterScrobbling(index: Int) {
-		val scrobbler = getScrobbler(index) ?: return
-		launchJob(Dispatchers.Default) {
-			scrobbler.unregisterScrobbling(
-				mangaId = mangaId,
-			)
-		}
-	}
+    fun unregisterScrobbling(index: Int) {
+        val scrobbler = getScrobbler(index) ?: return
+        launchJob(Dispatchers.Default) {
+            scrobbler.unregisterScrobbling(
+                mangaId = mangaId,
+            )
+        }
+    }
 
-	fun removeFromHistory() {
-		launchJob(Dispatchers.Default) {
-			val handle = historyRepository.delete(setOf(mangaId))
-			onActionDone.call(ReversibleAction(R.string.removed_from_history, handle))
-		}
-	}
+    fun removeFromHistory() {
+        launchJob(Dispatchers.Default) {
+            val handle = historyRepository.delete(setOf(mangaId))
+            onActionDone.call(ReversibleAction(R.string.removed_from_history, handle))
+        }
+    }
 
-	private fun doLoad(force: Boolean) = launchLoadingJob(Dispatchers.Default) {
-		try {
-			detailsLoadUseCase.invoke(intent, force)
-				.onEachWhile {
-					if (it.allChapters.isNotEmpty()) {
-						val manga = it.toManga()
-						val hist = historyRepository.getOne(manga)
-						selectedBranch.value = manga.getPreferredBranch(hist)
-						true
-					} else {
-						false
-					}
-				}.collect {
-					mangaDetails.value = it
-				}
-		} finally {
-			detailsLoadFinished.value = true
-		}
-	}
+    private fun doLoad(force: Boolean) = launchLoadingJob(Dispatchers.Default) {
+        try {
+            detailsLoadUseCase.invoke(intent, force)
+                .onEachWhile {
+                    if (it.allChapters.isNotEmpty()) {
+                        val manga = it.toManga()
+                        val hist = historyRepository.getOne(manga)
+                        selectedBranch.value = manga.getPreferredBranch(hist)
+                        true
+                    } else {
+                        false
+                    }
+                }.collect {
+                    currentCoroutineContext().ensureActive()
+                    synchronized(archiveDisplayLock) {
+                        if (!archiveSessionRetired.get()) mangaDetails.value = it
+                    }
+                }
+        } finally {
+            detailsLoadFinished.value = true
+        }
+    }
 
-	private fun getScrobbler(index: Int): Scrobbler? {
-		val info = scrobblingInfo.value.getOrNull(index)
-		val scrobbler = if (info != null) {
-			scrobblers.find { it.scrobblerService == info.scrobbler && it.isEnabled }
-		} else {
-			null
-		}
-		if (scrobbler == null) {
-			errorEvent.call(IllegalStateException("Scrobbler [$index] is not available"))
-		}
-		return scrobbler
-	}
+    private fun getScrobbler(index: Int): Scrobbler? {
+        val info = scrobblingInfo.value.getOrNull(index)
+        val scrobbler = if (info != null) {
+            scrobblers.find { it.scrobblerService == info.scrobbler && it.isEnabled }
+        } else {
+            null
+        }
+        if (scrobbler == null) {
+            errorEvent.call(IllegalStateException("Scrobbler [$index] is not available"))
+        }
+        return scrobbler
+    }
 }

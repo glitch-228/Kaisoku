@@ -28,4 +28,10 @@
         android:persistent="false"
         android:title="@string/periodic_backups" />
 
+    <PreferenceScreen
+        android:fragment="org.koitharu.kotatsu.backups.webdav.WebDavSettingsFragment"
+        android:key="webdav_backup_beta"
+        android:persistent="false"
+        android:title="@string/webdav_title" />
+
 </PreferenceScreen>

@@ -1,6 +1,7 @@
 package org.koitharu.kotatsu.settings.userdata
 
 import android.net.Uri
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.activity.result.ActivityResultCallback
@@ -35,7 +36,10 @@ class BackupsSettingsFragment : BasePreferenceFragment(R.string.backup_restore),
     private val mihonBackupSelectCall = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (uri != null) viewModel.importMihonBackup(uri)
+        if (uri != null) {
+            runCatching { requireContext().contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            viewModel.importMihonBackup(uri)
+        }
     }
 
     private val backupCreateCall = registerForActivityResult(
@@ -59,6 +63,9 @@ class BackupsSettingsFragment : BasePreferenceFragment(R.string.backup_restore),
         bindPeriodicalBackupSummary()
         viewModel.onError.observeEvent(viewLifecycleOwner, SnackbarErrorObserver(listView, this))
         viewModel.mihonImportCompleted.observeEvent(viewLifecycleOwner, ::showMihonImportResult)
+        viewModel.mihonPreview.observe(viewLifecycleOwner) { preview ->
+            if (preview != null) MihonImportReviewDialog.show(childFragmentManager)
+        }
     }
 
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
@@ -118,7 +125,7 @@ class BackupsSettingsFragment : BasePreferenceFragment(R.string.backup_restore),
         Snackbar.make(
             listView,
             getString(
-                R.string.mihon_backup_imported,
+                R.string.mihon_review_imported,
                 report.restoredManga,
                 report.restoredChapters,
                 report.restoredTracking,

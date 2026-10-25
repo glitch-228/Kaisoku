@@ -19,7 +19,9 @@ data class ParcelableManga(
 
 	companion object : Parceler<ParcelableManga> {
 
-		override fun ParcelableManga.write(parcel: Parcel, flags: Int) = with(manga) {
+		override fun ParcelableManga.write(parcel: Parcel, flags: Int) = with(
+            org.koitharu.kotatsu.core.archive.ArchivePrivacy.publicReference(manga),
+        ) {
 			parcel.writeLong(id)
 			parcel.writeString(title)
 			parcel.writeStringSet(altTitles)

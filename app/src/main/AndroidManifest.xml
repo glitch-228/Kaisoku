@@ -73,6 +73,10 @@
 		android:theme="@style/Theme.Kotatsu"
 		tools:ignore="UnusedAttribute">
 
+        <activity
+            android:name="org.koitharu.kotatsu.remote.library.LibraryBrowserActivity"
+            android:exported="false" />
+
 		<activity
 			android:name="org.koitharu.kotatsu.main.ui.MainActivity"
 			android:banner="@drawable/tv_banner"
@@ -81,15 +85,22 @@
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
 			</intent-filter>
-			<intent-filter>
-				<action android:name="android.intent.action.MAIN" />
-				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-			</intent-filter>
 			<meta-data
 				android:name="android.app.default_searchable"
 				android:value="org.koitharu.kotatsu.search.ui.multi.MultiSearchActivity" />
 		</activity>
-		<activity
+        <activity-alias
+            android:name="org.koitharu.kotatsu.main.ui.TvLauncher"
+            android:targetActivity="org.koitharu.kotatsu.main.ui.MainActivity"
+            android:banner="@drawable/tv_banner"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity
 			android:name="org.koitharu.kotatsu.details.ui.DetailsActivity"
 			android:exported="true">
 			<intent-filter>
@@ -517,6 +528,12 @@
 		<service
 			android:name="org.koitharu.kotatsu.browser.AdListUpdateService"
 			android:exported="false" />
+
+		<provider
+            android:name="org.koitharu.kotatsu.core.archive.ArchiveContentProvider"
+            android:authorities="${applicationId}.archive"
+            android:exported="false"
+            android:grantUriPermissions="false" />
 
 		<provider
 			android:name="org.koitharu.kotatsu.search.ui.MangaSuggestionsProvider"
@@ -1806,6 +1823,18 @@
 			</intent-filter>
 
 		</activity-alias>
+
+        <activity
+            android:name=".scrobbling.v2.ComickAuthActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="io.github.glitch228.kaisoku" />
+            </intent-filter>
+        </activity>
 
 	</application>
 

@@ -1,5 +1,8 @@
 package org.koitharu.kotatsu.details.ui
 
+import org.koitharu.kotatsu.core.archive.retireArchiveDisplay
+import org.koitharu.kotatsu.core.archive.ArchiveDisplaySession
+
 import android.app.Activity
 import android.view.Menu
 import android.view.MenuInflater
@@ -12,15 +15,27 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.core.net.toUri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.community.data.isCommunitySimilarSeed
 import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.os.AppShortcutManager
 import org.koitharu.kotatsu.core.ui.dialog.buildAlertDialog
 import org.koitharu.kotatsu.core.util.ext.isHttpUrl
+import org.koitharu.kotatsu.details.translation.SynopsisTranslationSheet
+import org.koitharu.kotatsu.core.archive.ArchiveAccess
+import org.koitharu.kotatsu.core.archive.ArchiveUnlockDialog
+import org.koitharu.kotatsu.core.archive.EncryptedArchiveExportDialog
+import java.io.File
 
 class DetailsMenuProvider(
     private val activity: FragmentActivity,
@@ -28,6 +43,41 @@ class DetailsMenuProvider(
     private val snackbarHost: View,
     private val appShortcutManager: AppShortcutManager,
 ) : MenuProvider, ActivityResultCallback<ActivityResult> {
+
+    private var archiveFile: File? = null
+    private var protectedArchive = false
+
+    init {
+        activity.supportFragmentManager.setFragmentResultListener(ArchiveUnlockDialog.RESULT_UNLOCKED, activity) { _, result ->
+            if (result.getString(ArchiveUnlockDialog.KEY_FILE) == archiveFile?.canonicalPath) {
+                activity.invalidateOptionsMenu()
+                viewModel.reload(force = false)
+            }
+        }
+        val lockListener = ArchiveDisplaySession(
+            sessions = ArchiveAccess.get(activity).sessions,
+            currentArchives = { listOfNotNull(viewModel.localArchiveFile) },
+            retire = {
+                viewModel.retireArchiveSession()
+                activity.runOnUiThread { retireArchiveDisplay(activity, activity.findViewById(android.R.id.content)) {} }
+            },
+        )
+        activity.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) { lockListener.close() }
+        })
+        activity.lifecycleScope.launch {
+            viewModel.mangaDetails.collect {
+                val file = viewModel.localArchiveFile
+                archiveFile = file
+                protectedArchive = file != null // Fail closed while asynchronous header inspection is pending.
+                // Public directory inspection belongs on IO, never in menu callbacks.
+                protectedArchive = file != null && try {
+                    withContext(Dispatchers.IO) { ArchiveAccess.get(activity).isSensitive(file) }
+                } catch (error: CancellationException) { throw error } catch (_: Exception) { true }
+                activity.invalidateOptionsMenu()
+            }
+        }
+    }
 
     private val activityForResultLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -43,6 +93,12 @@ class DetailsMenuProvider(
 
     override fun onPrepareMenu(menu: Menu) {
         val manga = viewModel.manga.value
+        menu.findItem(R.id.action_community_similar).isVisible =
+            (activity as? DetailsActivity)?.settings?.let { it.isCommunitySimilarEnabled && !it.useLegacySuggestions } == true &&
+                manga != null && manga.isCommunitySimilarSeed && !protectedArchive
+        menu.findItem(R.id.action_refresh_cover).isVisible =
+            (activity as? DetailsActivity)?.settings?.isCoverRefreshActionEnabled == true &&
+                viewModel.coverUrl.value?.isHttpUrl() == true && !protectedArchive
         menu.findItem(R.id.action_share).isVisible = manga != null && AppRouter.isShareSupported(manga)
         menu.findItem(R.id.action_save).isVisible = manga?.source != null && manga.source != LocalMangaSource
         menu.findItem(R.id.action_delete).isVisible = manga?.source == LocalMangaSource
@@ -57,6 +113,14 @@ class DetailsMenuProvider(
             isVisible = manga != null && manga.source != LocalMangaSource && manga.id != 0L
             isChecked = viewModel.isSavedMetadataOnly.value
         }
+        menu.findItem(R.id.action_translate_synopsis).isVisible =
+            !viewModel.mangaDetails.value?.description.isNullOrBlank()
+        menu.findItem(R.id.action_archive_unlock).apply {
+            isVisible = protectedArchive && archiveFile != null
+            title = activity.getString(if (archiveFile?.let { ArchiveAccess.sessions.isUnlocked(it) } == true)
+                R.string.archive_lock else R.string.archive_unlock_beta)
+        }
+        menu.findItem(R.id.action_archive_export).isVisible = archiveFile != null
         val isFavourite = viewModel.favouriteCategories.value.isNotEmpty()
         menu.findItem(R.id.action_favourite).setIcon(
             if (isFavourite) R.drawable.ic_heart else R.drawable.ic_heart_outline,
@@ -129,6 +193,25 @@ class DetailsMenuProvider(
                 activityForResultLauncher.launch(intent)
             }
 
+            R.id.action_translate_synopsis -> {
+                val text = viewModel.mangaDetails.value?.description?.toString()?.takeIf { it.isNotBlank() }
+                    ?: return false
+                SynopsisTranslationSheet.show(activity.supportFragmentManager, text, allowPersistentCache = !protectedArchive)
+            }
+
+            R.id.action_archive_unlock -> {
+                val file = archiveFile ?: return false
+                if (ArchiveAccess.sessions.isUnlocked(file)) ArchiveAccess.sessions.lock(file)
+                else ArchiveUnlockDialog.show(activity.supportFragmentManager, file)
+                activity.invalidateOptionsMenu()
+            }
+
+            R.id.action_archive_export -> {
+                val file = archiveFile ?: return false
+                if (protectedArchive && !ArchiveAccess.sessions.isUnlocked(file)) ArchiveUnlockDialog.show(activity.supportFragmentManager, file)
+                else EncryptedArchiveExportDialog.show(activity.supportFragmentManager, file)
+            }
+
             R.id.action_saved_metadata_only -> {
                 if (viewModel.isSavedMetadataOnly.value) {
                     viewModel.setSavedMetadataOnly(false)
@@ -139,6 +222,13 @@ class DetailsMenuProvider(
                         setPositiveButton(android.R.string.ok) { _, _ -> viewModel.setSavedMetadataOnly(true) }
                         setNegativeButton(android.R.string.cancel, null)
                     }.show()
+                }
+            }
+
+            R.id.action_refresh_cover -> (activity as? DetailsActivity)?.refreshCover()
+            R.id.action_community_similar -> (activity as? DetailsActivity)?.let { details ->
+                viewModel.getMangaOrNull()?.let { seed ->
+                    details.communitySimilarUi.show(seed, snackbarHost, activity.lifecycleScope, router)
                 }
             }
 

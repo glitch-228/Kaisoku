@@ -49,154 +49,170 @@ import javax.inject.Provider
 @HiltAndroidApp
 open class BaseApp : Application(), Configuration.Provider {
 
-	@Inject
-	lateinit var databaseObserversProvider: Provider<Set<@JvmSuppressWildcards InvalidationTracker.Observer>>
+    @Inject
+    lateinit var databaseObserversProvider: Provider<Set<@JvmSuppressWildcards InvalidationTracker.Observer>>
 
-	@Inject
-	lateinit var activityLifecycleCallbacks: Set<@JvmSuppressWildcards ActivityLifecycleCallbacks>
+    @Inject
+    lateinit var activityLifecycleCallbacks: Set<@JvmSuppressWildcards ActivityLifecycleCallbacks>
 
-	@Inject
-	lateinit var database: Provider<MangaDatabase>
+    @Inject
+    lateinit var database: Provider<MangaDatabase>
 
-	@Inject
-	lateinit var settings: AppSettings
+    @Inject
+    lateinit var settings: AppSettings
 
-	@Inject
-	lateinit var workerFactory: AppWorkerFactory
+    @Inject
+    lateinit var workerFactory: AppWorkerFactory
 
-	@Inject
-	lateinit var appValidator: AppValidator
+    @Inject
+    lateinit var appValidator: AppValidator
 
-	@Inject
-	lateinit var nsfwOverridesLoader: NsfwOverridesLoader
+    @Inject
+    lateinit var nsfwOverridesLoader: NsfwOverridesLoader
 
-	@Inject
-	lateinit var workScheduleManager: WorkScheduleManager
+    @Inject
+    lateinit var workScheduleManager: WorkScheduleManager
 
-	@Inject
-	lateinit var localMangaIndexProvider: Provider<LocalMangaIndex>
+    @Inject
+    lateinit var localMangaIndexProvider: Provider<LocalMangaIndex>
 
-	@Inject
-	@LocalStorageChanges
-	lateinit var localStorageChanges: MutableSharedFlow<LocalManga?>
+    @Inject
+    @LocalStorageChanges
+    lateinit var localStorageChanges: MutableSharedFlow<LocalManga?>
 
-	@Inject
-	lateinit var lnReaderSourceManager: Provider<LnReaderSourceManager>
+    @Inject
+    lateinit var lnReaderSourceManager: Provider<LnReaderSourceManager>
+
+    @Inject
+    lateinit var remoteLibraries: Provider<org.koitharu.kotatsu.remote.library.RemoteLibraryManager>
+
+    @Inject
+    lateinit var categoryStatus: Provider<org.koitharu.kotatsu.scrobbling.v2.categories.CategoryStatusEngine>
+
+    @Inject
+    lateinit var outgoingProgress: Provider<org.koitharu.kotatsu.scrobbling.v2.progress.OutgoingProgressCoordinator>
 
     @Inject
     lateinit var drivePreferenceVersions: DrivePreferenceVersions
 
-	@Inject
-	lateinit var bundledPluginsInstaller: Provider<BundledPluginsInstaller>
+    @Inject
+    lateinit var bundledPluginsInstaller: Provider<BundledPluginsInstaller>
 
-	@Inject
-	lateinit var mihonExtensionRepoStore: Provider<MihonExtensionRepoStore>
+    @Inject
+    lateinit var mihonExtensionRepoStore: Provider<MihonExtensionRepoStore>
 
-	override val workManagerConfiguration: Configuration
-		get() = Configuration.Builder()
-			.setWorkerFactory(workerFactory)
-			.build()
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
-	override fun onCreate() {
-		super.onCreate()
-		if (isCrashProcess()) {
-			return
-		}
-		if (ACRA.isACRASenderServiceProcess()) {
-			return
-		}
-		drivePreferenceVersions.start()
-		org.koitharu.kotatsu.core.diagnostics.LocalDiagnostics.start(this, settings)
-		PlatformRegistry.applicationContext = this // TODO replace with OkHttp.initialize
-		GlobalCrashHandler.install(this)
-		AppCompatDelegate.setDefaultNightMode(settings.theme)
-		// TLS 1.3 support for Android < 10
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-			Security.insertProviderAt(Conscrypt.newProvider(), 1)
-		}
-		setupActivityLifecycleCallbacks()
-		if (isCrashReportingEnabled() && ACRA.isInitialised) {
-			processLifecycleScope.launch {
-				ACRA.errorReporter.putCustomData("isOriginalApp", appValidator.isOriginalApp.getOrNull().toString())
-				ACRA.errorReporter.putCustomData("isMiui", RomCompat.isMiui.getOrNull().toString())
-			}
-		}
-		processLifecycleScope.launch(Dispatchers.Default) {
-			setupDatabaseObservers()
-			nsfwOverridesLoader.ensureLoaded()
-			localStorageChanges.collect(localMangaIndexProvider.get())
-		}
-		processLifecycleScope.launch(Dispatchers.IO) {
-			runCatching { bundledPluginsInstaller.get().install() }
-			DynamicParserManager.loadParsersFromDirectory(this@BaseApp, PluginFileLoader.pluginsDir(this@BaseApp))
-		}
-		processLifecycleScope.launch(Dispatchers.IO) {
-			runCatching { mihonExtensionRepoStore.get().seedDefaults() }
-		}
-		// Populate the LNReader source registry eagerly so novels resolve from history/
-		// shortcuts/DB on a cold start, before any Explore-side assimilation ran.
-		processLifecycleScope.launch(Dispatchers.IO) {
-			runCatching { lnReaderSourceManager.get().reload() }
-		}
-		workScheduleManager.init()
-	}
+    override fun onCreate() {
+        super.onCreate()
+        if (isCrashProcess()) {
+            return
+        }
+        if (ACRA.isACRASenderServiceProcess()) {
+            return
+        }
+        drivePreferenceVersions.start()
+        org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.start(this)
+        org.koitharu.kotatsu.core.diagnostics.LocalDiagnostics.start(this, settings)
+        PlatformRegistry.applicationContext = this // TODO replace with OkHttp.initialize
+        GlobalCrashHandler.install(this)
+        AppCompatDelegate.setDefaultNightMode(settings.theme)
+        org.koitharu.kotatsu.core.os.TvLauncherSettings.apply(this, settings.isTvLauncherEnabled)
+        // TLS 1.3 support for Android < 10
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            Security.insertProviderAt(Conscrypt.newProvider(), 1)
+        }
+        processLifecycleScope.launch(Dispatchers.IO) { categoryStatus.get().start(processLifecycleScope) }
+        processLifecycleScope.launch(Dispatchers.IO) { outgoingProgress.get().start(processLifecycleScope) }
+        setupActivityLifecycleCallbacks()
+        if (isCrashReportingEnabled() && ACRA.isInitialised) {
+            processLifecycleScope.launch {
+                ACRA.errorReporter.putCustomData("isOriginalApp", appValidator.isOriginalApp.getOrNull().toString())
+                ACRA.errorReporter.putCustomData("isMiui", RomCompat.isMiui.getOrNull().toString())
+            }
+        }
+        processLifecycleScope.launch(Dispatchers.Default) {
+            setupDatabaseObservers()
+            nsfwOverridesLoader.ensureLoaded()
+            localStorageChanges.collect(localMangaIndexProvider.get())
+        }
+        processLifecycleScope.launch(Dispatchers.IO) {
+            runCatching { bundledPluginsInstaller.get().install() }
+            DynamicParserManager.loadParsersFromDirectory(this@BaseApp, PluginFileLoader.pluginsDir(this@BaseApp))
+        }
+        processLifecycleScope.launch(Dispatchers.IO) {
+            runCatching { mihonExtensionRepoStore.get().seedDefaults() }
+        }
+        // Populate the LNReader source registry eagerly so novels resolve from history/
+        // shortcuts/DB on a cold start, before any Explore-side assimilation ran.
+        processLifecycleScope.launch(Dispatchers.IO) {
+            runCatching { lnReaderSourceManager.get().reload() }
+        }
+        processLifecycleScope.launch(Dispatchers.IO) {
+            runCatching { remoteLibraries.get().connections() }
+        }
+        workScheduleManager.init()
+    }
 
-	override fun attachBaseContext(base: Context) {
-		super.attachBaseContext(base)
-		if (isCrashProcess()) {
-			return
-		}
-		if (ACRA.isACRASenderServiceProcess()) {
-			return
-		}
-		val reportUrl = getString(R.string.acra_report_url).trim()
-		if (reportUrl.isEmpty()) {
-			return
-		}
-		initAcra {
-			buildConfigClass = BuildConfig::class.java
-			reportFormat = StringFormat.JSON
-			httpSender {
-				uri = reportUrl
-				basicAuthLogin = getString(R.string.acra_login)
-				basicAuthPassword = getString(R.string.acra_password)
-				httpMethod = HttpSender.Method.POST
-			}
-			reportContent = listOf(
-				ReportField.PACKAGE_NAME,
-				ReportField.INSTALLATION_ID,
-				ReportField.APP_VERSION_CODE,
-				ReportField.APP_VERSION_NAME,
-				ReportField.ANDROID_VERSION,
-				ReportField.PHONE_MODEL,
-				ReportField.STACK_TRACE,
-				ReportField.CRASH_CONFIGURATION,
-				ReportField.CUSTOM_DATA,
-			)
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        if (isCrashProcess()) {
+            return
+        }
+        if (ACRA.isACRASenderServiceProcess()) {
+            return
+        }
+        val reportUrl = getString(R.string.acra_report_url).trim()
+        if (reportUrl.isEmpty()) {
+            return
+        }
+        initAcra {
+            buildConfigClass = BuildConfig::class.java
+            reportFormat = StringFormat.JSON
+            httpSender {
+                uri = reportUrl
+                basicAuthLogin = getString(R.string.acra_login)
+                basicAuthPassword = getString(R.string.acra_password)
+                httpMethod = HttpSender.Method.POST
+            }
+            reportContent = listOf(
+                ReportField.PACKAGE_NAME,
+                ReportField.INSTALLATION_ID,
+                ReportField.APP_VERSION_CODE,
+                ReportField.APP_VERSION_NAME,
+                ReportField.ANDROID_VERSION,
+                ReportField.PHONE_MODEL,
+                ReportField.STACK_TRACE,
+                ReportField.CRASH_CONFIGURATION,
+                ReportField.CUSTOM_DATA,
+            )
 
-			dialog {
-				text = getString(R.string.crash_text)
-				title = getString(R.string.error_occurred)
-				positiveButtonText = getString(R.string.send)
-				resIcon = R.drawable.ic_alert_outline
-				resTheme = android.R.style.Theme_Material_Light_Dialog_Alert
-			}
-		}
-	}
+            dialog {
+                text = getString(R.string.crash_text)
+                title = getString(R.string.error_occurred)
+                positiveButtonText = getString(R.string.send)
+                resIcon = R.drawable.ic_alert_outline
+                resTheme = android.R.style.Theme_Material_Light_Dialog_Alert
+            }
+        }
+    }
 
-	@WorkerThread
-	private fun setupDatabaseObservers() {
-		val tracker = database.get().invalidationTracker
-		databaseObserversProvider.get().forEach {
-			tracker.addObserver(it)
-		}
-	}
+    @WorkerThread
+    private fun setupDatabaseObservers() {
+        val tracker = database.get().invalidationTracker
+        databaseObserversProvider.get().forEach {
+            tracker.addObserver(it)
+        }
+    }
 
-	private fun setupActivityLifecycleCallbacks() {
-		activityLifecycleCallbacks.forEach {
-			registerActivityLifecycleCallbacks(it)
-		}
-	}
+    private fun setupActivityLifecycleCallbacks() {
+        activityLifecycleCallbacks.forEach {
+            registerActivityLifecycleCallbacks(it)
+        }
+    }
 
-	private fun isCrashReportingEnabled(): Boolean = getString(R.string.acra_report_url).isNotBlank()
+    private fun isCrashReportingEnabled(): Boolean = getString(R.string.acra_report_url).isNotBlank()
 }
