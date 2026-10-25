@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <Preference android:key="server_extended_description" android:title="@string/server_extended_title"
+        android:summary="@string/server_extended_description" android:selectable="false" />
+    <Preference android:key="server_extended_check" android:title="@string/server_extended_check" />
+    <MultiSelectListPreference android:key="server_extended_content" android:persistent="false"
+        android:title="@string/server_extended_content" />
+    <SwitchPreferenceCompat android:key="server_extended_enabled" android:persistent="false"
+        android:title="@string/server_extended_enable" />
+    <Preference android:key="server_extended_status" android:title="@string/server_extended_status"
+        android:selectable="false" />
+    <Preference android:key="server_extended_sync" android:title="@string/sync_now" />
+    <Preference android:key="server_extended_review_action" android:title="@string/server_extended_review_action" />
+    <Preference android:key="server_extended_resume" android:title="@string/server_extended_resume" />
+    <SwitchPreferenceCompat android:key="server_extended_automatic" android:persistent="false"
+        android:title="@string/server_extended_automatic" />
+    <SwitchPreferenceCompat android:key="server_extended_startup" android:persistent="false"
+        android:title="@string/sync_on_start" />
+    <SwitchPreferenceCompat android:key="server_extended_wifi" android:persistent="false"
+        android:title="@string/wifi_only" />
+    <SwitchPreferenceCompat android:key="server_extended_http" android:persistent="false"
+        android:title="@string/server_extended_http" android:summary="@string/server_extended_http_summary" />
+</PreferenceScreen>

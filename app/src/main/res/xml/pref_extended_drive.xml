@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <Preference android:title="@string/extended_drive_title" android:summary="@string/extended_drive_description"
+        android:selectable="false" />
+    <Preference android:key="extended_drive_check" android:title="@string/extended_drive_check" />
+    <MultiSelectListPreference android:key="extended_drive_content" android:persistent="false"
+        android:title="@string/extended_drive_content" />
+    <SwitchPreferenceCompat android:key="extended_drive_enabled" android:persistent="false"
+        android:title="@string/extended_drive_enable" />
+    <Preference android:key="extended_drive_status" android:title="@string/extended_drive_status" android:selectable="false" />
+    <Preference android:key="extended_drive_sync" android:title="@string/sync_now" />
+    <Preference android:key="extended_drive_resume" android:title="@string/extended_drive_resume" />
+    <SwitchPreferenceCompat android:key="extended_drive_automatic" android:persistent="false"
+        android:title="@string/extended_drive_automatic" />
+    <Preference android:key="extended_drive_copy" android:title="@string/extended_drive_copy" />
+</PreferenceScreen>

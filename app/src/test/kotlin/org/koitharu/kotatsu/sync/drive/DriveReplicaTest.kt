@@ -10,6 +10,18 @@ import java.io.File
 import org.koitharu.kotatsu.sync.drive.DriveReplicaCodec.readBounded
 
 class DriveReplicaTest {
+    @Test fun legacyBackupWriterNeverPublishesExtendedValuesOrDeletionOwnership() {
+        val file = File.createTempFile("legacy-extended-exclusion-", ".zip")
+        try {
+            val extended = org.koitharu.kotatsu.backups.domain.BackupSection.entries.filter { it.isExtended }
+            val records = extended.map { DriveReplicaRecord(it.entryName, "fixture", 100, "device",
+                Json.parseToJsonElement("""{"version":1,"private":"opaque"}""")) }
+            DriveReplicaBackup.write(file, records) { error("No category mapping expected") }
+            java.util.zip.ZipInputStream(file.inputStream()).use { assertNull(it.nextEntry) }
+            assertTrue(DriveReplicaBackup.read(file, { _, _ -> "fixture" }).isEmpty())
+        } finally { file.delete() }
+    }
+
     @Test fun deletionWinsAgainstStaleReplicasInAnyOrder() {
         val live = record(10, "a", JsonPrimitive("old"))
         val deleted = record(11, "b", null)

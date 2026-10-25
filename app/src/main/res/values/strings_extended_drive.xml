@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="extended_drive_title">Extended Drive sync · Beta</string>
+    <string name="extended_drive_description">Optionally transfer exact chapter completion, tracker links, saved metadata, remote library references and import evidence through your Google Drive app data. Select content and check your account before enabling. Existing Drive sync controls remain separate.</string>
+    <string name="extended_drive_check">Check Drive account</string>
+    <string name="extended_drive_verified">%1$s · verified account %2$s</string>
+    <string name="extended_drive_content">Content to transfer</string>
+    <string name="extended_drive_enable">Enable extended Drive sync</string>
+    <string name="extended_drive_status">Extended Drive status</string>
+    <string name="extended_drive_resume">Resume saved publication</string>
+    <string name="extended_drive_resume_description">Check and finish the saved upload with its original content. Newer local edits stay on this device and can be sent with a later Sync now. Files whose causal or privacy state cannot be preserved remain paused for review.</string>
+    <string name="extended_drive_automatic">Sync automatically every six hours</string>
+    <string name="extended_drive_copy">Copy sync diagnostics</string>
+    <string name="extended_drive_ready">Account checked; extended Drive sync enabled</string>
+    <string name="extended_drive_running">Extended Drive sync is running</string>
+    <string name="extended_drive_success">Selected content synchronized</string>
+    <string name="extended_drive_signin">Check the selected Google Drive account</string>
+    <string name="extended_drive_stale">Account, provider or consent changed</string>
+    <string name="extended_drive_recovery">A saved publication needs an explicit Resume action</string>
+    <string name="extended_drive_storage">Private extended Drive state requires attention</string>
+    <string name="extended_drive_network">The Drive connection could not complete</string>
+    <string name="extended_drive_quota">The Drive file or storage limit was reached</string>
+    <string name="extended_drive_review">Some content needs identity or privacy review before it can continue</string>
+    <string name="extended_drive_action_failed">The action could not complete. Check the selected Drive account, consent and sync status. Saved uploads and existing files were retained. Diagnostics contain status codes, without tokens or reading contents.</string>
+    <string name="extended_drive_chapters">Exact chapter completion</string>
+    <string name="extended_drive_links">Tracker links and inactive category intent</string>
+    <string name="extended_drive_metadata">Saved metadata overrides</string>
+    <string name="extended_drive_libraries">Remote library references</string>
+    <string name="extended_drive_imports">Foreign import evidence</string>
+</resources>

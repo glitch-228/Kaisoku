@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="server_extended_title">Extended server sync · Beta</string>
+    <string name="server_extended_description">Optionally transfer exact chapter completion, tracker links, metadata, remote library references and import evidence through a compatible server. Select content and check the signed-in server before enabling. Reading position and existing sync controls stay separate.</string>
+    <string name="server_extended_check">Check connection</string>
+    <string name="server_extended_content">Content to transfer</string>
+    <string name="server_extended_enable">Enable extended sync</string>
+    <string name="server_extended_status">Extended sync status</string>
+    <string name="server_extended_identity">%1$s · account %2$s
+%3$s</string>
+    <string name="server_extended_review_action">Review sync conflicts</string>
+    <string name="server_extended_review_help">Resolve source edition, chapter, tracker or library identities in their review workflows before trying again. A stale upload can be checked with Resume pending upload. An upload that cannot be verified remains paused.</string>
+    <string name="server_extended_available">Compatible content: %1$d of %2$d</string>
+    <string name="server_extended_resume">Resume pending upload</string>
+    <string name="server_extended_resume_consent">Send the saved upload again with its original content. A conflicting upload will be checked against the latest server state. Use Sync now later to send new changes.</string>
+    <string name="server_extended_automatic">Sync automatically every six hours</string>
+    <string name="server_extended_http">Allow private-address HTTP</string>
+    <string name="server_extended_http_summary">Off by default. Only literal private or loopback addresses are accepted.</string>
+    <string name="server_extended_http_consent">HTTP sends your sign-in token and reading data without encryption. Enable only for a private or loopback server you deliberately trust. HTTPS remains available without this option.</string>
+    <string name="server_extended_chapters">Exact chapter completion</string>
+    <string name="server_extended_links">Tracker links and inactive category intent</string>
+    <string name="server_extended_imports">Foreign import evidence</string>
+    <string name="server_extended_metadata">Saved metadata overrides</string>
+    <string name="server_extended_libraries">Remote library references</string>
+    <string name="server_extended_ready">Connection checked; extended sync enabled</string>
+    <string name="server_extended_running">Extended sync is running</string>
+    <string name="server_extended_success">Selected content synchronized</string>
+    <string name="server_extended_unsupported">This server or content version is unavailable</string>
+    <string name="server_extended_signin">Sign in to the configured sync account</string>
+    <string name="server_extended_stale">Account, server or consent changed; check the connection again</string>
+    <string name="server_extended_recovery">A saved upload needs an explicit Resume action</string>
+    <string name="server_extended_quota">The server rejected the payload or reached its storage limit</string>
+    <string name="server_extended_storage">Extended sync storage requires attention</string>
+    <string name="server_extended_network">The connection could not complete</string>
+    <string name="server_extended_review">Some content needs review before synchronization can continue</string>
+    <string name="server_extended_action_failed">The action could not complete. Check the server address, sign-in, supported content and saved sync status. No unavailable content was silently enabled.</string>
+</resources>

@@ -31,7 +31,8 @@ object DriveReplicaBackup {
             var entry = input.nextEntry
             while (entry != null) {
                 val section = BackupSection.of(entry)
-                if (section != null && section != BackupSection.INDEX) {
+                // Extended state travels in separate versioned replicas; legacy clients cannot own its tombstones.
+                if (section != null && section != BackupSection.INDEX && !section.isExtended) {
                     val rows = Json.parseToJsonElement(input.readBytes().decodeToString()).jsonArray
                     if (section == BackupSection.SETTINGS || section == BackupSection.SETTINGS_READER_GRID) {
                         for ((key, value) in rows.single().jsonObject) {
@@ -82,6 +83,7 @@ object DriveReplicaBackup {
         ZipOutputStream(file.outputStream().buffered()).use { output ->
             output.setLevel(java.util.zip.Deflater.BEST_COMPRESSION)
             for (section in BackupSection.entries) {
+                if (section.isExtended) continue
                 val rows = grouped[section.entryName] ?: continue
                 val value = if (section == BackupSection.SETTINGS || section == BackupSection.SETTINGS_READER_GRID) {
                     JsonArray(listOf(JsonObject(rows.associate { it.key to checkNotNull(it.value) })))

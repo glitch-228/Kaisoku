@@ -45,11 +45,12 @@ class DriveReplicaStore @Inject constructor(
     suspend fun merge(
         account: String,
         device: String,
-        sections: Set<BackupSection>,
+        requestedSections: Set<BackupSection>,
         remote: List<DriveReplica>,
         legacy: List<Legacy>,
     ): DriveReplica {
         currentCoroutineContext().ensureActive()
+        val sections = requestedSections.filterNotTo(hashSetOf()) { it.isExtended }
         val mergedMangaIds = linkedMapOf<Long, Long>()
         // Preferences cannot roll back with SQLite. Once the local transaction starts, complete its
         // local merge even if the worker is stopped; authentication/transfers stay cancellable.
@@ -172,7 +173,7 @@ class DriveReplicaStore @Inject constructor(
     }
 
     suspend fun writeCompatibilityBackup(file: File, replica: DriveReplica) = database.withTransaction {
-        val sections = BackupSection.entries.filterTo(hashSetOf()) { it.entryName in replica.sections }
+        val sections = BackupSection.entries.filterTo(hashSetOf()) { !it.isExtended && it.entryName in replica.sections }
         ZipOutputStream(file.outputStream().buffered()).use {
             backupRepository.createBackup(it, null, sections, includeCustomCovers = true)
         }
