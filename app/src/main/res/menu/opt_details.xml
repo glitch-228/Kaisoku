@@ -99,6 +99,13 @@
 		android:title="@string/replace_source"
 		app:showAsAction="never" />
 
+    <item
+        android:id="@id/action_recommendation_provider_match"
+        android:orderInCategory="50"
+        android:title="@string/recommendation_public_match"
+        android:visible="false"
+        app:showAsAction="never" />
+
 	<item
 		android:id="@+id/action_online"
 		android:orderInCategory="50"

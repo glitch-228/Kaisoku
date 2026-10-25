@@ -268,9 +268,7 @@ class DetailsActivity :
         )
         addMenuProvider(menuProvider)
         addMenuProvider(object : androidx.core.view.MenuProvider {
-            override fun onCreateMenu(menu: android.view.Menu, inflater: android.view.MenuInflater) {
-                menu.add(android.view.Menu.NONE, R.id.action_recommendation_provider_match, android.view.Menu.NONE, R.string.recommendation_public_match)
-            }
+            override fun onCreateMenu(menu: android.view.Menu, inflater: android.view.MenuInflater) = Unit
             override fun onPrepareMenu(menu: android.view.Menu) {
                 menu.findItem(R.id.action_recommendation_provider_match)?.isVisible = settings.publicRecommendations && !settings.useLegacySuggestions
             }
