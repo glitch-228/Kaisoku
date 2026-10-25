@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="synopsis_translate_beta">Перевести описание · Бета</string>
+    <string name="synopsis_translation_notice">Перевод запускается только по запросу. Описание отправляется выбранному сервису и может расходовать его квоту. Качество перевода может различаться.</string>
+    <string name="synopsis_translation_configuration">%1$s · %2$s → %3$s</string>
+    <string name="synopsis_translation_google">Google Переводчик</string>
+    <string name="synopsis_translation_auto_language">Определить язык</string>
+    <string name="synopsis_translation_original">Показать оригинал</string>
+    <string name="synopsis_translation_result">Показать перевод</string>
+    <string name="synopsis_translation_translate">Перевести</string>
+    <string name="synopsis_translation_again">Перевести заново</string>
+    <string name="synopsis_translation_cached">Сохранённый перевод</string>
+    <string name="synopsis_translation_progress">Перевод… %1$d/%2$d</string>
+    <string name="synopsis_translation_loading">Перевод…</string>
+    <string name="synopsis_translation_copy_error">Скопировать полную ошибку</string>
+    <string name="synopsis_translation_configuration_action">Настройки перевода</string>
+    <string name="synopsis_translation_too_long">Описание слишком длинное для безопасного перевода. Исходный текст сохранён.</string>
+    <string name="synopsis_translation_empty_result">Сервис вернул пустой перевод. Повторите попытку или выберите другой сервис.</string>
+    <string name="synopsis_translation_result_too_long">Ответ сервиса превысил местное ограничение размера. Исходный текст сохранён.</string>
+    <string name="synopsis_translation_unavailable">Описание недоступно. Закройте это окно и откройте его снова со страницы произведения, при необходимости разблокировав книгу.</string>
+</resources>

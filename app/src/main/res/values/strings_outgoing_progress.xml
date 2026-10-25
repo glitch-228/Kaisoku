@@ -1,0 +1,17 @@
+<resources>
+    <string name="outgoing_progress_beta">Outgoing progress · Beta</string>
+    <string name="outgoing_progress_notice">Automatic updates are off by default. Review the account, source edition and branch. Remote services can change between readback and saving; uncertain sends require a check. Blank fields remain unchanged.</string>
+    <string name="outgoing_progress_enable">Enable automatic progress…</string>
+    <string name="outgoing_progress_disable">Disable automatic progress</string>
+    <string name="outgoing_progress_automatic_notice">Only confirmed chapter completion is sent. The new workflow requires exact chapter completion enabled separately for each title. Existing legacy tracking remains for other titles. Integer-only services cannot accept fractional chapters. No titles are added automatically.</string>
+    <string name="outgoing_progress_manual">Review a progress update…</string>
+    <string name="outgoing_progress_check">Check remote result</string>
+    <string name="outgoing_progress_chapter">Chapter number (optional)</string>
+    <string name="outgoing_progress_volume">Volume (optional)</string>
+    <string name="outgoing_progress_entry">Chapter entry ID (instead of number)</string>
+    <string name="outgoing_progress_preview">Preview progress</string>
+    <string name="outgoing_progress_values">Remote: chapter %1$s, volume %2$s, entry %3$s\nSelected: chapter %4$s, volume %5$s, entry %6$s</string>
+    <string name="outgoing_progress_allow_lower">Replace a higher remote value with this lower value</string>
+    <string name="outgoing_progress_allow_unknown">Replace unknown or nonnumeric remote progress</string>
+    <string name="outgoing_progress_confirm">Confirm this update</string>
+</resources>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_tools_no_titles">No confirmed source editions are linked to this account. Review a match first.</string>
+</resources>

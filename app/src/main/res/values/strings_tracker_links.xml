@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_link_backup">Lossless tracker links · Beta</string>
+    <string name="tracker_link_review">Review restored tracker links · Beta</string>
+    <string name="tracker_link_review_notice">Restored links stay inactive on this device until you verify the account and confirm the source edition. Confirmation reads the existing tracker entry; it does not add a title, send progress or move your reader position.</string>
+    <string name="tracker_link_verify">Verify account and show pending links</string>
+    <string name="tracker_link_confirm">Confirm this link</string>
+    <string name="tracker_link_pending_empty">No restored links need confirmation for this account.</string>
+    <string name="tracker_link_review_details">%1$s\nSource: %2$s\nEdition: %3$s\nAccount: %4$s\nMedia ID: %5$s\nList entry: %6$s\nSaved progress: %7$s\nVolume: %8$s\nRaw entry: %9$s\nUnit: %10$s</string>
+</resources>

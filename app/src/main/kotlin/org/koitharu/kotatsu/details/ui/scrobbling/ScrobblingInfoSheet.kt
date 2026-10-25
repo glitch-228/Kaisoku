@@ -31,132 +31,143 @@ import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblingStatus
 
 @AndroidEntryPoint
 class ScrobblingInfoSheet :
-	BaseAdaptiveSheet<SheetScrobblingBinding>(),
-	AdapterView.OnItemSelectedListener,
-	RatingBar.OnRatingBarChangeListener,
-	View.OnClickListener,
-	PopupMenu.OnMenuItemClickListener {
+    BaseAdaptiveSheet<SheetScrobblingBinding>(),
+    AdapterView.OnItemSelectedListener,
+    RatingBar.OnRatingBarChangeListener,
+    View.OnClickListener,
+    PopupMenu.OnMenuItemClickListener {
 
-	private val viewModel by activityViewModels<DetailsViewModel>()
-	private var scrobblerIndex: Int = -1
+    private val viewModel by activityViewModels<DetailsViewModel>()
+    private var scrobblerIndex: Int = -1
 
-	private var menu: PopupMenu? = null
+    private var menu: PopupMenu? = null
 
-	override fun onCreate(savedInstanceState: Bundle?) {
-		super.onCreate(savedInstanceState)
-		scrobblerIndex = requireArguments().getInt(AppRouter.KEY_INDEX, scrobblerIndex)
-	}
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        scrobblerIndex = requireArguments().getInt(AppRouter.KEY_INDEX, scrobblerIndex)
+    }
 
-	override fun onCreateViewBinding(inflater: LayoutInflater, container: ViewGroup?): SheetScrobblingBinding {
-		return SheetScrobblingBinding.inflate(inflater, container, false)
-	}
+    override fun onCreateViewBinding(inflater: LayoutInflater, container: ViewGroup?): SheetScrobblingBinding {
+        return SheetScrobblingBinding.inflate(inflater, container, false)
+    }
 
-	override fun onViewBindingCreated(binding: SheetScrobblingBinding, savedInstanceState: Bundle?) {
-		super.onViewBindingCreated(binding, savedInstanceState)
-		viewModel.scrobblingInfo.observe(viewLifecycleOwner, ::onScrobblingInfoChanged)
-		viewModel.onError.observeEvent(viewLifecycleOwner) {
-			Toast.makeText(binding.root.context, it.getDisplayMessage(binding.root.resources), Toast.LENGTH_SHORT)
-				.show()
-		}
+    override fun onViewBindingCreated(binding: SheetScrobblingBinding, savedInstanceState: Bundle?) {
+        super.onViewBindingCreated(binding, savedInstanceState)
+        viewModel.scrobblingInfo.observe(viewLifecycleOwner, ::onScrobblingInfoChanged)
+        viewModel.onError.observeEvent(viewLifecycleOwner) {
+            Toast.makeText(binding.root.context, it.getDisplayMessage(binding.root.resources), Toast.LENGTH_SHORT)
+                .show()
+        }
 
-		binding.spinnerStatus.onItemSelectedListener = this
-		binding.ratingBar.onRatingBarChangeListener = this
-		binding.buttonMenu.setOnClickListener(this)
-		binding.imageViewCover.setOnClickListener(this)
-		binding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
+        binding.spinnerStatus.onItemSelectedListener = this
+        binding.ratingBar.onRatingBarChangeListener = this
+        binding.buttonMenu.setOnClickListener(this)
+        binding.imageViewCover.setOnClickListener(this)
+        binding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
 
-		menu = PopupMenu(binding.root.context, binding.buttonMenu).apply {
-			inflate(R.menu.opt_scrobbling)
-			setOnMenuItemClickListener(this@ScrobblingInfoSheet)
-		}
-	}
+        menu = PopupMenu(binding.root.context, binding.buttonMenu).apply {
+            inflate(R.menu.opt_scrobbling)
+            setOnMenuItemClickListener(this@ScrobblingInfoSheet)
+        }
+    }
 
-	override fun onDestroyView() {
-		super.onDestroyView()
-		menu = null
-	}
+    override fun onDestroyView() {
+        super.onDestroyView()
+        menu = null
+    }
 
-	override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
-		val typeMask = WindowInsetsCompat.Type.systemBars()
-		viewBinding?.root?.updatePadding(
-			bottom = insets.getInsets(typeMask).bottom,
-		)
-		return insets.consume(v, typeMask, bottom = true)
-	}
+    override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
+        val typeMask = WindowInsetsCompat.Type.systemBars()
+        viewBinding?.root?.updatePadding(
+            bottom = insets.getInsets(typeMask).bottom,
+        )
+        return insets.consume(v, typeMask, bottom = true)
+    }
 
 
-	override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-		viewModel.updateScrobbling(
-			index = scrobblerIndex,
-			rating = requireViewBinding().ratingBar.rating / requireViewBinding().ratingBar.numStars,
-			status = ScrobblingStatus.entries.getOrNull(position),
-		)
-	}
+    override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+        viewModel.updateScrobbling(
+            index = scrobblerIndex,
+            rating = requireViewBinding().ratingBar.rating / requireViewBinding().ratingBar.numStars,
+            status = ScrobblingStatus.entries.getOrNull(position),
+        )
+    }
 
-	override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+    override fun onNothingSelected(parent: AdapterView<*>?) = Unit
 
-	override fun onRatingChanged(ratingBar: RatingBar, rating: Float, fromUser: Boolean) {
-		if (fromUser) {
-			viewModel.updateScrobbling(
-				index = scrobblerIndex,
-				rating = rating / ratingBar.numStars,
-				status = ScrobblingStatus.entries.getOrNull(requireViewBinding().spinnerStatus.selectedItemPosition),
-			)
-		}
-	}
+    override fun onRatingChanged(ratingBar: RatingBar, rating: Float, fromUser: Boolean) {
+        if (fromUser) {
+            viewModel.updateScrobbling(
+                index = scrobblerIndex,
+                rating = rating / ratingBar.numStars,
+                status = ScrobblingStatus.entries.getOrNull(requireViewBinding().spinnerStatus.selectedItemPosition),
+            )
+        }
+    }
 
-	override fun onClick(v: View) {
-		when (v.id) {
-			R.id.button_menu -> menu?.show()
-			R.id.imageView_cover -> router.openImage(
-				url = viewModel.scrobblingInfo.value.getOrNull(scrobblerIndex)?.coverUrl ?: return,
-				source = null,
-				anchor = v,
-			)
-		}
-	}
+    override fun onClick(v: View) {
+        when (v.id) {
+            R.id.button_menu -> menu?.show()
+            R.id.imageView_cover -> router.openImage(
+                url = viewModel.scrobblingInfo.value.getOrNull(scrobblerIndex)?.coverUrl ?: return,
+                source = null,
+                anchor = v,
+            )
+        }
+    }
 
-	private fun onScrobblingInfoChanged(scrobblings: List<ScrobblingInfo>) {
-		val scrobbling = scrobblings.getOrNull(scrobblerIndex)
-		if (scrobbling == null) {
-			dismissAllowingStateLoss()
-			return
-		}
-		val binding = viewBinding ?: return
-		binding.textViewTitle.text = scrobbling.title
-		binding.ratingBar.rating = scrobbling.rating * binding.ratingBar.numStars
-		binding.textViewDescription.text = scrobbling.description?.sanitize()
-		binding.spinnerStatus.setSelection(scrobbling.status?.ordinal ?: -1)
-		binding.imageViewLogo.contentDescription = getString(scrobbling.scrobbler.titleResId)
-		binding.imageViewLogo.setImageResource(scrobbling.scrobbler.iconResId)
-		binding.imageViewCover.setImageAsync(scrobbling.coverUrl)
-	}
+    private fun onScrobblingInfoChanged(scrobblings: List<ScrobblingInfo>) {
+        val scrobbling = scrobblings.getOrNull(scrobblerIndex)
+        if (scrobbling == null) {
+            dismissAllowingStateLoss()
+            return
+        }
+        val binding = viewBinding ?: return
+        binding.textViewTitle.text = scrobbling.title
+        binding.ratingBar.rating = scrobbling.rating * binding.ratingBar.numStars
+        binding.textViewDescription.text = scrobbling.description?.sanitize()
+        binding.spinnerStatus.setSelection(scrobbling.status?.ordinal ?: -1)
+        binding.imageViewLogo.contentDescription = getString(scrobbling.scrobbler.titleResId)
+        binding.imageViewLogo.setImageResource(scrobbling.scrobbler.iconResId)
+        binding.imageViewCover.setImageAsync(scrobbling.coverUrl)
+    }
 
-	override fun onMenuItemClick(item: MenuItem): Boolean {
-		when (item.itemId) {
-			R.id.action_browser -> {
-				val url = viewModel.scrobblingInfo.value.getOrNull(scrobblerIndex)?.externalUrl ?: return false
-				if (!router.openExternalBrowser(url, getString(R.string.open_in_browser))) {
-					Snackbar.make(
-						viewBinding?.textViewDescription ?: return false,
-						R.string.operation_not_supported,
-						Snackbar.LENGTH_SHORT,
-					).show()
-				}
-			}
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.action_incoming_progress -> {
+                val manga = viewModel.manga.value ?: return false
+                val service = viewModel.scrobblingInfo.value.getOrNull(scrobblerIndex)?.scrobbler ?: return false
+                org.koitharu.kotatsu.scrobbling.v2.IncomingProgressSheet.show(parentFragmentManager, manga.id, service.name)
+            }
+            R.id.action_browser -> {
+                val url = viewModel.scrobblingInfo.value.getOrNull(scrobblerIndex)?.externalUrl ?: return false
+                if (!router.openExternalBrowser(url, getString(R.string.open_in_browser))) {
+                    Snackbar.make(
+                        viewBinding?.textViewDescription ?: return false,
+                        R.string.operation_not_supported,
+                        Snackbar.LENGTH_SHORT,
+                    ).show()
+                }
+            }
 
-			R.id.action_unregister -> {
-				viewModel.unregisterScrobbling(scrobblerIndex)
-				dismiss()
-			}
+            R.id.action_unregister -> {
+                viewModel.unregisterScrobbling(scrobblerIndex)
+                dismiss()
+            }
 
-			R.id.action_edit -> {
-				val manga = viewModel.manga.value ?: return false
-				val scrobblerService = viewModel.scrobblingInfo.value.getOrNull(scrobblerIndex)?.scrobbler
-				activity?.router?.showScrobblingSelectorSheet(manga, scrobblerService)
-				dismiss()
-			}
-		}
-		return true
-	}
+            R.id.action_edit -> {
+                val manga = viewModel.manga.value ?: return false
+                val scrobblerService = viewModel.scrobblingInfo.value.getOrNull(scrobblerIndex)?.scrobbler
+                activity?.router?.showScrobblingSelectorSheet(manga, scrobblerService)
+                dismiss()
+            }
+
+            R.id.action_tracker_metadata -> {
+                val manga = viewModel.manga.value ?: return false
+                val service = viewModel.scrobblingInfo.value.getOrNull(scrobblerIndex)?.scrobbler ?: return false
+                org.koitharu.kotatsu.scrobbling.v2.TrackerMetadataPreviewSheet.show(parentFragmentManager, manga.id, service)
+            }
+        }
+        return true
+    }
 }

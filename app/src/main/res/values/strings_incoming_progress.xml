@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="incoming_progress_beta">Import tracker progress · Beta</string>
+    <string name="incoming_progress_notice">Review the exact source edition, branch and chapters. Tracker progress can refer to another edition or numbering scheme. No chapters are selected automatically.</string>
+    <string name="incoming_progress_preview">Verify account and preview</string>
+    <string name="incoming_progress_raw">Reported progress: %1$s · Volume: %2$s · Unit: %3$s</string>
+    <string name="incoming_progress_branch">Branch: %1$s</string>
+    <string name="incoming_progress_choose_branch">Choose branch</string>
+    <string name="incoming_progress_default_branch">Default branch</string>
+    <string name="incoming_progress_selected">Chapters selected as read: %1$d</string>
+    <string name="incoming_progress_choose_chapters">Choose exact read chapters</string>
+    <string name="incoming_progress_through">Select through reported chapter…</string>
+    <string name="incoming_progress_through_confirm">Select these %1$d numbered chapters as read? Unnumbered or ambiguous chapters are never inferred.</string>
+    <string name="incoming_progress_exact_consent">Enable exact chapter completion for this title. A later chapter does not imply that earlier chapters were read.</string>
+    <string name="incoming_progress_resume_preserved">Reading position stays unchanged unless you choose a new resume chapter.</string>
+    <string name="incoming_progress_resume_choose">Choose new resume chapter…</string>
+    <string name="incoming_progress_resume_clear">Keep existing reading position</string>
+    <string name="incoming_progress_confirm">Apply only the reviewed local changes? No tracker writes, favorites changes or reading time will be recorded.</string>
+    <string name="incoming_progress_applied">Reviewed progress applied locally.</string>
+    <string name="incoming_progress_refresh">Prepare a fresh preview</string>
+</resources>

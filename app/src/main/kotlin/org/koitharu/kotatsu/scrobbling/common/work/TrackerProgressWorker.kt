@@ -18,6 +18,7 @@ class TrackerProgressWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val library: TrackerLibraryRepository,
+    private val rawProgress: javax.inject.Provider<org.koitharu.kotatsu.scrobbling.v2.progress.OutgoingProgressCoordinator>,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val serviceId = inputData.getInt("service", 0)
@@ -31,6 +32,10 @@ class TrackerProgressWorker @AssistedInject constructor(
             val pending = store.read(account, manga) ?: return Result.success()
             if (!tracker.isEnabled || tracker.trackerRepository.cachedUser?.id != account) return Result.success()
             try {
+                if (rawProgress.get().ownsLegacyQueue(service.name, account, manga)) {
+                    store.discard(pending)
+                    return Result.success()
+                }
                 if (!tracker.syncProgress(pending)) {
                     store.discard(pending)
                     return Result.success()

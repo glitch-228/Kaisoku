@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_tools_no_titles">Нет подтверждённых изданий источников, связанных с этим аккаунтом. Сначала проверьте сопоставление.</string>
+</resources>

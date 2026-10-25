@@ -1,5 +1,11 @@
 package org.koitharu.kotatsu.scrobbling.kitsu.data
 
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerJson
+import org.koitharu.kotatsu.scrobbling.common.data.accountSession
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerElement
+import org.koitharu.kotatsu.scrobbling.common.data.raw
+import org.koitharu.kotatsu.scrobbling.common.data.obj
+import org.koitharu.kotatsu.scrobbling.common.data.array
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import okhttp3.FormBody
@@ -111,6 +117,47 @@ class KitsuRepository(
         return db.getScrobblingDao().delete(ScrobblerService.KITSU.id, mangaId, storage.requestSession().accountId)
     }
 
+    override suspend fun readRawEntry(mediaId: Long): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry? {
+        require(mediaId > 0)
+        val session = storage.requestSession()
+        val owner = requireNotNull(session.accountId)
+        val url = "$BASE_WEB_URL/api/edge/library-entries?filter[manga_id]=$mediaId&filter[user_id]=$owner&include=manga"
+        val json = okHttp.trackerCall(Request.Builder().url(url).get().build(), storage).rawTrackerJson()
+        val rows = json.array("data")
+        check(rows.size <= 1) { "Several Kitsu entries match; review the account" }
+        val row = rows.singleOrNull() ?: return null
+        val actual = row.obj("relationships").obj("manga").obj("data").raw("id")
+        require(actual == mediaId.toString()) { "Tracker returned another title" }
+        val metadata = getMangaInfo(mediaId)
+        require(metadata.id == mediaId) { "Tracker returned another title" }
+        storage.checkSession(session)
+        val title = org.koitharu.kotatsu.scrobbling.v2.TrackerTitle(mediaId.toString(), metadata.name,
+            coverUrl = metadata.cover, description = metadata.descriptionHtml, url = metadata.url)
+        return org.koitharu.kotatsu.scrobbling.common.data.TrackerRawRead.entry(ScrobblerService.KITSU,
+            owner.toString(), mediaId.toString(), title, row)
+    }
+
+    override val supportsRawWrites: Boolean get() = true
+
+    override suspend fun mutateRawEntry(
+        expected: org.koitharu.kotatsu.scrobbling.v2.TrackerReference,
+        patch: org.koitharu.kotatsu.scrobbling.v2.TrackerPatch,
+        allowCreate: Boolean,
+    ): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry =
+        org.koitharu.kotatsu.scrobbling.common.data.TrackerRawMutation.execute(
+            this, ScrobblerService.KITSU, okHttp, expected, patch, allowCreate,
+        )
+
+    override suspend fun readRawLibraryPage(cursor: String?): org.koitharu.kotatsu.scrobbling.v2.TrackerLibraryPage {
+        val session = accountSession()
+        return storage.withSession(session) {
+            val owner = readRawOwner()
+            org.koitharu.kotatsu.scrobbling.common.data.TrackerRawLibrary.read(
+                ScrobblerService.KITSU, owner, session.revision, cursor,
+            ) { request -> okHttp.trackerCall(request, storage).rawTrackerElement() }
+        }
+    }
+
     override suspend fun fetchLibrary(): List<TrackerLibraryEntry> {
         val owner = requireNotNull(storage.requestSession().accountId)
         return collectTrackerLibraryPages { _, offset ->
@@ -216,6 +263,14 @@ class KitsuRepository(
             .url("$BASE_WEB_URL/api/edge/library-entries/$rateId?include=manga")
             .patch(payload.toKitsuRequestBody())
         val response = okHttp.trackerCall(request.build(), storage).parseJson().ensureSuccess().getJSONObject("data")
+        saveRate(response, mangaId)
+    }
+
+    override suspend fun updateStatus(rateId: Int, mangaId: Long, status: String) {
+        val payload = JSONObject().put("data", JSONObject().put("type", "libraryEntries").put("id", rateId)
+            .put("attributes", org.koitharu.kotatsu.scrobbling.v2.LegacyStatusPatch.json(ScrobblerService.KITSU, status)))
+        val response = okHttp.trackerCall(Request.Builder().url("$BASE_WEB_URL/api/edge/library-entries/$rateId?include=manga")
+            .patch(payload.toKitsuRequestBody()).build(), storage).parseJson().ensureSuccess().getJSONObject("data")
         saveRate(response, mangaId)
     }
 

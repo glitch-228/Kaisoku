@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_categories_beta">Статус трекера по категориям · Бета</string>
+    <string name="tracker_categories_summary">Настройка для каждого аккаунта с проверкой конфликтов. Выключено до подтверждения.</string>
+    <string name="tracker_categories_notice">Изменение категории может автоматически изменить статус в трекере. Сначала проверьте аккаунт и издание. Противоречия ожидают решения. Удаление последней связанной категории не удаляет запись трекера и не меняет прогресс.</string>
+    <string name="tracker_categories_verify">Проверить подключённый аккаунт…</string>
+    <string name="tracker_categories_enable">Включить после проверки правил</string>
+    <string name="tracker_categories_add">Связать категорию со статусом…</string>
+    <string name="tracker_categories_review">Проверить правила и существующие записи…</string>
+    <string name="tracker_categories_review_notice">Сейчас изменятся только отмеченные записи. После подтверждения правила будут применяться при последующих изменениях категорий. По умолчанию ничего не выбрано.</string>
+    <string name="tracker_categories_disable">Выключить правила этого аккаунта</string>
+    <string name="tracker_categories_pending">Ожидают решения: %1$d</string>
+    <string name="tracker_categories_resolve">Выбрать статус при конфликте…</string>
+    <string name="tracker_categories_check">Проверить статус в трекере</string>
+    <string name="tracker_categories_retry_notice">Повторно проверить аккаунт, издание и категории, затем повторить изменение статуса? Другие поля трекера сохранятся.</string>
+    <string name="tracker_categories_conflict">Противоречивые статусы категорий</string>
+    <string name="tracker_categories_unmapped">Статус не изменится</string>
+    <string name="tracker_categories_ready">Ожидает отправки проверенного статуса</string>
+    <string name="tracker_categories_sending">Отправка статуса</string>
+    <string name="tracker_categories_needs_review">Приостановлено до проверки</string>
+    <string name="tracker_categories_wont_read">Не буду читать</string>
+    <string name="tracker_categories_previous">Предыдущие решения</string>
+</resources>

@@ -1,5 +1,11 @@
 package org.koitharu.kotatsu.scrobbling.mal.data
 
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerJson
+import org.koitharu.kotatsu.scrobbling.common.data.accountSession
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerElement
+import org.koitharu.kotatsu.scrobbling.common.data.raw
+import org.koitharu.kotatsu.scrobbling.common.data.obj
+import org.koitharu.kotatsu.scrobbling.common.data.array
 import android.content.Context
 import android.util.Base64
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -102,6 +108,44 @@ class MALRepository @Inject constructor(
         return db.getScrobblingDao().delete(ScrobblerService.MAL.id, mangaId, storage.requestSession().accountId)
     }
 
+    override suspend fun readRawEntry(mediaId: Long): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry? {
+        require(mediaId > 0)
+        val session = storage.requestSession()
+        val url = "$BASE_API_URL/manga/$mediaId".toHttpUrl().newBuilder()
+            .addQueryParameter("fields", "my_list_status{status,score,num_chapters_read,num_volumes_read,comments,updated_at,is_rereading},synopsis")
+            .build()
+        val json = okHttp.trackerCall(Request.Builder().url(url).get().build(), storage).rawTrackerJson()
+        require(json.raw("id") == mediaId.toString()) { "Tracker returned another title" }
+        val row = json["my_list_status"] as? kotlinx.serialization.json.JsonObject ?: return null
+        val title = org.koitharu.kotatsu.scrobbling.v2.TrackerTitle(mediaId.toString(), requireNotNull(json.raw("title")),
+            coverUrl = (json["main_picture"] as? kotlinx.serialization.json.JsonObject)?.raw("large"),
+            description = json.raw("synopsis"), url = "https://myanimelist.net/manga/$mediaId")
+        storage.checkSession(session)
+        return org.koitharu.kotatsu.scrobbling.common.data.TrackerRawRead.entry(ScrobblerService.MAL,
+            requireNotNull(session.accountId).toString(), mediaId.toString(), title, row)
+    }
+
+    override val supportsRawWrites: Boolean get() = true
+
+    override suspend fun mutateRawEntry(
+        expected: org.koitharu.kotatsu.scrobbling.v2.TrackerReference,
+        patch: org.koitharu.kotatsu.scrobbling.v2.TrackerPatch,
+        allowCreate: Boolean,
+    ): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry =
+        org.koitharu.kotatsu.scrobbling.common.data.TrackerRawMutation.execute(
+            this, ScrobblerService.MAL, okHttp, expected, patch, allowCreate,
+        )
+
+    override suspend fun readRawLibraryPage(cursor: String?): org.koitharu.kotatsu.scrobbling.v2.TrackerLibraryPage {
+        val session = accountSession()
+        return storage.withSession(session) {
+            val owner = readRawOwner()
+            org.koitharu.kotatsu.scrobbling.common.data.TrackerRawLibrary.read(
+                ScrobblerService.MAL, owner, session.revision, cursor,
+            ) { request -> okHttp.trackerCall(request, storage).rawTrackerElement() }
+        }
+    }
+
     override suspend fun fetchLibrary(): List<TrackerLibraryEntry> = collectTrackerLibraryPages { _, offset ->
         val url = "$BASE_API_URL/users/@me/mangalist".toHttpUrl().newBuilder()
             .addQueryParameter("limit", "100").addQueryParameter("offset", offset.toString()).addQueryParameter("nsfw", "true")
@@ -178,6 +222,15 @@ class MALRepository @Inject constructor(
             .put(body.build())
             .build()
         val response = okHttp.trackerCall(request, storage).parseJson()
+        saveRate(response, mangaId, rateId.toLong())
+    }
+
+    override suspend fun updateStatus(rateId: Int, mangaId: Long, status: String) {
+        val fields = org.koitharu.kotatsu.scrobbling.v2.LegacyStatusPatch.fields(ScrobblerService.MAL, status)
+        val body = FormBody.Builder().apply { fields.forEach { (key, value) -> add(key, value.toString()) } }.build()
+        val url = BASE_API_URL.toHttpUrl().newBuilder().addPathSegment("manga")
+            .addPathSegment(rateId.toString()).addPathSegment("my_list_status").build()
+        val response = okHttp.trackerCall(Request.Builder().url(url).put(body).build(), storage).parseJson()
         saveRate(response, mangaId, rateId.toLong())
     }
 

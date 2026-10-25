@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_bulk_title">Saved tracker review · Beta</string>
+    <string name="tracker_bulk_notice">Choose up to 100 titles per batch. Suggestions require confirmation of the readable source edition. Drafts stay privately on this device. Progress and metadata imports are separate actions.</string>
+    <string name="tracker_bulk_read_only">Remote additions are unavailable in this account lane. Add missing entries on the tracker, then check again. Existing remote entries can be linked and imported locally.</string>
+    <string name="tracker_bulk_list_complete">%1$d entries loaded · complete list</string>
+    <string name="tracker_bulk_list_partial">%1$d entries loaded · partial list; further pages may be available</string>
+    <string name="tracker_bulk_import_selected">Select remote entries to import</string>
+    <string name="tracker_bulk_saved_drafts">Saved drafts: %1$d</string>
+    <string name="tracker_bulk_rebind">Review draft with this verified session</string>
+    <string name="tracker_bulk_rebind_notice">Use the newly verified session for this same account? Unsent choices need confirmation again. Interrupted additions remain readback only.</string>
+    <string name="tracker_bulk_review_items">Review draft items</string>
+    <string name="tracker_bulk_search_unresolved">Search unresolved titles</string>
+    <string name="tracker_bulk_discard">Discard this saved draft</string>
+    <string name="tracker_bulk_discard_notice">Discard these saved choices? Applied local links and remote additions are retained.</string>
+    <string name="tracker_bulk_readback_notice">Check the remote entry and finish only its reviewed local link. This never resends a remote addition.</string>
+    <string name="tracker_bulk_search_notice">Search for a tracker match for this exact source edition? An existing link is retained until you confirm a replacement.</string>
+    <string name="tracker_bulk_choose_source">Choose an enabled readable source</string>
+    <string name="tracker_bulk_choose_edition">Choose the source edition and language</string>
+    <string name="tracker_bulk_choose_category">Choose the destination category</string>
+    <string name="tracker_bulk_addition">May add this missing title to the remote list</string>
+    <string name="tracker_bulk_final_review">Review selected links and additions</string>
+    <string name="tracker_bulk_apply_notice">Apply %1$d reviewed items? %2$d items allow a remote addition if missing. Local imports add only the chosen category. Existing reading progress, dates and other memberships are preserved.</string>
+    <string name="tracker_bulk_operation_failed">This operation stopped. Saved choices and completed items remain available.</string>
+    <string name="tracker_bulk_validate_website">Validate Anime-Planet writes</string>
+    <string name="tracker_bulk_validate_notice">Send the existing status of this entry unchanged and read it back to validate website write access? This is an explicit tracker request.</string>
+    <string name="tracker_bulk_matching">Match favorites</string>
+    <string name="tracker_bulk_importing">Import remote list</string>
+    <string name="tracker_bulk_state_unresolved">Unresolved</string>
+    <string name="tracker_bulk_state_suggested">Suggestion · confirm edition</string>
+    <string name="tracker_bulk_state_retained">Existing link retained</string>
+    <string name="tracker_bulk_state_confirmed">Confirmed · ready for final review</string>
+    <string name="tracker_bulk_state_creating">Sending addition</string>
+    <string name="tracker_bulk_state_readback">Check remote entry</string>
+    <string name="tracker_bulk_state_link">Remote entry verified · finish local link</string>
+    <string name="tracker_bulk_state_applied">Applied</string>
+    <string name="tracker_bulk_state_failed">Stopped · review and retry</string>
+    <string name="tracker_bulk_state_skipped">Skipped</string>
+    <string name="tracker_bulk_search_again">Search this title again</string>
+    <string name="tracker_bulk_no_results">This source returned no readable result. The unresolved entry remains in the draft; try another source or query.</string>
+    <string name="tracker_bulk_no_categories">Create a favorites category first, then return to this saved draft.</string>
+    <string name="tracker_bulk_cooldown">Provider cooldown until %1$s</string>
+    <string name="tracker_bulk_creation_race">This provider cannot reserve an absent entry. If another app adds it during the request, its status may become Planning. Confirm additions only if you accept this possibility.</string>
+</resources>

@@ -1,5 +1,10 @@
 package org.koitharu.kotatsu.scrobbling.anilist.data
 
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerJson
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerElement
+import org.koitharu.kotatsu.scrobbling.common.data.raw
+import org.koitharu.kotatsu.scrobbling.common.data.obj
+import org.koitharu.kotatsu.scrobbling.common.data.array
 import android.content.Context
 import androidx.core.content.edit
 import androidx.work.BackoffPolicy
@@ -261,6 +266,53 @@ class AniListRepository @Inject constructor(
         }
     }
 
+    override suspend fun readRawEntry(mediaId: Long): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry? {
+        require(mediaId > 0)
+        val session = storage.requestSession()
+        val owner = requireNotNull(session.accountId)
+        val query = "query { MediaList(mediaId: $mediaId, userId: $owner, type: MANGA) { id userId mediaId status progress progressVolumes score notes updatedAt } }"
+        val body = JSONObject().put("query", query).toString().toRequestBody("application/json".toMediaType())
+        val json = okHttp.trackerCall(Request.Builder().url(ENDPOINT).post(body).build(), storage).rawTrackerJson()
+        val errors = json["errors"] as? kotlinx.serialization.json.JsonArray
+        if (!errors.isNullOrEmpty()) {
+            val missing = errors.all { (it as? kotlinx.serialization.json.JsonObject)?.raw("status") == "404" }
+            if (missing) return null
+            throw java.io.IOException("AniList rejected the incoming-progress query")
+        }
+        val row = json.obj("data")["MediaList"] as? kotlinx.serialization.json.JsonObject ?: return null
+        require(row.raw("userId") == owner.toString() && row.raw("mediaId") == mediaId.toString()) {
+            "Tracker returned another entry or account"
+        }
+        val metadata = getMangaInfo(mediaId)
+        require(metadata.id == mediaId) { "Tracker returned another title" }
+        storage.checkSession(session)
+        val title = org.koitharu.kotatsu.scrobbling.v2.TrackerTitle(mediaId.toString(), metadata.name,
+            coverUrl = metadata.cover, description = metadata.descriptionHtml, url = metadata.url)
+        return org.koitharu.kotatsu.scrobbling.common.data.TrackerRawRead.entry(ScrobblerService.ANILIST,
+            owner.toString(), mediaId.toString(), title, row)
+    }
+
+    override val supportsRawWrites: Boolean get() = true
+
+    override suspend fun mutateRawEntry(
+        expected: org.koitharu.kotatsu.scrobbling.v2.TrackerReference,
+        patch: org.koitharu.kotatsu.scrobbling.v2.TrackerPatch,
+        allowCreate: Boolean,
+    ): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry =
+        org.koitharu.kotatsu.scrobbling.common.data.TrackerRawMutation.execute(
+            this, ScrobblerService.ANILIST, okHttp, expected, patch, allowCreate,
+        )
+
+    override suspend fun readRawLibraryPage(cursor: String?): org.koitharu.kotatsu.scrobbling.v2.TrackerLibraryPage {
+        val session = accountSession()
+        return storage.withSession(session) {
+            val owner = readRawOwner()
+            org.koitharu.kotatsu.scrobbling.common.data.TrackerRawLibrary.read(
+                ScrobblerService.ANILIST, owner, session.revision, cursor,
+            ) { request -> okHttp.trackerCall(request, storage).rawTrackerElement() }
+        }
+    }
+
     override suspend fun fetchLibrary(): List<TrackerLibraryEntry> {
         val owner = requireNotNull(storage.requestSession().accountId)
         return refreshLibrary(owner, force = true, syncLinks = false).map { entry ->
@@ -420,6 +472,16 @@ class AniListRepository @Inject constructor(
                 if (current?.targetId == targetId && current.id == rateId) pushProgress(rateId, mangaId, chapter)
             } } },
         )
+    }
+
+    override suspend fun updateStatus(rateId: Int, mangaId: Long, status: String) {
+        org.koitharu.kotatsu.scrobbling.v2.LegacyStatusPatch.fields(ScrobblerService.ANILIST, status)
+        val response = doRequest(REQUEST_MUTATION, """
+            SaveMediaListEntry(id: $rateId, status: $status) {
+                id mediaId status notes score(format: POINT_100) progress
+            }
+        """)
+        saveRate(response.getJSONObject("data").getJSONObject("SaveMediaListEntry"), mangaId)
     }
 
     override suspend fun updateRate(

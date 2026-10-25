@@ -1,0 +1,17 @@
+<resources>
+    <string name="outgoing_progress_beta">Отправка прогресса · Бета</string>
+    <string name="outgoing_progress_notice">Автоматическая отправка изначально выключена. Проверьте аккаунт, издание и ветку. Данные сервиса могут измениться между проверкой и сохранением. Неопределённый результат требует проверки. Пустые поля не меняются.</string>
+    <string name="outgoing_progress_enable">Включить автоматическую отправку…</string>
+    <string name="outgoing_progress_disable">Выключить автоматическую отправку</string>
+    <string name="outgoing_progress_automatic_notice">Отправляется только подтверждённое завершение главы. Для нового режима отдельно включите точный учёт прочитанных глав в каждом произведении. Для остальных сохраняется прежний режим. Некоторые сервисы не принимают дробные номера. Произведения автоматически не добавляются.</string>
+    <string name="outgoing_progress_manual">Проверить отправку прогресса…</string>
+    <string name="outgoing_progress_check">Проверить результат на сервисе</string>
+    <string name="outgoing_progress_chapter">Номер главы (необязательно)</string>
+    <string name="outgoing_progress_volume">Том (необязательно)</string>
+    <string name="outgoing_progress_entry">ID главы (вместо номера)</string>
+    <string name="outgoing_progress_preview">Проверка прогресса</string>
+    <string name="outgoing_progress_values">На сервисе: глава %1$s, том %2$s, ID %3$s\nВыбрано: глава %4$s, том %5$s, ID %6$s</string>
+    <string name="outgoing_progress_allow_lower">Заменить больший прогресс на меньший</string>
+    <string name="outgoing_progress_allow_unknown">Заменить неизвестный или нечисловой прогресс</string>
+    <string name="outgoing_progress_confirm">Подтвердить отправку</string>
+</resources>

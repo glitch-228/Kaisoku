@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_tools_beta">Tracker tools · Beta</string>
+    <string name="tracker_tools_summary">Review tracker metadata, bulk matches, category statuses and Beta website connections.</string>
+    <string name="tracker_tools_refresh">Refresh</string>
+    <string name="tracker_metadata_beta">Use tracker metadata · Beta</string>
+    <string name="tracker_metadata_title">Title</string>
+    <string name="tracker_metadata_notice">Select each field to replace its local override. Source metadata, reading progress and tracker status are preserved.</string>
+    <string name="tracker_metadata_field_preview">Current:\n%1$s\n\nTracker:\n%2$s</string>
+    <string name="tracker_tools_connect_comick">Connect Comick</string>
+    <string name="tracker_tools_comick_client">Registered Comick public client ID</string>
+    <string name="tracker_tools_comick_notice">Register a public native client with this callback: %1$s. Read access and synchronization writes require separate consent. Your password is entered only in the system browser.</string>
+    <string name="tracker_tools_comick_write">Request permission to update the Comick list</string>
+    <string name="tracker_tools_auth_done">Tracker connected</string>
+    <string name="tracker_tools_auth_restart">Authorization is unavailable or expired. Start a new connection from Tracker tools.</string>
+    <string name="tracker_tools_beta_notice">Beta: verify the account and each source edition. Title matches can be wrong. Opening this screen sends no request; remote additions require separate confirmation.</string>
+    <string name="tracker_tools_website_login">Sign in to Anime-Planet</string>
+    <string name="tracker_tools_verify_account">Verify account</string>
+    <string name="tracker_tools_library">Browse tracker list</string>
+    <string name="tracker_tools_bulk">Match selected favorites</string>
+    <string name="tracker_tools_disconnect">Disconnect</string>
+    <string name="tracker_tools_next">Next page</string>
+    <string name="tracker_tools_unresolved">Needs review</string>
+    <string name="tracker_tools_apply_selected">Apply confirmed matches</string>
+    <string name="tracker_tools_apply_notice">Link only the confirmed titles. Items with explicit permission may be added to the remote list as Planning. Reading progress and favorite categories are preserved.</string>
+    <string name="tracker_tools_confirm_edition">Tracker: %1$s\nLocal: %2$s\nSource: %3$s\n\nConfirm that these are the same work and edition.</string>
+    <string name="tracker_tools_allow_remote_add">Allow adding this title to the remote list if missing</string>
+    <string name="tracker_tools_confirm_match">Confirm match</string>
+    <string name="tracker_tools_not_connected">Not connected</string>
+    <string name="tracker_tools_library_count">Choose from %1$d loaded titles</string>
+</resources>

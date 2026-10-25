@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_bulk_title">Сохранённая проверка трекера · Бета</string>
+    <string name="tracker_bulk_notice">Выберите до 100 произведений за раз. Подсказки требуют подтверждения источника и издания. Черновики хранятся только на этом устройстве. Прогресс и метаданные импортируются отдельно.</string>
+    <string name="tracker_bulk_read_only">Добавление в список трекера недоступно для этого подключения. Добавьте отсутствующее произведение на сайте трекера и проверьте снова. Существующие записи можно связать и импортировать локально.</string>
+    <string name="tracker_bulk_list_complete">Загружено записей: %1$d · полный список</string>
+    <string name="tracker_bulk_list_partial">Загружено записей: %1$d · список неполный, могут быть другие страницы</string>
+    <string name="tracker_bulk_import_selected">Выбрать записи трекера для импорта</string>
+    <string name="tracker_bulk_saved_drafts">Сохранённые черновики: %1$d</string>
+    <string name="tracker_bulk_rebind">Проверить черновик с этим подключением</string>
+    <string name="tracker_bulk_rebind_notice">Использовать новое проверенное подключение того же аккаунта? Неотправленные изменения потребуют повторного подтверждения. Для прерванных добавлений доступна только проверка записи.</string>
+    <string name="tracker_bulk_review_items">Проверить элементы черновика</string>
+    <string name="tracker_bulk_search_unresolved">Найти несопоставленные произведения</string>
+    <string name="tracker_bulk_discard">Удалить этот черновик</string>
+    <string name="tracker_bulk_discard_notice">Удалить сохранённый выбор? Уже применённые связи и добавления в трекере сохранятся.</string>
+    <string name="tracker_bulk_readback_notice">Проверить запись трекера и завершить подтверждённую локальную связь. Повторное добавление в трекер не отправляется.</string>
+    <string name="tracker_bulk_search_notice">Найти соответствие в трекере для этого издания? Существующая связь сохранится до подтверждения замены.</string>
+    <string name="tracker_bulk_choose_source">Выберите включённый источник для чтения</string>
+    <string name="tracker_bulk_choose_edition">Выберите издание и язык</string>
+    <string name="tracker_bulk_choose_category">Выберите категорию назначения</string>
+    <string name="tracker_bulk_addition">Разрешено добавление отсутствующего произведения в трекер</string>
+    <string name="tracker_bulk_final_review">Проверьте связи и добавления</string>
+    <string name="tracker_bulk_apply_notice">Применить выбранные элементы: %1$d? Для %2$d разрешено добавление в трекер при отсутствии записи. Локальный импорт добавляет только выбранную категорию. Прогресс чтения, даты и другие категории сохранятся.</string>
+    <string name="tracker_bulk_operation_failed">Операция остановлена. Сохранённый выбор и завершённые элементы доступны для проверки.</string>
+    <string name="tracker_bulk_validate_website">Проверить запись в Anime-Planet</string>
+    <string name="tracker_bulk_validate_notice">Отправить существующий статус без изменений и прочитать его для проверки права записи на сайте? Будет выполнен явный запрос к трекеру.</string>
+    <string name="tracker_bulk_matching">Сопоставление избранного</string>
+    <string name="tracker_bulk_importing">Импорт списка трекера</string>
+    <string name="tracker_bulk_state_unresolved">Не сопоставлено</string>
+    <string name="tracker_bulk_state_suggested">Подсказка · подтвердите издание</string>
+    <string name="tracker_bulk_state_retained">Существующая связь сохранена</string>
+    <string name="tracker_bulk_state_confirmed">Подтверждено · готово к итоговой проверке</string>
+    <string name="tracker_bulk_state_creating">Отправка добавления</string>
+    <string name="tracker_bulk_state_readback">Проверьте запись трекера</string>
+    <string name="tracker_bulk_state_link">Запись проверена · завершите локальную связь</string>
+    <string name="tracker_bulk_state_applied">Применено</string>
+    <string name="tracker_bulk_state_failed">Остановлено · проверьте и повторите</string>
+    <string name="tracker_bulk_state_skipped">Пропущено</string>
+    <string name="tracker_bulk_search_again">Повторить поиск этого произведения</string>
+    <string name="tracker_bulk_no_results">Источник не вернул доступных результатов. Запись сохранена в черновике; попробуйте другой источник или запрос.</string>
+    <string name="tracker_bulk_no_categories">Сначала создайте категорию избранного, затем вернитесь к этому черновику.</string>
+    <string name="tracker_bulk_cooldown">Ограничение трекера до %1$s</string>
+    <string name="tracker_bulk_creation_race">Трекер не позволяет зарезервировать отсутствующую запись. Если другое приложение добавит её во время запроса, статус может измениться на «Запланировано». Подтверждайте добавление, только если это допустимо.</string>
+</resources>

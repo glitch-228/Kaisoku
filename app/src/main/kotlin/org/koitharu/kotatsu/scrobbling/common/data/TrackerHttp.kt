@@ -16,9 +16,14 @@ suspend fun OkHttpClient.trackerCall(request: Request, storage: ScrobblerStorage
         return response
     }
     val session = storage.requestSession()
-    val call = newCall(request.newBuilder().tag(TrackerSession::class.java, session).build())
+    val guarded = kotlinx.coroutines.currentCoroutineContext()[TrackerRequestGuard] != null
+    // A reviewed automatic patch must not be resent by connection recovery or token authenticators.
+    val transport = if (guarded) newBuilder().retryOnConnectionFailure(false)
+        .authenticator(okhttp3.Authenticator.NONE).build() else this
+    val call = transport.newCall(request.newBuilder().tag(TrackerSession::class.java, session).build())
     val response = storage.requestGate.execute {
         storage.checkSession(session)
+        checkTrackerRequestGuard()
         call.await().also { storage.requestGate.update(it) }
     }
     try {

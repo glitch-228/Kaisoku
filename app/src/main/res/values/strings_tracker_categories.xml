@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_categories_beta">Tracker status from categories · Beta</string>
+    <string name="tracker_categories_summary">Review account-specific mappings and resolve conflicting statuses. Off until enabled and confirmed.</string>
+    <string name="tracker_categories_notice">Mapped category changes can update tracker status automatically. Verify the account and title edition first. Conflicting categories stay pending. Removing the last mapped category does not remove a tracker entry or change its progress.</string>
+    <string name="tracker_categories_verify">Verify connected account…</string>
+    <string name="tracker_categories_enable">Enable after reviewing these mappings</string>
+    <string name="tracker_categories_add">Map a category…</string>
+    <string name="tracker_categories_review">Review mappings and existing titles…</string>
+    <string name="tracker_categories_review_notice">Only checked existing titles will be updated now. After confirmation, future actual membership changes use these mappings. Nothing is selected by default.</string>
+    <string name="tracker_categories_disable">Disable this account’s mappings now</string>
+    <string name="tracker_categories_pending">Pending decisions: %1$d</string>
+    <string name="tracker_categories_resolve">Choose status for this conflict…</string>
+    <string name="tracker_categories_check">Check remote status</string>
+    <string name="tracker_categories_retry_notice">Recheck this account, title edition and current categories, then retry this status change? Other tracker fields will be preserved.</string>
+    <string name="tracker_categories_conflict">Conflicting category statuses</string>
+    <string name="tracker_categories_unmapped">No status change</string>
+    <string name="tracker_categories_ready">Waiting to send reviewed status</string>
+    <string name="tracker_categories_sending">Sending status</string>
+    <string name="tracker_categories_needs_review">Paused for review</string>
+    <string name="tracker_categories_wont_read">Won’t read</string>
+    <string name="tracker_categories_previous">Previous decisions</string>
+</resources>

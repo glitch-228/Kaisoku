@@ -1,5 +1,11 @@
 package org.koitharu.kotatsu.scrobbling.shikimori.data
 
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerJson
+import org.koitharu.kotatsu.scrobbling.common.data.accountSession
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerElement
+import org.koitharu.kotatsu.scrobbling.common.data.raw
+import org.koitharu.kotatsu.scrobbling.common.data.obj
+import org.koitharu.kotatsu.scrobbling.common.data.array
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import okhttp3.FormBody
@@ -105,6 +111,49 @@ class ShikimoriRepository @Inject constructor(
         storage.clear()
     }
 
+    override suspend fun readRawEntry(mediaId: Long): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry? {
+        require(mediaId > 0)
+        val session = storage.requestSession()
+        val owner = requireNotNull(session.accountId)
+        val url = "${BASE_URL}api/v2/user_rates".toHttpUrl().newBuilder()
+            .addQueryParameter("user_id", owner.toString()).addQueryParameter("target_id", mediaId.toString())
+            .addQueryParameter("target_type", "Manga").build()
+        val rows = okHttp.trackerCall(Request.Builder().url(url).get().build(), storage).rawTrackerElement()
+            as? kotlinx.serialization.json.JsonArray ?: error("Invalid Shikimori list response")
+        check(rows.size <= 1) { "Several Shikimori entries match; review the account" }
+        val row = rows.singleOrNull() as? kotlinx.serialization.json.JsonObject ?: return null
+        require(row.raw("target_id") == mediaId.toString() && row.raw("user_id") == owner.toString() &&
+            row.raw("target_type") == "Manga") { "Tracker returned another entry or account" }
+        val metadata = getMangaInfo(mediaId)
+        require(metadata.id == mediaId) { "Tracker returned another title" }
+        storage.checkSession(session)
+        val title = org.koitharu.kotatsu.scrobbling.v2.TrackerTitle(mediaId.toString(), metadata.name,
+            coverUrl = metadata.cover, description = metadata.descriptionHtml, url = metadata.url)
+        return org.koitharu.kotatsu.scrobbling.common.data.TrackerRawRead.entry(ScrobblerService.SHIKIMORI,
+            owner.toString(), mediaId.toString(), title, row)
+    }
+
+    override val supportsRawWrites: Boolean get() = true
+
+    override suspend fun mutateRawEntry(
+        expected: org.koitharu.kotatsu.scrobbling.v2.TrackerReference,
+        patch: org.koitharu.kotatsu.scrobbling.v2.TrackerPatch,
+        allowCreate: Boolean,
+    ): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry =
+        org.koitharu.kotatsu.scrobbling.common.data.TrackerRawMutation.execute(
+            this, ScrobblerService.SHIKIMORI, okHttp, expected, patch, allowCreate,
+        )
+
+    override suspend fun readRawLibraryPage(cursor: String?): org.koitharu.kotatsu.scrobbling.v2.TrackerLibraryPage {
+        val session = accountSession()
+        return storage.withSession(session) {
+            val owner = readRawOwner()
+            org.koitharu.kotatsu.scrobbling.common.data.TrackerRawLibrary.read(
+                ScrobblerService.SHIKIMORI, owner, session.revision, cursor,
+            ) { request -> okHttp.trackerCall(request, storage).rawTrackerElement() }
+        }
+    }
+
     override suspend fun fetchLibrary(): List<TrackerLibraryEntry> {
         val owner = requireNotNull(storage.requestSession().accountId)
         return collectTrackerLibraryPages { page, _ ->
@@ -195,6 +244,15 @@ class ShikimoriRepository @Inject constructor(
             .build()
         val request = Request.Builder().url(url).patch(payload.toRequestBody()).build()
         val response = okHttp.trackerCall(request, storage).parseJson()
+        saveRate(response, mangaId)
+    }
+
+    override suspend fun updateStatus(rateId: Int, mangaId: Long, status: String) {
+        val payload = JSONObject().put("user_rate",
+            org.koitharu.kotatsu.scrobbling.v2.LegacyStatusPatch.json(ScrobblerService.SHIKIMORI, status))
+        val url = BASE_URL.toHttpUrl().newBuilder().addPathSegment("api").addPathSegment("v2")
+            .addPathSegment("user_rates").addPathSegment(rateId.toString()).build()
+        val response = okHttp.trackerCall(Request.Builder().url(url).patch(payload.toRequestBody()).build(), storage).parseJson()
         saveRate(response, mangaId)
     }
 

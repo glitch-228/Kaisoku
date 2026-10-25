@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import org.koitharu.kotatsu.scrobbling.common.data.accountSession
 import org.koitharu.kotatsu.scrobbling.common.data.withSession
+import org.koitharu.kotatsu.scrobbling.common.data.withTrackerRequestGuard
 import org.koitharu.kotatsu.scrobbling.common.data.requestSession
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.parser.MangaRepository
@@ -108,6 +109,10 @@ abstract class Scrobbler(
     }
 
     private suspend fun scrobbleWithAccount(manga: Manga, chapterId: Long) {
+        val entity = db.getScrobblingDao().find(scrobblerService.id, manga.id,
+            trackerRepository.storage.requestSession().accountId) ?: return
+        val owner = outgoingRawOwner(entity.mangaId)
+        if (!outgoingLinkCurrent(entity, owner)) return
         var chapters = manga.chapters
         if (chapters.isNullOrEmpty()) {
             chapters = mangaRepositoryFactory.create(manga.source).getDetails(manga).chapters
@@ -122,8 +127,7 @@ abstract class Scrobbler(
             chapters = chapters.filter { x -> x.branch == chapter.branch }
             chapters.indexOf(chapter) + 1
         }
-        val entity = db.getScrobblingDao().find(scrobblerService.id, manga.id, trackerRepository.storage.requestSession().accountId) ?: return
-        trackerRepository.updateRate(entity.id, entity.mangaId, number)
+        withOutgoingLinkGuard(entity, owner) { trackerRepository.updateRate(entity.id, entity.mangaId, number) }
 
     }
 
@@ -135,10 +139,40 @@ abstract class Scrobbler(
             trackerRepository.storage.mutationMutex.withLock {
                 val link = db.getScrobblingDao().find(scrobblerService.id, pending.mangaId, pending.accountId)
                 if (link?.targetId != pending.targetId || link.id != pending.rateId) return@withLock false
-                trackerRepository.updateRate(link.id, link.mangaId, pending.chapter)
+                val owner = outgoingRawOwner(link.mangaId)
+                if (!outgoingLinkCurrent(link, owner)) return@withLock false
+                withOutgoingLinkGuard(link, owner) { trackerRepository.updateRate(link.id, link.mangaId, pending.chapter) }
                 true
             }
         }
+    }
+
+    private suspend fun outgoingRawOwner(mangaId: Long): org.koitharu.kotatsu.scrobbling.v2.TrackerOwner? =
+        if (db.getTrackerLinkV2Dao().providerManga(scrobblerService.name, mangaId).isEmpty()) null
+        else trackerRepository.readRawOwner().also { require(it.provider == scrobblerService.name) }
+
+    private suspend fun withOutgoingLinkGuard(entity: ScrobblingEntity,
+        owner: org.koitharu.kotatsu.scrobbling.v2.TrackerOwner?, block: suspend () -> Unit) {
+        check(outgoingLinkCurrent(entity, owner)) {
+            "Tracker link changed; review its source edition before syncing progress"
+        }
+        if (owner == null) block() // Preserve the original numeric lane's authentication/retry behavior.
+        else withTrackerRequestGuard({ check(outgoingLinkCurrent(entity, owner)) {
+            "Tracker link changed; review its source edition before syncing progress"
+        } }, block)
+    }
+
+    private suspend fun outgoingLinkCurrent(entity: ScrobblingEntity,
+        owner: org.koitharu.kotatsu.scrobbling.v2.TrackerOwner?): Boolean {
+        val session = trackerRepository.storage.requestSession()
+        val latest = db.getScrobblingDao().find(scrobblerService.id, entity.mangaId, entity.accountId)
+        if (session.accountId != entity.accountId || latest?.id != entity.id || latest.targetId != entity.targetId) return false
+        val links = db.getTrackerLinkV2Dao().providerManga(scrobblerService.name, entity.mangaId)
+        if (links.isEmpty()) return true
+        if (owner == null) return false // A v2 correction arrived after the original session snapshot.
+        val current = links.singleOrNull { it.accountId == owner.accountId }
+        return org.koitharu.kotatsu.scrobbling.v2.LegacyOutgoingLinkPolicy.allows(current, entity,
+            db.getMangaDao().find(entity.mangaId)?.manga)
     }
 
     suspend fun getScrobblingInfoOrNull(mangaId: Long): ScrobblingInfo? {
@@ -153,6 +187,17 @@ abstract class Scrobbler(
             updateScrobblingInfoImpl(mangaId, rating, status, comment)
             trackerRepository.storage.invalidateLibrary(requireNotNull(trackerRepository.storage.requestSession().accountId))
         } }
+
+    suspend fun updateStatusOnly(mangaId: Long, status: ScrobblingStatus) = withAccount {
+        trackerRepository.storage.mutationMutex.withLock {
+            val owner = requireNotNull(trackerRepository.storage.requestSession().accountId)
+            val link = db.getScrobblingDao().find(scrobblerService.id, mangaId, owner)
+                ?: throw IllegalStateException("Confirm this tracker link before changing status")
+            val remote = requireNotNull(statuses[status]) { "This tracker does not support that status" }
+            trackerRepository.updateStatus(link.id, mangaId, remote)
+            trackerRepository.storage.invalidateLibrary(owner)
+        }
+    }
 
     protected abstract suspend fun updateScrobblingInfoImpl(
         mangaId: Long,

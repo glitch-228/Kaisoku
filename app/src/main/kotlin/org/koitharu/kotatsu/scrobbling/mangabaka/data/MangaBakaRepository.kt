@@ -1,5 +1,11 @@
 package org.koitharu.kotatsu.scrobbling.mangabaka.data
 
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerJson
+import org.koitharu.kotatsu.scrobbling.common.data.accountSession
+import org.koitharu.kotatsu.scrobbling.common.data.rawTrackerElement
+import org.koitharu.kotatsu.scrobbling.common.data.raw
+import org.koitharu.kotatsu.scrobbling.common.data.obj
+import org.koitharu.kotatsu.scrobbling.common.data.array
 import android.content.Context
 import android.util.Base64
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -61,6 +67,7 @@ class MangaBakaRepository @Inject constructor(
 
     private val clientId = context.getString(R.string.mangabaka_clientId)
     private var codeVerifier: String? = null
+    @Volatile private var rawOwnerSnapshot: Pair<Long, org.koitharu.kotatsu.scrobbling.v2.TrackerOwner>? = null
 
     override val oauthUrl: String
         get() {
@@ -124,6 +131,69 @@ class MangaBakaRepository @Inject constructor(
 
     override suspend fun unregister(mangaId: Long) {
         db.getScrobblingDao().delete(ScrobblerService.MANGABAKA.id, mangaId, storage.requestSession().accountId)
+    }
+
+    override suspend fun readRawOwner(): org.koitharu.kotatsu.scrobbling.v2.TrackerOwner {
+        val session = accountSession()
+        rawOwnerSnapshot?.takeIf { it.first == session.revision }?.let {
+            storage.checkSession(session)
+            return it.second
+        }
+        return storage.withSession(session) {
+            val profile = okHttp.trackerCall(Request.Builder().url("$BASE_API_URL/my/profile").get().build(), storage)
+                .rawTrackerJson().obj("data")
+            val actual = requireNotNull(profile.raw("id")) { "MangaBaka did not return an account identity" }
+            require(actual.hashCode().toLong() == session.accountId) { "Tracker returned another account" }
+            val owner = org.koitharu.kotatsu.scrobbling.v2.TrackerOwner(ScrobblerService.MANGABAKA.name, actual)
+            storage.checkSession(session)
+            rawOwnerSnapshot = session.revision to owner
+            owner
+        }
+    }
+
+    override suspend fun readRawEntry(mediaId: Long): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry? {
+        require(mediaId > 0)
+        val session = accountSession()
+        return storage.withSession(session) {
+            val owner = readRawOwner()
+            val json = try {
+                okHttp.trackerCall(Request.Builder().url("$BASE_API_URL/my/library/$mediaId").get().build(), storage).rawTrackerJson()
+            } catch (e: org.koitharu.kotatsu.scrobbling.common.data.TrackerHttpException) {
+                if (e.code == 404) return@withSession null else throw e
+            }
+            val row = json.obj("data")
+            row.raw("user_id")?.let { require(it == owner.accountId) { "Tracker returned another account" } }
+            val actual = row.raw("series_id") ?: (row["series"] as? kotlinx.serialization.json.JsonObject)?.raw("id")
+            require(actual == mediaId.toString()) { "Tracker returned another title" }
+            val metadata = getMangaInfo(mediaId)
+            require(metadata.id == mediaId) { "Tracker returned another title" }
+            storage.checkSession(session)
+            val title = org.koitharu.kotatsu.scrobbling.v2.TrackerTitle(mediaId.toString(), metadata.name,
+                coverUrl = metadata.cover, description = metadata.descriptionHtml, url = metadata.url)
+            org.koitharu.kotatsu.scrobbling.common.data.TrackerRawRead.entry(ScrobblerService.MANGABAKA,
+                owner.accountId, mediaId.toString(), title, row)
+        }
+    }
+
+    override val supportsRawWrites: Boolean get() = true
+
+    override suspend fun mutateRawEntry(
+        expected: org.koitharu.kotatsu.scrobbling.v2.TrackerReference,
+        patch: org.koitharu.kotatsu.scrobbling.v2.TrackerPatch,
+        allowCreate: Boolean,
+    ): org.koitharu.kotatsu.scrobbling.v2.TrackerRemoteEntry =
+        org.koitharu.kotatsu.scrobbling.common.data.TrackerRawMutation.execute(
+            this, ScrobblerService.MANGABAKA, okHttp, expected, patch, allowCreate,
+        )
+
+    override suspend fun readRawLibraryPage(cursor: String?): org.koitharu.kotatsu.scrobbling.v2.TrackerLibraryPage {
+        val session = accountSession()
+        return storage.withSession(session) {
+            val owner = readRawOwner()
+            org.koitharu.kotatsu.scrobbling.common.data.TrackerRawLibrary.read(
+                ScrobblerService.MANGABAKA, owner, session.revision, cursor,
+            ) { request -> okHttp.trackerCall(request, storage).rawTrackerElement() }
+        }
     }
 
     override suspend fun fetchLibrary(): List<TrackerLibraryEntry> = collectTrackerLibraryPages { page, _ ->
@@ -191,6 +261,15 @@ class MangaBakaRepository @Inject constructor(
         val body = JSONObject().put("progress_chapter", chapter).toString().toJsonBody()
         okHttp.trackerCall(Request.Builder().url("$BASE_API_URL/my/library/$targetId").put(body).build(), storage).parseJson()
         fetchRate(mangaId, targetId, null)
+    }
+
+    override suspend fun updateStatus(rateId: Int, mangaId: Long, status: String) {
+        val target = requireEntity(mangaId).targetId
+        val existing = libraryEntry(target) ?: throw TrackerRemoteEntryMissing()
+        val payload = org.koitharu.kotatsu.scrobbling.v2.LegacyStatusPatch.json(ScrobblerService.MANGABAKA, status)
+        okHttp.trackerCall(Request.Builder().url("$BASE_API_URL/my/library/$target")
+            .put(payload.toString().toJsonBody()).build(), storage).parseJson()
+        fetchRate(mangaId, target, existing.getStringOrNull("note"))
     }
 
     override suspend fun updateRate(

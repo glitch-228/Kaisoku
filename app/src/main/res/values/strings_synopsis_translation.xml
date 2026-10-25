@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="synopsis_translate_beta">Translate synopsis · Beta</string>
+    <string name="synopsis_translation_notice">Translate only when requested. The synopsis is sent to the selected provider and may use its quota. Translation quality can vary.</string>
+    <string name="synopsis_translation_configuration">%1$s · %2$s → %3$s</string>
+    <string name="synopsis_translation_google">Google Translate</string>
+    <string name="synopsis_translation_auto_language">Detect language</string>
+    <string name="synopsis_translation_original">Show original</string>
+    <string name="synopsis_translation_result">Show translation</string>
+    <string name="synopsis_translation_translate">Translate</string>
+    <string name="synopsis_translation_again">Translate again</string>
+    <string name="synopsis_translation_cached">Saved translation</string>
+    <string name="synopsis_translation_progress">Translating… %1$d/%2$d</string>
+    <string name="synopsis_translation_loading">Translating…</string>
+    <string name="synopsis_translation_copy_error">Copy full error</string>
+    <string name="synopsis_translation_configuration_action">Translation settings</string>
+    <string name="synopsis_translation_too_long">This synopsis is too long to translate safely. The original text has been preserved.</string>
+    <string name="synopsis_translation_empty_result">The provider returned an empty translation. Retry or choose another provider.</string>
+    <string name="synopsis_translation_result_too_long">The provider response exceeded the local size limit. The original text has been preserved.</string>
+    <string name="synopsis_translation_unavailable">The synopsis is unavailable. Close this sheet and reopen it from details after unlocking the book if needed.</string>
+</resources>

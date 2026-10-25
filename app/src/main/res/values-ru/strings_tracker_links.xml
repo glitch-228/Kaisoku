@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_link_backup">Точные связи с трекерами · Бета</string>
+    <string name="tracker_link_review">Проверка восстановленных связей · Бета</string>
+    <string name="tracker_link_review_notice">Восстановленные связи неактивны на этом устройстве, пока вы не проверите аккаунт и издание источника. Подтверждение читает существующую запись трекера, не добавляет тайтл, не отправляет прогресс и не меняет позицию чтения.</string>
+    <string name="tracker_link_verify">Проверить аккаунт и показать ожидающие связи</string>
+    <string name="tracker_link_confirm">Подтвердить эту связь</string>
+    <string name="tracker_link_pending_empty">Для этого аккаунта нет связей, ожидающих подтверждения.</string>
+    <string name="tracker_link_review_details">%1$s\nИсточник: %2$s\nИздание: %3$s\nАккаунт: %4$s\nID тайтла: %5$s\nЗапись списка: %6$s\nСохранённый прогресс: %7$s\nТом: %8$s\nИсходная запись: %9$s\nЕдиница: %10$s</string>
+</resources>

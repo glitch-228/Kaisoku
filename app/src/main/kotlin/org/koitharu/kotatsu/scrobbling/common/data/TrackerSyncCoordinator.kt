@@ -27,10 +27,15 @@ class TrackerSyncCoordinator @Inject constructor(
     private val scrobblers: Set<@JvmSuppressWildcards Scrobbler>,
     private val db: MangaDatabase,
     private val workManager: WorkManager,
+    private val rawProgress: javax.inject.Provider<org.koitharu.kotatsu.scrobbling.v2.progress.OutgoingProgressCoordinator>,
 ) {
     suspend fun onChapterCompleted(manga: Manga, chapterId: Long) {
+        val handled = try { rawProgress.get().onChapterCompleted(manga.id, chapterId) }
+            catch (error: CancellationException) { throw error }
+            catch (error: Exception) { error.printStackTraceDebug(); emptySet<String>() }
         val chapter = completedTrackerChapter(manga, chapterId) ?: return
         for (scrobbler in scrobblers) {
+            if (scrobbler.scrobblerService.name in handled) continue
             val owner = scrobbler.trackerRepository.cachedUser?.id ?: continue
             if (!scrobbler.isEnabled) continue
             val storage = scrobbler.trackerRepository.storage

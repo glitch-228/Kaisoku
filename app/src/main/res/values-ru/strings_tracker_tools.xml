@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tracker_tools_beta">Инструменты трекеров · Бета</string>
+    <string name="tracker_tools_summary">Метаданные трекеров, массовое сопоставление, статусы категорий и подключения к сайтам в режиме бета.</string>
+    <string name="tracker_tools_refresh">Обновить</string>
+    <string name="tracker_metadata_beta">Использовать метаданные трекера · Бета</string>
+    <string name="tracker_metadata_title">Название</string>
+    <string name="tracker_metadata_notice">Выберите поля для замены местных переопределений. Данные источника, прогресс чтения и статус трекера сохранятся.</string>
+    <string name="tracker_metadata_field_preview">Сейчас:\n%1$s\n\nВ трекере:\n%2$s</string>
+    <string name="tracker_tools_connect_comick">Подключить Comick</string>
+    <string name="tracker_tools_comick_client">ID зарегистрированного публичного клиента Comick</string>
+    <string name="tracker_tools_comick_notice">Зарегистрируйте публичный нативный клиент с этим адресом возврата: %1$s. Доступ к чтению и изменения списка требуют отдельных разрешений. Пароль вводится только в системном браузере.</string>
+    <string name="tracker_tools_comick_write">Запросить разрешение на изменение списка Comick</string>
+    <string name="tracker_tools_auth_done">Трекер подключён</string>
+    <string name="tracker_tools_auth_restart">Авторизация недоступна или истекла. Начните подключение заново в инструментах трекеров.</string>
+    <string name="tracker_tools_beta_notice">Бета: проверьте аккаунт и издание каждого источника. Совпадения названий могут быть ошибочными. Экран не отправляет запросов при открытии; добавление в удалённый список требует отдельного подтверждения.</string>
+    <string name="tracker_tools_website_login">Войти в Anime-Planet</string>
+    <string name="tracker_tools_verify_account">Проверить аккаунт</string>
+    <string name="tracker_tools_library">Открыть список трекера</string>
+    <string name="tracker_tools_bulk">Сопоставить выбранное избранное</string>
+    <string name="tracker_tools_disconnect">Отключить</string>
+    <string name="tracker_tools_next">Следующая страница</string>
+    <string name="tracker_tools_unresolved">Требует проверки</string>
+    <string name="tracker_tools_apply_selected">Применить подтверждённые совпадения</string>
+    <string name="tracker_tools_apply_notice">Связать только подтверждённые произведения. С отдельным разрешением произведения могут быть добавлены в удалённый список «В планах». Прогресс чтения и категории избранного сохранятся.</string>
+    <string name="tracker_tools_confirm_edition">Трекер: %1$s\nВ приложении: %2$s\nИсточник: %3$s\n\nПодтвердите, что это одно произведение и издание.</string>
+    <string name="tracker_tools_allow_remote_add">Разрешить добавить это произведение в удалённый список, если его там нет</string>
+    <string name="tracker_tools_confirm_match">Подтвердить совпадение</string>
+    <string name="tracker_tools_not_connected">Не подключено</string>
+    <string name="tracker_tools_library_count">Выбрать из загруженных произведений: %1$d</string>
+</resources>

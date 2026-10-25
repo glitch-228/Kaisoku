@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="incoming_progress_beta">Импорт прогресса трекера · Бета</string>
+    <string name="incoming_progress_notice">Проверьте издание, источник, ветку и главы. Нумерация в трекере может относиться к другому изданию. Главы не выбираются автоматически.</string>
+    <string name="incoming_progress_preview">Проверить аккаунт и показать изменения</string>
+    <string name="incoming_progress_raw">Прогресс трекера: %1$s · Том: %2$s · Единица: %3$s</string>
+    <string name="incoming_progress_branch">Ветка: %1$s</string>
+    <string name="incoming_progress_choose_branch">Выбрать ветку</string>
+    <string name="incoming_progress_default_branch">Основная ветка</string>
+    <string name="incoming_progress_selected">Выбрано прочитанных глав: %1$d</string>
+    <string name="incoming_progress_choose_chapters">Выбрать прочитанные главы</string>
+    <string name="incoming_progress_through">Выбрать до главы из трекера…</string>
+    <string name="incoming_progress_through_confirm">Отметить эти %1$d пронумерованных глав прочитанными? Главы без номера или с неоднозначной нумерацией не учитываются автоматически.</string>
+    <string name="incoming_progress_exact_consent">Включить точный учёт прочитанных глав. Переход к поздней главе не означает, что предыдущие прочитаны.</string>
+    <string name="incoming_progress_resume_preserved">Позиция чтения сохранится, если вы не выберете другую главу для продолжения.</string>
+    <string name="incoming_progress_resume_choose">Выбрать главу для продолжения…</string>
+    <string name="incoming_progress_resume_clear">Сохранить текущую позицию чтения</string>
+    <string name="incoming_progress_confirm">Применить только проверенные локальные изменения? Данные трекера, избранное и время чтения не изменятся.</string>
+    <string name="incoming_progress_applied">Проверенный прогресс применён локально.</string>
+    <string name="incoming_progress_refresh">Подготовить новый просмотр изменений</string>
+</resources>
