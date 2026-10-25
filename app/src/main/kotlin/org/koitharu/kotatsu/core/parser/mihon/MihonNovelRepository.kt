@@ -1,9 +1,13 @@
 package org.koitharu.kotatsu.core.parser.mihon
 
 import eu.kanade.tachiyomi.source.NovelSource
+import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.model.Page
+import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -31,10 +35,16 @@ class MihonNovelRepository(
     override suspend fun getChapterHtml(chapter: MangaChapter): String = requests.withLock(chapter.url) {
         synchronized(chapters) { chapters[chapter.url] }?.let { return@withLock it }
         val html = withContext(Dispatchers.IO) {
-            // These wrappers deliberately do not implement their image-oriented page parsers.
             val site = (loaded.sourceInstance as? HttpSource)?.baseUrl.orEmpty()
             val base = site.toHttpUrlOrNull()?.resolve(chapter.url)?.toString() ?: site
-            fetchMihonChapterHtml(novel, chapter.url, base)
+            val original = SChapter.create().also {
+                it.url = chapter.url
+                it.name = chapter.title ?: chapter.name
+                it.chapter_number = chapter.number
+                it.date_upload = chapter.uploadDate
+                it.scanlator = chapter.scanlator
+            }
+            fetchMihonChapterHtml(novel, original, base)
         }
         synchronized(chapters) {
             while (chapters.isNotEmpty() && (chapters.size >= 8 || cachedCharacters + html.length > MAX_CACHE_CHARS)) {
@@ -51,13 +61,15 @@ class MihonNovelRepository(
     }
 
     override suspend fun getImageHeaders(): Map<String, String> = withContext(Dispatchers.IO) {
-        (loaded.sourceInstance as? HttpSource)?.headers?.toMap().orEmpty()
+        mihonExtensionCall { (loaded.sourceInstance as? HttpSource)?.headers?.toMap().orEmpty() }
     }
 
     override fun createPageRequest(pageUrl: String, page: MangaPage): Request {
         val http = loaded.sourceInstance as? HttpSource ?: return super.createPageRequest(pageUrl, page)
-        return http.imageRequest(Page(index = 0, url = pageUrl, imageUrl = pageUrl)).newBuilder()
-            .tag(MangaSource::class.java, page.source).build()
+        return mihonExtensionCall {
+            http.imageRequest(Page(index = 0, url = pageUrl, imageUrl = pageUrl)).newBuilder()
+                .tag(MangaSource::class.java, page.source).build()
+        }
     }
 
     companion object {
@@ -65,12 +77,53 @@ class MihonNovelRepository(
     }
 }
 
-internal suspend fun fetchMihonChapterHtml(source: NovelSource, chapterUrl: String, baseUrl: String): String =
-    normalizeMihonChapterHtml(source.fetchPageText(Page(index = 0, url = chapterUrl)), baseUrl)
+private const val MAX_NOVEL_CHAPTER_CHARS = 8 * 1024 * 1024
+private const val MAX_NOVEL_TEXT_PAGES = 64
+
+internal suspend fun fetchMihonChapterHtml(source: NovelSource, chapter: SChapter, baseUrl: String): String =
+    mihonExtensionCall {
+    currentCoroutineContext().ensureActive()
+    val pages = if (usesDirectMihonNovelText(source.javaClass.name)) {
+        // These inspected wrappers explicitly leave enumeration unsupported.
+        listOf(Page(index = 0, url = chapter.url))
+    } else {
+        val pageSource = source as? Source ?: throw IOException("Novel source does not support chapter discovery")
+        pageSource.getPageList(chapter)
+    }
+    currentCoroutineContext().ensureActive()
+    if (pages.isEmpty()) throw IOException("Novel source returned no chapter pages")
+    if (pages.size > MAX_NOVEL_TEXT_PAGES) throw IOException("Novel chapter has too many text pages")
+    val result = StringBuilder()
+    var rawCharacters = 0
+    for (page in pages) {
+        currentCoroutineContext().ensureActive()
+        val raw = source.fetchPageText(page)
+        currentCoroutineContext().ensureActive()
+        if (raw.length > MAX_NOVEL_CHAPTER_CHARS - rawCharacters) {
+            throw IOException("Novel chapter text is too large")
+        }
+        rawCharacters += raw.length
+        val pageBase = baseUrl.toHttpUrlOrNull()?.resolve(page.url)?.toString() ?: baseUrl
+        val html = normalizeMihonChapterHtml(raw, pageBase)
+        val separatorLength = if (result.isEmpty()) 0 else 1
+        if (html.length > MAX_NOVEL_CHAPTER_CHARS - result.length - separatorLength) {
+            throw IOException("Novel chapter text is too large")
+        }
+        if (result.isNotEmpty()) result.append('\n')
+        result.append(html)
+    }
+    result.toString()
+}
+
+internal fun usesDirectMihonNovelText(className: String): Boolean = when (className) {
+    "eu.kanade.tachiyomi.novelextension.all.shosetsu.ShosetsuExtensionAdapter",
+    "eu.kanade.tachiyomi.novelextension.en.tsundoku.TsundokuDocs" -> true
+    else -> false
+}
 
 internal fun normalizeMihonChapterHtml(raw: String, baseUrl: String): String {
     if (raw.isBlank()) throw IOException("Novel source returned no chapter text")
-    if (raw.length > 8 * 1024 * 1024) throw IOException("Novel chapter text is too large")
+    if (raw.length > MAX_NOVEL_CHAPTER_CHARS) throw IOException("Novel chapter text is too large")
     val doc = Jsoup.parseBodyFragment(raw, baseUrl)
     doc.outputSettings().prettyPrint(false)
     doc.select("img[src]").forEach { image ->

@@ -102,14 +102,14 @@ open class MihonMangaRepository(
 	override fun hasExternalFiltersApplied(): Boolean =
 		mihonFilters.stateFingerprint() != defaultFilterState
 
-	override fun resetExternalFilters(): Boolean {
+	override fun resetExternalFilters(): Boolean = mihonExtensionCall {
 		if (!hasExternalFiltersApplied()) return false
 		mihonFilters = mihonSource.getFilterList()
-		return true
+		true
 	}
 
 	override suspend fun getList(offset: Int, order: SortOrder?, filter: MangaListFilter?): List<Manga> = withContext(Dispatchers.IO) {
-		runCatching {
+		runCatchingCancellable {
 			if (offset <= 0 || offset < lastOffset) {
 				currentPage = 1
 			} else if (offset > lastOffset && lastOffset >= 0) {
@@ -179,7 +179,7 @@ open class MihonMangaRepository(
     override suspend fun getChapterUrl(manga: Manga, chapter: MangaChapter): String? = withContext(Dispatchers.IO) {
         val httpSource = mihonSource as? HttpSource ?: return@withContext null
         val original = chapterCache.get(manga.url, chapter.url) ?: chapter.toSChapter()
-        chapterWebUrl(httpSource.getChapterUrl(original))
+        mihonExtensionCall { chapterWebUrl(httpSource.getChapterUrl(original)) }
     }
 
 	override suspend fun getPageUrl(page: MangaPage): String = withContext(Dispatchers.IO) {
@@ -206,7 +206,7 @@ open class MihonMangaRepository(
 
 	override suspend fun getRelatedMangaImpl(seed: Manga): List<Manga> = emptyList()
 
-	override fun getImageClient(): OkHttpClient? = (mihonSource as? HttpSource)?.client
+	override fun getImageClient(): OkHttpClient? = mihonExtensionCall { (mihonSource as? HttpSource)?.client }
 
 	override fun createPageRequest(pageUrl: String, page: MangaPage): Request {
 		val httpSource = mihonSource as? HttpSource
@@ -441,7 +441,7 @@ open class MihonMangaRepository(
 		return if (looksLikeHostedWebViewAuth) {
 			AuthRequiredException(source, error)
 		} else {
-			error
+			mihonRuntimeFailure(error)
 		}
 	}
 
@@ -461,7 +461,7 @@ open class MihonMangaRepository(
 		return if (looksLikeAuthFailure) {
 			AuthRequiredException(source, error)
 		} else {
-			error
+			mihonRuntimeFailure(error)
 		}
 	}
 

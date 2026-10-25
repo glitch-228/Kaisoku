@@ -23,14 +23,14 @@ import java.io.IOException
 import java.util.UUID
 
 class MihonNovelRepositoryTest {
-    @Test fun concurrentTextRequestsCoalesceAndNeverCallImagePages() = fixture { repository, source, chapter ->
+    @Test fun concurrentTextRequestsCoalesceAndUseTransformedTextPages() = fixture { repository, source, chapter ->
         val texts = coroutineScope { List(8) { async { repository.getChapterHtml(chapter) } }.awaitAll() }
         assertEquals(1, source.calls)
         assertTrue(texts.all { it.contains("Fixture chapter") })
-        assertEquals(chapter.url, source.requested!!.url)
+        assertEquals("https://fixture.invalid/api/chapter/42/", source.requested!!.url)
         assertEquals(0, source.requested!!.index)
         assertEquals(emptyMap<String, String>(), repository.getImageHeaders())
-        assertEquals(0, source.imageCalls)
+        assertEquals(1, source.pageListCalls)
         assertEquals(texts.first(), repository.getChapterHtml(chapter))
         assertEquals(1, source.calls)
     }
@@ -77,7 +77,7 @@ class MihonNovelRepositoryTest {
         override val supportsLatest = false
         override fun getFilterList() = eu.kanade.tachiyomi.source.model.FilterList()
         var calls = 0
-        var imageCalls = 0
+        var pageListCalls = 0
         var failure: Throwable? = null
         var requested: Page? = null
         override suspend fun fetchPageText(page: Page): String {
@@ -88,8 +88,9 @@ class MihonNovelRepositoryTest {
             return "<p>Fixture chapter</p>"
         }
         override suspend fun getPageList(chapter: eu.kanade.tachiyomi.source.model.SChapter): List<Page> {
-            imageCalls++
-            error("Image pages must never be used for novel text")
+            pageListCalls++
+            assertEquals("/book/chapter", chapter.url)
+            return listOf(Page(0, "https://fixture.invalid/api/chapter/42/"))
         }
     }
 }

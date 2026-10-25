@@ -185,10 +185,12 @@ class MetadataRefreshRepositoryTest {
     @Test fun indexedLocalLookupDoesNotInitializeOrScanTheStorageIndex() = runTest {
         fixture { settings, database, _ ->
             val data = MangaDataRepository(database, Provider { error("link resolver must remain unused") },
-                Provider { error("shortcuts must remain unused") }, settings)
+                Provider { error("shortcuts must remain unused") }, settings,
+                org.koitharu.kotatsu.history.exact.ChapterReadRepository(database))
             var scans = 0
             val index = LocalMangaIndex(data, database, ApplicationProvider.getApplicationContext<Application>(),
-                Provider { scans++; error("storage scan must not run") })
+                Provider { scans++; error("storage scan must not run") },
+                org.koitharu.kotatsu.remote.library.RemoteLibraryPersistence(ApplicationProvider.getApplicationContext<Application>()))
             assertNull(index.getIndexed(seed.id, withDetails = true))
             assertEquals(0, scans)
             assertNull(database.getMangaDao().find(seed.id))

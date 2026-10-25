@@ -42,6 +42,7 @@ class MetadataRefreshFactoryTest {
     @Inject lateinit var mirrors: MirrorSwitcher
     @Inject lateinit var mihon: MihonExtensionManager
     @Inject lateinit var evidence: RecommendationStore
+    @Inject lateinit var remoteLibraries: org.koitharu.kotatsu.remote.library.RemoteLibraryManager
 
     @Before fun inject() = hilt.inject()
 
@@ -108,7 +109,7 @@ class MetadataRefreshFactoryTest {
         try {
             val factory = MangaRepository.Factory(context, local, loader, cache, mirrors, mihon, manager,
                 AppSettings(context), evidence, settings, SavedMangaMetadata(database),
-                dagger.Lazy { error("Tsuki is not used by this fixture") })
+                dagger.Lazy { error("Tsuki is not used by this fixture") }, remoteLibraries)
             block(factory, settings, database, manager)
         } finally {
             LnReaderSourceRegistry.replaceAll(previousSources)
