@@ -27,6 +27,7 @@ object RecommendationCodec {
         put("provenance", value.provenance.name); put("score", value.score); put("reason", value.reason.name)
         put("because", value.because); put("confidence", value.confidence)
         put("identifiers", JSONObject(value.trustedIdentifiers))
+        put("relatedTo", JSONArray(value.relatedTo.sorted().take(MAX_RECOMMENDATION_RELATION_SEEDS)))
         (value.target as? RecommendationTarget.PublicTitle)?.let {
             put("provider", it.provider); put("identifier", it.identifier)
             put("kind", (manga.source as PublicRecommendationSource).kind.name)
@@ -52,6 +53,12 @@ object RecommendationCodec {
             json.optString("because").takeIf { it.isNotEmpty() }, RecommendationProvenance.valueOf(json.getString("provenance")),
             json.optDouble("confidence", 0.0), json.optJSONObject("identifiers")?.let { identifiers ->
                 identifiers.keys().asSequence().associateWith { identifiers.getString(it) }
+            }.orEmpty(), json.optJSONArray("relatedTo")?.let { related ->
+                (0 until minOf(related.length(), MAX_RECOMMENDATION_RELATION_SEEDS))
+                    .mapNotNull { related.optString(it).takeIf { key ->
+                        (key.startsWith("source:") || key.startsWith("provider:")) && key.length <= 1024
+                    } }
+                    .toSet()
             }.orEmpty())
     }.getOrNull()
 

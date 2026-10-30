@@ -6,6 +6,8 @@ import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.lifecycleScope
 import org.koitharu.kotatsu.core.util.ext.addMenuProvider
+import org.koitharu.kotatsu.core.util.ext.observe
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.ui.list.ListSelectionController
 import org.koitharu.kotatsu.list.ui.MangaListFragment
@@ -18,6 +20,8 @@ class RelatedListFragment : MangaListFragment() {
 
     override fun onViewBindingCreated(binding: org.koitharu.kotatsu.databinding.FragmentListBinding, state: android.os.Bundle?) {
         super.onViewBindingCreated(binding, state)
+        settings.observe(AppSettings.KEY_SUGGESTIONS_TITLE_ONLY, AppSettings.KEY_SUGGESTIONS_LEGACY)
+            .observe(viewLifecycleOwner) { updateSuggestionTitle() }
         addMenuProvider(object : androidx.core.view.MenuProvider {
             override fun onCreateMenu(menu: Menu, inflater: MenuInflater) {
                 menu.add(Menu.NONE, R.id.action_recommendation_provider_match, Menu.NONE, R.string.recommendation_public_match)
@@ -31,6 +35,16 @@ class RelatedListFragment : MangaListFragment() {
                 return true
             }
         })
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateSuggestionTitle()
+    }
+
+    private fun updateSuggestionTitle() {
+        requireActivity().setTitle(if (!settings.useLegacySuggestions && settings.useTitleOnlySuggestions)
+            R.string.recommendations_similar_beta else R.string.related_manga)
     }
 
 	override fun onScrolledToEnd() = Unit

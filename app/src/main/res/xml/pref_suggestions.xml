@@ -12,6 +12,8 @@
 
     <SwitchPreferenceCompat android:key="suggestions_legacy" android:defaultValue="false"
         android:title="@string/recommendations_legacy" android:summary="@string/recommendations_legacy_summary" />
+    <SwitchPreferenceCompat android:key="suggestions_title_only" android:defaultValue="false"
+        android:title="@string/recommendations_title_only" android:summary="@string/recommendations_title_only_summary" />
     <SeekBarPreference android:key="suggestions_diversity" android:defaultValue="50" android:max="100"
         android:title="@string/recommendations_diversity" app:min="0" app:showSeekBarValue="false" />
     <SwitchPreferenceCompat android:key="suggestions_started" android:defaultValue="true"

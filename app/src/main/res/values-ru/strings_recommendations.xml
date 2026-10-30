@@ -3,6 +3,9 @@
     <string name="recommendations_beta">Локальные рекомендации · Бета</string>
     <string name="recommendations_legacy">Прежние рекомендации</string>
     <string name="recommendations_legacy_summary">Использовать прежний алгоритм в Обзоре и на странице произведения.</string>
+    <string name="recommendations_title_only">Подбор по открытому произведению · Бета</string>
+    <string name="recommendations_title_only_summary">На странице произведения показывать похожие и связанные с ним работы, без учёта ваших интересов и ползунка разнообразия. Выключите, чтобы вернуть персональный подбор на странице. Обзор не меняется. При нехватке данных источника результатов может быть меньше.</string>
+    <string name="recommendations_similar_beta">Похожие произведения · Бета</string>
     <string name="recommendations_diversity">Похожие → Сбалансированные → Необычные</string>
     <string name="recommendations_diversity_value">Доля новых направлений: %1$d%%</string>
     <string name="recommendations_started">Рекомендовать начатое с новыми главами</string>
@@ -20,6 +23,8 @@
     <string name="recommendation_genres">Похожие жанры</string>
     <string name="recommendation_author">Тот же автор</string>
     <string name="recommendation_related">Связано на этом источнике</string>
+    <string name="recommendation_title_terms">Похожее название или другое имя</string>
+    <string name="recommendation_title_relation">Связано с этим произведением</string>
     <string name="recommendation_discovery">Попробуйте что-нибудь новое</string>
     <string name="recommendation_new_chapters">Подтверждённые новые главы</string>
     <string name="recommendation_not_interested">Не интересно</string>

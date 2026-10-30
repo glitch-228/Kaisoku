@@ -137,8 +137,12 @@ class RecommendationEngine @Inject constructor(
                     .takeUnless { excludeNsfw() && RecommendationContentPolicy.isNsfw(it, settings.useSeparateSourceContentClasses) }
                     ?.let { TasteTitle(it, title.favorite, title.lastRead, title.durationMillis) }
             } }
+            val publicRelationKeys = if (request is RecommendationRequest.Details && settings.useTitleOnlySuggestions) {
+                publicProviders.links(request.seed).mapTo(mutableSetOf()) { it.relationKey(request.seed) }
+            } else emptySet()
             val ranked = RecommendationRanker.rank(candidates, profile, request, settings.recommendationDiversity,
-                row?.refreshed ?: System.currentTimeMillis()).map { value ->
+                row?.refreshed ?: System.currentTimeMillis(), titleOnlyDetails = settings.useTitleOnlySuggestions,
+                publicRelationKeys = publicRelationKeys).map { value ->
                 if (progress[value.key].orEmpty().any { it.lastRead > 0 }) value.copy(reason = RecommendationReason.NEW_CHAPTERS)
                 else value
             }
@@ -243,18 +247,9 @@ class RecommendationEngine @Inject constructor(
                             val repository = repositories.create(source)
                             val lookup = seed ?: taste.firstOrNull { it.source.name == source.name }
                             if (seed != null) {
-                                if (repository.supportsRelatedDiscovery) {
-                                    operation(source.name) { repository.discoverRelated(seed) }.orEmpty().take(60).mapTo(local) {
-                                        Recommendation(RecommendationTarget.SourceTitle(it), provenance = RecommendationProvenance.RELATED)
-                                    }
-                                } else if (repository.filterCapabilities.isSearchSupported) {
-                                    operation(source.name) { repository.discover(
-                                        SortOrder.RELEVANCE.takeIf { it in repository.sortOrders } ?: repository.defaultSortOrder,
-                                        MangaListFilter(query = seed.title.take(120)),
-                                    ) }.orEmpty().take(35).mapTo(local) {
-                                        Recommendation(RecommendationTarget.SourceTitle(it), provenance = RecommendationProvenance.SEARCH)
-                                    }
-                                }
+                                operation(source.name) {
+                                    discoverDetailsSuggestions(repository, seed, settings.useTitleOnlySuggestions)
+                                }?.let(local::addAll)
                                 return@capture
                             }
                             val orders = if (sourceOrder.indexOf(source) % 2 == 0) listOf(SortOrder.POPULARITY, SortOrder.UPDATED, SortOrder.NEWEST)
@@ -313,7 +308,7 @@ class RecommendationEngine @Inject constructor(
                         failures.capture(source, sourceNames[source] ?: link.provider,
                             onFailure = { sourceFailed(source) }, recordSuccess = false) {
                             publicProviders.related(link) { operationKey, call -> operation(operationKey, call) }
-                        }?.let { found.addAll(it) }
+                        }?.let { values -> found.addAll(values.map { it.withRelationTo(publicSeed, link) }) }
                     }
                 }
             }
@@ -406,7 +401,8 @@ class RecommendationEngine @Inject constructor(
 
 
     companion object {
-        val KEYS = arrayOf(AppSettings.KEY_SUGGESTIONS_LEGACY, AppSettings.KEY_SUGGESTIONS_DIVERSITY, AppSettings.KEY_SUGGESTIONS_PUBLIC,
+        val KEYS = arrayOf(AppSettings.KEY_SUGGESTIONS_LEGACY, AppSettings.KEY_SUGGESTIONS_TITLE_ONLY,
+            AppSettings.KEY_SUGGESTIONS_DIVERSITY, AppSettings.KEY_SUGGESTIONS_PUBLIC,
             AppSettings.KEY_SUGGESTIONS_STARTED, AppSettings.KEY_SUGGESTIONS_THRESHOLD, AppSettings.KEY_SUGGESTIONS_MEDIA,
             AppSettings.KEY_SUGGESTIONS_LANGUAGES, AppSettings.KEY_SUGGESTIONS, AppSettings.KEY_RELATED_MANGA,
             AppSettings.KEY_SUGGESTIONS_EXCLUDE_NSFW, AppSettings.KEY_SUGGESTIONS_EXCLUDE_TAGS, AppSettings.KEY_DISABLE_NSFW,

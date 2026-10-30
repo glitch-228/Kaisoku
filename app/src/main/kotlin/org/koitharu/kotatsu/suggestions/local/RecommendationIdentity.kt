@@ -22,6 +22,13 @@ internal object RecommendationIdentity {
 
     fun deduplicate(values: List<Recommendation>): List<Recommendation> {
         val seen = mutableSetOf<String>()
+        val relations = mutableMapOf<String, MutableSet<String>>()
+        values.filter { it.relatedTo.isNotEmpty() }.forEach { value ->
+            feedbackKeys(value).forEach { key ->
+                val seeds = relations.getOrPut(key, ::linkedSetOf)
+                seeds.addAll(value.relatedTo.sorted().take(MAX_RECOMMENDATION_RELATION_SEEDS - seeds.size))
+            }
+        }
         return RecommendationContentPolicy.retainAdultMetadata(values)
             .sortedWith(compareBy<Recommendation> { it.target is RecommendationTarget.PublicTitle }
             .thenBy { if (it.provenance == RecommendationProvenance.RELATED) 0 else 1 }
@@ -31,6 +38,10 @@ internal object RecommendationIdentity {
             .filter { value ->
                 val keys = feedbackKeys(value)
                 if (keys.any { it in seen }) false else { seen.addAll(keys); true }
+            }
+            .map { value ->
+                value.copy(relatedTo = feedbackKeys(value).flatMap { relations[it].orEmpty() }
+                    .distinct().sorted().take(MAX_RECOMMENDATION_RELATION_SEEDS).toSet())
             }
     }
 }

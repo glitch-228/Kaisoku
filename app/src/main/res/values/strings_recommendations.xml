@@ -3,6 +3,9 @@
     <string name="recommendations_beta">Local recommendations · Beta</string>
     <string name="recommendations_legacy">Use legacy suggestions</string>
     <string name="recommendations_legacy_summary">Use the previous algorithm in Explore and on title details.</string>
+    <string name="recommendations_title_only">Title-only suggestions · Beta</string>
+    <string name="recommendations_title_only_summary">On title details, suggest similar works using only the opened title and its related works. Ignore reading tastes and the variety slider there. Turn off to restore personalized details suggestions. Explore is unchanged. Sparse source metadata may give fewer results.</string>
+    <string name="recommendations_similar_beta">Similar titles · Beta</string>
     <string name="recommendations_diversity">Similar → Balanced → Wild</string>
     <string name="recommendations_diversity_value">Exploration: %1$d%%</string>
     <string name="recommendations_started">Recommend started titles with new chapters</string>
@@ -20,6 +23,8 @@
     <string name="recommendation_genres">Similar genres</string>
     <string name="recommendation_author">Same author</string>
     <string name="recommendation_related">Related on this source</string>
+    <string name="recommendation_title_terms">Similar title or alternate name</string>
+    <string name="recommendation_title_relation">Related to this title</string>
     <string name="recommendation_discovery">Something to explore</string>
     <string name="recommendation_new_chapters">Confirmed new chapters</string>
     <string name="recommendation_not_interested">Not interested</string>

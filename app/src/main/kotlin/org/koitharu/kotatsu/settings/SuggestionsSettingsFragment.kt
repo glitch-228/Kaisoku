@@ -74,12 +74,12 @@ class SuggestionsSettingsFragment : BasePreferenceFragment(R.string.suggestions)
         if (key !in org.koitharu.kotatsu.suggestions.local.RecommendationEngine.KEYS) return
         updateRecommendationControls()
         val localOnly = key in setOf(AppSettings.KEY_SUGGESTIONS_DIVERSITY, AppSettings.KEY_SUGGESTIONS_STARTED,
-            AppSettings.KEY_SUGGESTIONS_THRESHOLD)
+            AppSettings.KEY_SUGGESTIONS_THRESHOLD, AppSettings.KEY_SUGGESTIONS_TITLE_ONLY)
         if (settings.isSuggestionsEnabled && !localOnly) updateSuggestions()
     }
 
     private fun updateRecommendationControls() {
-        listOf(AppSettings.KEY_SUGGESTIONS_DIVERSITY, AppSettings.KEY_SUGGESTIONS_STARTED,
+        listOf(AppSettings.KEY_SUGGESTIONS_TITLE_ONLY, AppSettings.KEY_SUGGESTIONS_DIVERSITY, AppSettings.KEY_SUGGESTIONS_STARTED,
             AppSettings.KEY_SUGGESTIONS_PUBLIC, AppSettings.KEY_SUGGESTIONS_LANGUAGES, "recommendations_clear_dismissals",
             "recommendations_beta_info").forEach { key -> findPreference<androidx.preference.Preference>(key)?.isEnabled = !settings.useLegacySuggestions }
         findPreference<androidx.preference.Preference>(AppSettings.KEY_SUGGESTIONS_THRESHOLD)?.isEnabled =

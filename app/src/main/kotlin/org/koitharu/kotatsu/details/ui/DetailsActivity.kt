@@ -242,6 +242,8 @@ class DetailsActivity :
         viewModel.scrobblingInfo.observe(this, ::onScrobblingInfoChanged)
         viewModel.localSize.observe(this, ::onLocalSizeChanged)
         viewModel.relatedManga.observe(this, ::onRelatedMangaChanged)
+        settings.observe(AppSettings.KEY_SUGGESTIONS_TITLE_ONLY, AppSettings.KEY_SUGGESTIONS_LEGACY)
+            .observe(this) { updateRelatedTitle() }
         viewModel.recommendationError.observe(this) { error ->
             val details = error?.takeIf { it.isNotBlank() && settings.isRelatedMangaEnabled && !settings.useLegacySuggestions }
             viewBinding.buttonRecommendationErrorDetails?.isVisible = details != null
@@ -285,6 +287,7 @@ class DetailsActivity :
     override fun onResume() {
         org.koitharu.kotatsu.core.archive.ArchiveSessionLifecycle.enforceBeforeDisplay()
         super.onResume()
+        updateRelatedTitle()
         if (inlineChaptersEnabled != settings.isDetailsChaptersInline) {
             inlineChapters?.collapseSearch()
             recreate()
@@ -543,8 +546,16 @@ class DetailsActivity :
         }
     }
 
+    private fun updateRelatedTitle() {
+        viewBinding.textViewRelatedTitle.setText(when {
+            settings.useLegacySuggestions -> R.string.related_manga
+            settings.useTitleOnlySuggestions -> R.string.recommendations_similar_beta
+            else -> R.string.recommendations_beta
+        })
+    }
+
     private fun onRelatedMangaChanged(related: List<MangaListModel>) {
-        viewBinding.textViewRelatedTitle.setText(if (settings.useLegacySuggestions) R.string.related_manga else R.string.recommendations_beta)
+        updateRelatedTitle()
         if (related.isEmpty()) {
             (viewBinding.recyclerViewRelated.adapter as? BaseListAdapter<ListModel>)?.items = emptyList()
             viewBinding.groupRelated.isVisible = settings.isRelatedMangaEnabled && !settings.useLegacySuggestions

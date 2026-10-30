@@ -772,6 +772,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
         get() = prefs.getBoolean(KEY_SUGGESTIONS_WIFI_ONLY, false)
 
     val useLegacySuggestions: Boolean get() = prefs.getBoolean(KEY_SUGGESTIONS_LEGACY, false)
+    val useTitleOnlySuggestions: Boolean get() = prefs.getBoolean(KEY_SUGGESTIONS_TITLE_ONLY, false)
     val recommendationDiversity: Int get() = prefs.getInt(KEY_SUGGESTIONS_DIVERSITY, 50).coerceIn(0, 100)
     val publicRecommendations: Boolean get() = prefs.getBoolean(KEY_SUGGESTIONS_PUBLIC, false)
     val recommendationLanguages: Set<String> get() = prefs.getStringSet(KEY_SUGGESTIONS_LANGUAGES, emptySet()).orEmpty()
@@ -1309,6 +1310,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
         const val KEY_PAGES_PRELOAD = "pages_preload"
         const val KEY_SUGGESTIONS = "suggestions"
         const val KEY_SUGGESTIONS_LEGACY = "suggestions_legacy"
+        const val KEY_SUGGESTIONS_TITLE_ONLY = "suggestions_title_only"
         const val KEY_SUGGESTIONS_DIVERSITY = "suggestions_diversity"
         const val KEY_SUGGESTIONS_PUBLIC = "suggestions_public"
         const val KEY_SUGGESTIONS_LANGUAGES = "suggestions_languages"

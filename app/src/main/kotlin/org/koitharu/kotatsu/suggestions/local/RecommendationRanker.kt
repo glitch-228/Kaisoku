@@ -65,7 +65,12 @@ object RecommendationRanker {
         diversity: Int,
         now: Long,
         limit: Int = 160,
+        titleOnlyDetails: Boolean = false,
+        publicRelationKeys: Set<String> = emptySet(),
     ): List<Recommendation> {
+        if (titleOnlyDetails && request is RecommendationRequest.Details) {
+            return rankTitleOnly(candidates, request.seed, limit, publicRelationKeys)
+        }
         val titles = taste.distinctBy { it.manga.source.name to it.manga.id }
         val vectors = candidates.associate { it.key to features(it.manga) }
         val tasteVectors = titles.map { it to features(it.manga) }
@@ -135,5 +140,39 @@ object RecommendationRanker {
             }
         }
         return output
+    }
+
+    private fun rankTitleOnly(
+        candidates: List<Recommendation>,
+        seed: org.koitharu.kotatsu.parsers.model.Manga,
+        limit: Int,
+        publicRelationKeys: Set<String>,
+    ): List<Recommendation> {
+        val seedKey = seed.recommendationSourceKey()
+        val eligible = candidates.distinctBy { it.key }.filter {
+            it.key != seedKey && it.manga.recommendationKind() == seed.recommendationKind()
+        }.take(500)
+        val seedFeatures = features(seed)
+        val vectors = eligible.associate { it.key to features(it.manga) }
+        // Neither personal scores nor history-dependent document frequencies belong in this mode.
+        val frequency = (vectors.values + listOf(seedFeatures)).flatMap { it.keys }.groupingBy { it }.eachCount()
+        fun weights(vector: Map<String, Double>) = Weights(vector.mapValues { (key, value) ->
+            value / sqrt((frequency[key] ?: 1).toDouble())
+        })
+        val seedVector = weights(seedFeatures)
+        return eligible.mapNotNull { candidate ->
+            val vector = weights(vectors.getValue(candidate.key))
+            val similar = similarity(vector, seedVector)
+            val related = seedKey in candidate.relatedTo || publicRelationKeys.any { it in candidate.relatedTo }
+            if (similar <= 0.0 && !related) return@mapNotNull null
+            val reason = when {
+                related -> RecommendationReason.TITLE_RELATION
+                vector.values.keys.any { it.startsWith("g:") && it in seedFeatures } -> RecommendationReason.GENRES
+                vector.values.keys.any { it.startsWith("a:") && it in seedFeatures } -> RecommendationReason.AUTHOR
+                else -> RecommendationReason.TITLE_TERMS
+            }
+            val score = (similar + if (related) .08 else 0.0).coerceIn(0.0, 1.0)
+            candidate.copy(score = score, confidence = score, reason = reason, because = null)
+        }.sortedWith(compareByDescending<Recommendation> { it.score }.thenBy { it.key }).take(limit.coerceAtLeast(0))
     }
 }

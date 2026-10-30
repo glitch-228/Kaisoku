@@ -20,6 +20,8 @@ data class Recommendation(
     val provenance: RecommendationProvenance = RecommendationProvenance.CACHE,
     val confidence: Double = 0.0,
     val trustedIdentifiers: Map<String, String> = emptyMap(),
+    /** Seed identities for witnessed relationships; a shared cache's provenance alone is not evidence. */
+    val relatedTo: Set<String> = emptySet(),
 ) {
     val manga: Manga get() = when (target) {
         is RecommendationTarget.SourceTitle -> target.manga
@@ -31,7 +33,21 @@ data class Recommendation(
     }
 }
 
-enum class RecommendationReason { BECAUSE_READ, BECAUSE_FAVORITE, GENRES, AUTHOR, RELATED, DISCOVERY, NEW_CHAPTERS }
+enum class RecommendationReason {
+    BECAUSE_READ, BECAUSE_FAVORITE, GENRES, AUTHOR, RELATED, DISCOVERY, NEW_CHAPTERS, TITLE_TERMS, TITLE_RELATION,
+}
+
+internal const val MAX_RECOMMENDATION_RELATION_SEEDS = 32
+
+internal fun Manga.recommendationSourceKey(): String = "source:${source.name}:$id"
+
+internal fun RecommendationProviderLink.relationKey(seed: Manga): String =
+    "provider:$provider:$identifier:$kind:${seed.recommendationSourceKey()}"
+
+internal fun Recommendation.withRelationTo(seed: Manga, provider: RecommendationProviderLink? = null): Recommendation = copy(
+    relatedTo = (listOf(provider?.relationKey(seed) ?: seed.recommendationSourceKey()) + relatedTo.sorted())
+        .distinct().take(MAX_RECOMMENDATION_RELATION_SEEDS).toSet(),
+)
 
 fun Manga.recommendationKind(): RecommendationKind =
     when (val current = source.unwrap()) {

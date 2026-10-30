@@ -35,6 +35,8 @@ fun recommendationReasonText(value: Recommendation, context: Context): String = 
     RecommendationReason.GENRES -> context.getString(R.string.recommendation_genres)
     RecommendationReason.AUTHOR -> context.getString(R.string.recommendation_author)
     RecommendationReason.RELATED -> context.getString(R.string.recommendation_related)
+    RecommendationReason.TITLE_TERMS -> context.getString(R.string.recommendation_title_terms)
+    RecommendationReason.TITLE_RELATION -> context.getString(R.string.recommendation_title_relation)
     RecommendationReason.NEW_CHAPTERS -> context.getString(R.string.recommendation_new_chapters)
     RecommendationReason.DISCOVERY -> context.getString(R.string.recommendation_discovery)
 }
