@@ -1,0 +1,6 @@
+- Add optional title-only details suggestions (off by default).
+- Fix crashes opening extended Drive and server sync settings.
+- Refresh tracker cards, filters and single-source selection.
+- Add unified tracker/source search (off by default).
+- Improve tracker linking and copyable search warnings.
+- Update Russian/Turkish translations and add initial Uyghur support.
