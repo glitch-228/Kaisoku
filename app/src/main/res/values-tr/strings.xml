@@ -892,7 +892,7 @@
     <string name="translated_text_count">Çevirilmiş metin (%1$d)</string>
     <string name="library">Kütüphane</string>
     <string name="extract_text">metni çıkart</string>
-    <string name="translate_page">çevirilmiş sayfa</string>
+    <string name="translate_page">Sayfayı çevir</string>
     <string name="copy">kopyala</string>
     <string name="error_copied">Hata detayları kopyalandı</string>
     <string name="ocr_no_text">metin bulunamadı.</string>
@@ -917,8 +917,8 @@
     <string name="translate_clear_cache">Çeviri önbelleğini temizle</string>
     <string name="translate_provider_google_lens">Google Lens / Google çeviri(anahtarsız)</string>
     <string name="novel_translation_settings">Çeviri ayarları</string>
-    <string name="lang_auto">ortomatik-algıla</string>
-    <string name="cover_only">sadece kapla</string>
+    <string name="lang_auto">Otomatik algıla</string>
+    <string name="cover_only">Yalnızca kapak</string>
     <string name="no_more_chapters">Daha fazla Bölüm Yok</string>
     <string name="by_unread_chapters">Okunmamış Bölümler</string>
     <string name="by_unread_chapters_reverse">Tersten Okunmamış Bölümler</string>
@@ -931,7 +931,7 @@
     <string name="ascending">Artan</string>
     <string name="descending">Azalan</string>
     <string name="same_language_as_current">Mevcut dille aynı</string>
-    <string name="same_content_type_as_current">Mevcut bağlantıyla aynı</string>
+    <string name="same_content_type_as_current">Mevcut içerikle aynı türde</string>
     <string name="hide_results_without_chapters">Bölümsüz sonuçları gizle</string>
     <string name="best_match">En iyi eşleşme</string>
     <string name="most_chapters">En fazla bölüm</string>
@@ -949,7 +949,7 @@
     <string name="novel_reader_settings">Roman okuyucu ayarları (Beta)</string>
     <string name="novel_reader_beta">Roman okuyucu · Beta</string>
     <string name="novel_translate_chapter">Bölümü çevir</string>
-    <string name="novel_show_original">Orjinal bölümü göster</string>
+    <string name="novel_show_original">Orijinal bölümü göster</string>
     <string name="novel_translating">Bölüm çeviriliyor…</string>
     <string name="novel_translation_progress">Çevrilmiş Bölüm: %1$d/%2$d</string>
     <string name="translate_temporary_provider_error">Gemini, HTTP %1$d hatası döndürdü. Uygulama isteği yeniden denedi; bekleyin ve tekrar deneyin. Sorun devam ederse, ayrıntıları kopyalayın ve Gemini API modeliniz ile projenizi kontrol edin.</string>
@@ -968,7 +968,7 @@
     <string name="novel_margin_horizontal">Yatay kenar boşlukları</string>
     <string name="novel_margin_vertical">Dikey kenar boşlukları</string>
     <string name="novel_theme_preset">Okuma teması</string>
-    <string name="novel_theme_paper">kağıt</string>
+    <string name="novel_theme_paper">kâğıt</string>
     <string name="novel_theme_sepia">sepya</string>
     <string name="novel_theme_moss">Yosun</string>
     <string name="novel_theme_slate">Arduvaz</string>
