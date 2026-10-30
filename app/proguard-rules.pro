@@ -18,6 +18,11 @@
 
 -keep class org.koitharu.kotatsu.settings.NotificationSettingsLegacyFragment
 -keep class org.koitharu.kotatsu.settings.about.changelog.ChangelogFragment
+# Preference destinations are loaded by class name, including nested XML entries
+# that AAPT does not always include in its generated rules.
+-keep,allowoptimization class * extends org.koitharu.kotatsu.core.ui.BasePreferenceFragment {
+    public <init>();
+}
 -keep class org.koitharu.kotatsu.settings.utils.EditTextDefaultSummaryProvider { <init>(...); public *; }
 -keep class org.koitharu.kotatsu.settings.utils.AutoCompleteTextViewPreference { <init>(...); public *; }
 
