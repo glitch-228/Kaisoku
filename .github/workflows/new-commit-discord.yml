@@ -15,14 +15,18 @@ jobs:
           DISCORD_ROLE_ID: ${{ secrets.DISCORD_ROLE_ID }}
           REPO_FULL_NAME: ${{ github.repository }}
           REPO: ${{ github.event.repository.name }}
-          COMMIT_URL: ${{ github.event.head_commit.url }}
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
           ACTOR: ${{ github.actor }}
           BRANCH: ${{ github.ref_name }}
-          TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
+          set -euo pipefail
+
           if [ -z "$WEBHOOK" ]; then
             echo "No DISCORD_WEBHOOK_URL secret configured, skipping notification."
+            exit 0
+          fi
+
+          # Only include commits from this push, never previous branch history.
+          if ! jq -e '(.deleted != true) and ((.commits // []) | length > 0)' "$GITHUB_EVENT_PATH" >/dev/null; then
             exit 0
           fi
 
@@ -39,26 +43,47 @@ jobs:
             ROLE_MENTIONS="[\"${ROLE_ID}\"]"
           fi
 
-          jq -n \
+          PAYLOAD=$(jq \
             --arg content "$CONTENT" \
             --argjson roles "$ROLE_MENTIONS" \
-            --arg title "New Commit: ${REPO}" \
-            --arg url "${COMMIT_URL}" \
-            --arg description "${COMMIT_MSG}" \
+            --arg repo "$REPO" \
             --arg author_name "${ACTOR}" \
             --arg author_icon "https://github.com/${ACTOR}.png" \
             --arg footer "Branch: ${BRANCH}" \
-            --arg timestamp "${TIMESTAMP}" \
-            '{
+            'def discord_length:
+              reduce explode[] as $code (0; . + (if $code > 65535 then 2 else 1 end));
+            {
+              commits: (.commits // []),
+              compare: .compare,
+              timestamp: .head_commit.timestamp
+            }
+            | . as $push
+            | (.commits | length) as $count
+            | (.commits[-10:] | reverse | map(
+                "[`\(.id[0:7])`](\(.url)) " +
+                ((.message // "") | split("\n")[0] | sub("\r$"; "") |
+                  if length > 160 then .[0:159] + "…" else . end)
+              )) as $lines
+            | "\n\n[View all \($count) commits](\($push.compare))" as $more
+            | (reduce $lines[] as $line ([];
+                if ((. + [$line]) | join("\n") | discord_length) <= (4096 - ($more | discord_length))
+                then . + [$line] else . end
+              )) as $shown
+            | {
               content: $content,
               allowed_mentions: { roles: $roles },
               embeds: [{
-                title: $title,
-                url: $url,
-                description: $description,
+                title: (if $count == 1 then "New Commit: \($repo)"
+                        else "New Commits (\($count)): \($repo)" end),
+                url: (if $count == 1 then $push.commits[0].url else $push.compare end),
+                description: (($shown | join("\n")) +
+                  (if $count > ($shown | length)
+                   then $more else "" end)),
                 color: 5814783,
                 author: { name: $author_name, icon_url: $author_icon },
                 footer: { text: $footer },
-                timestamp: $timestamp
-              }]
-            }' | curl -fsS -H "Content-Type: application/json" -X POST -d @- "$WEBHOOK"
+                timestamp: ($push.timestamp // $push.commits[-1].timestamp)
+              } | with_entries(select(.value != null))]
+            }' "$GITHUB_EVENT_PATH")
+
+          printf '%s' "$PAYLOAD" | curl -fsS -H "Content-Type: application/json" -X POST -d @- "$WEBHOOK"
