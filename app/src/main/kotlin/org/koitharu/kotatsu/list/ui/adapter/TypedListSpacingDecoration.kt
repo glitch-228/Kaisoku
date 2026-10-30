@@ -57,6 +57,7 @@ class TypedListSpacingDecoration(
 			ListItemType.FOOTER_LOADING,
 			ListItemType.FOOTER_ERROR,
 			ListItemType.FOOTER_BUTTON,
+            ListItemType.TRACKER_CATALOGUE_MORE,
 			ListItemType.STATE_LOADING,
 			ListItemType.STATE_ERROR,
 			ListItemType.RECOMMENDATION_WARNING,
@@ -64,6 +65,7 @@ class TypedListSpacingDecoration(
 			ListItemType.EXPLORE_SOURCE_GRID,
 			ListItemType.EXPLORE_SUGGESTION,
 			ListItemType.MANGA_NESTED_GROUP,
+            ListItemType.TRACKER_SEARCH_SECTION,
 			ListItemType.CATEGORY_LARGE,
 			ListItemType.NAV_ITEM,
 			ListItemType.CHAPTER_LIST,
@@ -88,6 +90,7 @@ class TypedListSpacingDecoration(
 	private fun Rect.set(spacing: Int) = set(spacing, spacing, spacing, spacing)
 
 	private fun ListItemType?.isEdgeToEdge() = this == ListItemType.MANGA_NESTED_GROUP
+        || this == ListItemType.TRACKER_SEARCH_SECTION
 		|| this == ListItemType.FILTER_SORT
 		|| this == ListItemType.FILTER_TAG
 		|| this == ListItemType.CHAPTER_LIST

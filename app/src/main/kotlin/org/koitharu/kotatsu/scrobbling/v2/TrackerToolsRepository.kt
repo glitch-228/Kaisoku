@@ -139,6 +139,8 @@ class TrackerToolsRepository @Inject constructor(
         }
     }
 
+    internal fun knownConnectionForSearch(key: String): TrackerConnection? = knownLegacyConnection(key)
+
     internal suspend fun knownConnection(key: String): TrackerConnection? = when (key) {
         "COMICK" -> comickConnection.knownConnection()
         "ANIME_PLANET" -> animePlanet.knownConnection()
@@ -243,6 +245,19 @@ class TrackerToolsRepository @Inject constructor(
     internal suspend fun priorLink(connection: TrackerConnection, mangaId: Long): TrackerLinkV2Entity? =
         links.find(connection.owner, mangaId)
 
+    /** Rechecked by the durable journal before reads, remote creation and local adoption. */
+    internal suspend fun checkSearchSource(local: org.koitharu.kotatsu.scrobbling.v2.bulk.BulkTrackerLocal) {
+        val source = (sources.getEnabledSources() + sources.getDisabledSources()).firstOrNull { it.name == local.source }
+            ?: error("The selected reading source is unavailable or restricted")
+        val manga = Manga(local.id, local.title, local.aliases, local.url, local.publicUrl,
+            org.koitharu.kotatsu.parsers.model.RATING_UNKNOWN,
+            org.koitharu.kotatsu.core.db.entity.ContentRating(local.contentRating), null, emptySet(), null,
+            emptySet(), source = source)
+        check(org.koitharu.kotatsu.core.prefs.AppSettings(context).sourceContentPolicy.allows(manga)) {
+            "The selected source title is now restricted"
+        }
+    }
+
     /** The selected source result and exact prior link are reviewed before this single local commit. */
     internal suspend fun commitBulk(
         connection: TrackerConnection,
@@ -255,8 +270,8 @@ class TrackerToolsRepository @Inject constructor(
         require(selection.confirmed && selection.localMangaId == local.id && selection.mediaId == entry.reference.mediaId &&
             entry.reference.owner == connection.owner)
         checkConnection(connection)
-        val selectedSource = if (local.fromSearch) sources.getEnabledSources().singleOrNull { it.name == local.source }
-            ?: error("The selected source is unavailable or disabled; choose a source edition again") else null
+        val selectedSource = if (local.fromSearch) (sources.getEnabledSources() + sources.getDisabledSources()).singleOrNull { it.name == local.source }
+            ?: error("The selected source is unavailable or restricted; choose a source edition again") else null
         val applyLocal: suspend () -> Unit = { db.withTransaction {
             checkConnection(connection)
             check(incomingLink(connection, local.id) == expectedLink) { "Tracker link changed; review the match again" }

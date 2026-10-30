@@ -28,6 +28,10 @@ internal class BulkTrackerRepositoryAccess @Inject constructor(
 ) : BulkTrackerAccess {
     override fun check(account: BulkTrackerAccount) = tools.checkConnection(account.connection())
 
+    override suspend fun checkReadable(local: BulkTrackerLocal) {
+        if (local.fromSearch) tools.checkSearchSource(local)
+    }
+
     override suspend fun local(id: Long): BulkTrackerLocal? = tools.localManga(id)?.takeUnless {
         ArchivePrivacy.isSensitive(it)
     }?.let { snapshot(it, false) }

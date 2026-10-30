@@ -1,78 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/swipeRefresh"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
-        <TextView
-            android:id="@+id/textBeta"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp" android:paddingVertical="6dp"
-            android:text="@string/tracker_beta_short"
-            android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackground"
-            android:minHeight="48dp" android:textAppearance="?attr/textAppearanceBodySmall" />
-        <com.google.android.material.tabs.TabLayout
-            android:id="@+id/tabsServices"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            xmlns:app="http://schemas.android.com/apk/res-auto" app:tabMode="scrollable" />
-        <TextView android:id="@+id/textAccount" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp" android:paddingVertical="4dp" android:textAppearance="?attr/textAppearanceTitleSmall" />
-        <com.google.android.material.tabs.TabLayout
-            xmlns:app="http://schemas.android.com/apk/res-auto"
-            android:id="@+id/tabsStatuses" android:layout_width="match_parent" android:layout_height="wrap_content"
-            app:tabMode="scrollable" />
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingBottom="8dp">
-            <EditText
-                android:id="@+id/editSearch"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:hint="@string/search"
-                android:imeOptions="actionSearch"
-                android:inputType="text"
-                android:singleLine="true" />
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonSort"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/sort_title" />
+    xmlns:app="http://schemas.android.com/apk/res-auto" android:id="@+id/swipeRefresh"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+        <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:scrollbars="none">
+            <com.google.android.material.chip.ChipGroup android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:paddingHorizontal="12dp" app:singleLine="true">
+                <com.google.android.material.chip.Chip android:id="@+id/chipService" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/anilist" />
+                <com.google.android.material.chip.Chip android:id="@+id/chipStatus" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/anilist_all" />
+                <com.google.android.material.chip.Chip android:id="@+id/chipSource" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/enabled_sources" />
+                <com.google.android.material.chip.Chip android:id="@+id/chipLink" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/tracker_link_filter_all" />
+                <com.google.android.material.chip.Chip android:id="@+id/chipDownloaded" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/on_device" />
+                <com.google.android.material.chip.Chip android:id="@+id/chipSort" style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/sort_title" />
+            </com.google.android.material.chip.ChipGroup>
+        </HorizontalScrollView>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/textAccount" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:paddingHorizontal="16dp" android:paddingVertical="4dp" android:textAppearance="?attr/textAppearanceTitleSmall" />
+            <ImageButton android:id="@+id/buttonWarning" android:layout_width="48dp" android:layout_height="48dp"
+                android:src="@drawable/ic_alert_outline" android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/tracker_search_warnings" android:visibility="gone" />
         </LinearLayout>
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/buttonLogin"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:text="@string/connect_anilist"
-            android:visibility="gone" />
-        <TextView android:id="@+id/textSync" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp" android:paddingVertical="6dp" android:visibility="gone" />
-        <TextView
-            android:id="@+id/textError"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            android:textColor="?attr/colorError"
-            android:visibility="gone" />
+        <TextView android:id="@+id/textBeta" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp" android:paddingVertical="6dp" android:text="@string/tracker_beta_short"
+            android:clickable="true" android:focusable="true" android:minHeight="48dp"
+            android:background="?attr/selectableItemBackground" android:textAppearance="?attr/textAppearanceBodySmall" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/buttonLogin"
+            android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_horizontal"
+            android:text="@string/connect_anilist" android:visibility="gone" />
         <TextView android:id="@+id/textEmpty" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:padding="24dp" android:gravity="center" android:text="@string/nothing_found" android:visibility="gone" />
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingHorizontal="12dp"
-            android:paddingBottom="12dp" />
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/recyclerView" android:layout_width="match_parent"
+            android:layout_height="0dp" android:layout_weight="1" android:clipToPadding="false"
+            android:paddingHorizontal="12dp" android:paddingBottom="12dp" />
     </LinearLayout>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

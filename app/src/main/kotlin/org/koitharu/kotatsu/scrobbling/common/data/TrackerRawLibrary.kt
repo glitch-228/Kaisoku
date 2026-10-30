@@ -40,7 +40,7 @@ internal object TrackerRawLibrary {
                         pageInfo { hasNextPage }
                         mediaList(userId: ${numericOwner(owner)}, type: MANGA, sort: MEDIA_ID) {
                             id userId mediaId status progress progressVolumes score(format: POINT_100) notes updatedAt
-                            media { id type chapters format description siteUrl synonyms
+                            media { id type chapters format isAdult description siteUrl synonyms
                                 title { userPreferred romaji english native } coverImage { large } }
                         }
                     } }
@@ -52,7 +52,7 @@ internal object TrackerRawLibrary {
             ScrobblerService.MAL -> "https://api.myanimelist.net/v2/users/@me/mangalist".toHttpUrl().newBuilder()
                 .addQueryParameter("limit", size.toString()).addQueryParameter("offset", offset.toString())
                 .addQueryParameter("nsfw", "true")
-                .addQueryParameter("fields", "list_status{status,score,num_chapters_read,num_volumes_read,comments,updated_at,is_rereading},num_chapters,alternative_titles,media_type")
+                .addQueryParameter("fields", "list_status{status,score,num_chapters_read,num_volumes_read,comments,updated_at,is_rereading},num_chapters,alternative_titles,media_type,nsfw")
                 .build()
             ScrobblerService.KITSU -> "https://kitsu.app/api/edge/library-entries".toHttpUrl().newBuilder()
                 .addQueryParameter("filter[user_id]", numericOwner(owner))
@@ -116,7 +116,7 @@ internal object TrackerRawLibrary {
                         ?: names.raw("english") ?: names.raw("native"),
                         setOfNotNull(names.raw("romaji"), names.raw("english"), names.raw("native")) + media.textArray("synonyms"),
                         media["coverImage"].objectOrNull()?.raw("large"), media.raw("description"),
-                        "https://anilist.co/manga/$id", media.raw("format"))
+                        "https://anilist.co/manga/$id", media.raw("format")).copy(contentClass = org.koitharu.kotatsu.search.unified.TrackerCatalogue.classify(service, media).takeUnless { it == org.koitharu.kotatsu.search.unified.CatalogueContent.UNKNOWN }?.name)
                     TrackerRawRead.entry(service, owner.accountId, id, title, row).copy(total = media.raw("chapters"))
                 }
             }
@@ -132,7 +132,7 @@ internal object TrackerRawLibrary {
                     val title = title(id, media.raw("title"), names?.let {
                         setOfNotNull(it.raw("en"), it.raw("ja")) + it.textArray("synonyms")
                     }.orEmpty(), media["main_picture"].objectOrNull()?.raw("large"), null,
-                        "https://myanimelist.net/manga/$id", media.raw("media_type"))
+                        "https://myanimelist.net/manga/$id", media.raw("media_type")).copy(contentClass = org.koitharu.kotatsu.search.unified.TrackerCatalogue.classify(service, media).takeUnless { it == org.koitharu.kotatsu.search.unified.CatalogueContent.UNKNOWN }?.name)
                     TrackerRawRead.entry(service, owner.accountId, id, title, row.obj("list_status"))
                         .copy(total = media.raw("num_chapters"))
                 }
@@ -167,7 +167,7 @@ internal object TrackerRawLibrary {
                     }?.toSet().orEmpty()
                     val title = title(id, attrs.raw("canonicalTitle") ?: names.firstOrNull(), names,
                         attrs["posterImage"].objectOrNull()?.raw("medium"), attrs.raw("description"),
-                        "https://kitsu.app/manga/$id", attrs.raw("subtype"))
+                        "https://kitsu.app/manga/$id", attrs.raw("subtype")).copy(contentClass = org.koitharu.kotatsu.search.unified.TrackerCatalogue.classify(service, attrs).takeUnless { it == org.koitharu.kotatsu.search.unified.CatalogueContent.UNKNOWN }?.name)
                     TrackerRawRead.entry(service, owner.accountId, id, title, row).copy(total = attrs.raw("chapterCount"))
                 }
             }
@@ -187,7 +187,7 @@ internal object TrackerRawLibrary {
                     row.raw("target_id")?.let { require(it == id) { "Tracker returned another title" } }
                     val title = title(id, media.raw("name"), setOfNotNull(media.raw("russian")),
                         absoluteShikimori(media["image"].objectOrNull()?.raw("original")), null,
-                        "https://shikimori.io/mangas/$id", media.raw("kind"))
+                        "https://shikimori.io/mangas/$id", media.raw("kind")).copy(contentClass = org.koitharu.kotatsu.search.unified.TrackerCatalogue.classify(service, media).takeUnless { it == org.koitharu.kotatsu.search.unified.CatalogueContent.UNKNOWN }?.name)
                     TrackerRawRead.entry(service, owner.accountId, id, title, row).copy(total = media.raw("chapters"))
                 }
             }
@@ -212,7 +212,7 @@ internal object TrackerRawLibrary {
                     val title = title(id, names.firstOrNull { it.raw("is_primary") == "true" }?.raw("title")
                         ?: names.firstOrNull()?.raw("title"), names.mapNotNull { it.raw("title") }.toSet(),
                         media["cover"].objectOrNull()?.raw("x250"), media.raw("description"),
-                        "https://mangabaka.org/$id", media.raw("type"))
+                        "https://mangabaka.org/$id", media.raw("type")).copy(contentClass = org.koitharu.kotatsu.search.unified.TrackerCatalogue.classify(service, media).takeUnless { it == org.koitharu.kotatsu.search.unified.CatalogueContent.UNKNOWN }?.name)
                     TrackerRawRead.entry(service, owner.accountId, id, title, entry).copy(total = media.raw("total_chapters"))
                 }
             }

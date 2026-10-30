@@ -19,6 +19,18 @@
 			android:layout_height="wrap_content"
 			app:layout_scrollFlags="scroll|enterAlways" />
 
+        <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:scrollbars="none">
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                <com.google.android.material.chip.Chip android:id="@+id/chipReadingSource" style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/enabled_sources" />
+                <com.google.android.material.chip.Chip android:id="@+id/chipTracker" style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/tracker_search_provider" />
+                <ImageButton android:id="@+id/buttonSearchWarning" android:layout_width="48dp" android:layout_height="48dp"
+                    android:src="@drawable/ic_alert_outline" android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/tracker_search_warnings" android:visibility="gone" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
 	</com.google.android.material.appbar.AppBarLayout>
 
 	<org.koitharu.kotatsu.core.ui.list.fastscroll.FastScrollRecyclerView

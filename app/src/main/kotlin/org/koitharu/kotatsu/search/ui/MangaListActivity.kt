@@ -126,6 +126,16 @@ class MangaListActivity :
     }
 
     fun pickForTracker(manga: Manga): Boolean {
+        val request = org.koitharu.kotatsu.search.domain.SearchRequest.decode(intent.getStringExtra(
+            org.koitharu.kotatsu.search.domain.SearchRequest.EXTRA))
+        if (request?.trackerTarget != null) {
+            if (request.sources.kind == org.koitharu.kotatsu.search.domain.SourceScopeKind.SINGLE &&
+                manga.source.name != request.sources.sourceName) return true
+            setResult(android.app.Activity.RESULT_OK, android.content.Intent()
+                .putExtra(AppRouter.KEY_MANGA, ParcelableManga(manga, withDescription = false)))
+            finish()
+            return true
+        }
         if (!intent.hasExtra(AppRouter.KEY_TRACKER_TARGET_ID)) return false
         org.koitharu.kotatsu.core.ui.dialog.buildAlertDialog(this, isCentered = true) {
             setTitle(R.string.tracker_link_source)

@@ -145,6 +145,7 @@ internal data class BulkTrackerPage(val entries: List<BulkTrackerRemote>, val ne
 
 internal interface BulkTrackerAccess {
     fun check(account: BulkTrackerAccount)
+    suspend fun checkReadable(local: BulkTrackerLocal) = Unit
     suspend fun local(id: Long): BulkTrackerLocal?
     suspend fun link(account: BulkTrackerAccount, id: Long): BulkTrackerLink?
     suspend fun search(account: BulkTrackerAccount, query: String): List<BulkTrackerCandidate>

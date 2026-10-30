@@ -144,6 +144,16 @@ class ShikimoriRepository @Inject constructor(
             this, ScrobblerService.SHIKIMORI, okHttp, expected, patch, allowCreate,
         )
 
+    override suspend fun readCataloguePage(query: String, cursor: String?):
+        org.koitharu.kotatsu.search.unified.CataloguePage {
+        val session = accountSession()
+        return storage.withSession(session) {
+            org.koitharu.kotatsu.search.unified.TrackerCatalogue.read(
+                ScrobblerService.SHIKIMORI, query, cursor,
+            ) { request -> okHttp.trackerCall(request, storage).rawTrackerElement() }
+        }
+    }
+
     override suspend fun readRawLibraryPage(cursor: String?): org.koitharu.kotatsu.scrobbling.v2.TrackerLibraryPage {
         val session = accountSession()
         return storage.withSession(session) {

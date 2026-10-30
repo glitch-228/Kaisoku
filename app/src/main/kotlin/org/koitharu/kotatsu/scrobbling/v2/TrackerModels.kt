@@ -68,6 +68,7 @@ data class TrackerTitle(
     val url: String,
     val format: String? = null,
     val externalIds: Map<String, String> = emptyMap(),
+    val contentClass: String? = null,
 )
 
 data class TrackerRemoteEntry(

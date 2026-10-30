@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="combined_tracker_search_beta">Combined tracker search · Beta</string>
+    <string name="combined_tracker_search_summary">Search your list, reading sources and the selected tracker catalogue together. Queries are sent only when you submit a search.</string>
+    <string name="tracker_remote_progress">Tracker: %1$s / %2$s</string>
+    <string name="tracker_score_raw">Score: %1$s</string>
+    <string name="tracker_link_filter_all">All links</string>
+    <string name="tracker_link_filter_linked">Linked</string>
+    <string name="tracker_link_filter_unlinked">Unlinked</string>
+    <string name="tracker_source_matches">Linked to this source</string>
+    <string name="tracker_source_unknown">No confirmed link to this source</string>
+    <string name="tracker_search_warnings">Search warnings</string>
+    <string name="tracker_search_saved">Your tracker list</string>
+    <string name="tracker_search_linked">Confirmed source matches</string>
+    <string name="tracker_search_catalogue">Other tracker titles</string>
+    <string name="tracker_catalogue_more">More tracker results</string>
+    <string name="tracker_search_provider">Tracker catalogue</string>
+    <string name="tracker_search_link">Link this source edition</string>
+    <string name="tracker_search_confirm">Link “%1$s” from %2$s to “%3$s”? Check that the work and adaptation match.</string>
+    <string name="tracker_search_pending">This action needs review. Open tracker tools to check its outcome before trying again.</string>
+    <item type="id" name="action_tracker_search_match" />
+    <string name="tracker_remote_progress_unit">Tracker: %1$s %2$s</string>
+</resources>

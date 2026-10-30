@@ -4,204 +4,158 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.view.isVisible
-import androidx.core.widget.addTextChangedListener
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.viewModels
-import androidx.recyclerview.widget.DiffUtil
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.ListAdapter
-import androidx.activity.result.contract.ActivityResultContracts
-import org.koitharu.kotatsu.core.nav.AppRouter
-import org.koitharu.kotatsu.core.util.ext.getParcelableExtraCompat
-import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
-import org.koitharu.kotatsu.scrobbling.common.data.TrackerHttpException
-import com.google.android.material.tabs.TabLayout
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.map
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.nav.router
+import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.ui.BaseFragment
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.databinding.FragmentAnilistLibraryBinding
-import org.koitharu.kotatsu.databinding.ItemAnilistLibraryEntryBinding
-import org.koitharu.kotatsu.scrobbling.common.domain.model.TrackerLibraryEntry
+import org.koitharu.kotatsu.list.ui.model.ListModel
+import org.koitharu.kotatsu.list.ui.size.DynamicItemSizeResolver
 import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblerService
+import org.koitharu.kotatsu.scrobbling.common.domain.model.trackerStatus
+import org.koitharu.kotatsu.search.domain.SearchKind
+import org.koitharu.kotatsu.search.domain.SourceScopeKind
+import org.koitharu.kotatsu.search.unified.*
+import javax.inject.Inject
 
 @AndroidEntryPoint
-class AniListLibraryFragment : BaseFragment<FragmentAnilistLibraryBinding>() {
-
+class AniListLibraryFragment : BaseFragment<FragmentAnilistLibraryBinding>(), TrackerSearchTarget {
     private val viewModel by viewModels<AniListLibraryViewModel>()
-    private val listAdapter = AniListLibraryAdapter(::onEntryClicked)
-    private var pendingEntry: TrackerLibraryEntry? = null
-    private var pendingAccountId: Long? = null
-    private var pendingRevision: Long = -1
-    private val picker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val entry = pendingEntry
-        val manga = result.data?.getParcelableExtraCompat<ParcelableManga>(AppRouter.KEY_MANGA)?.manga
-        pendingEntry = null
-        if (result.resultCode == android.app.Activity.RESULT_OK && entry != null && manga != null) {
-            val storage = viewModel.repository.scrobbler(entry.service).trackerRepository.storage
-            if (storage.user?.id == pendingAccountId && storage.sessionVersion == pendingRevision) {
-                router.showScrobblingSelectorSheet(manga, entry.service, entry.mediaId)
-            }
-        }
-    }
-    private val statusTabs = ArrayList<Pair<TabLayout.Tab, Pair<String?, Int>>>()
+    @Inject lateinit var settings: AppSettings
+    override val trackerSearchQuery get() = viewModel.filter.value.query
+    override val trackerSearchPreview get() = viewModel.content.map { it.take(12) }
+    override fun onSearchQueryChanged(query: String) = viewModel.setSearch(query)
+    override fun searchRequest(query: String, kind: SearchKind) = viewModel.request(query).copy(kind = kind)
+    override fun onTrackerSearchClick(card: TrackerSearchCard) = openCard(card)
 
     override fun onCreateViewBinding(inflater: LayoutInflater, container: ViewGroup?) =
         FragmentAnilistLibraryBinding.inflate(inflater, container, false)
 
     override fun onViewBindingCreated(binding: FragmentAnilistLibraryBinding, savedInstanceState: Bundle?) {
         super.onViewBindingCreated(binding, savedInstanceState)
-        binding.textBeta.setOnClickListener {
-            org.koitharu.kotatsu.core.ui.dialog.buildAlertDialog(requireContext()) {
-                setTitle(R.string.tracker_library_beta)
-                setMessage(R.string.tracker_beta_risks)
-                setPositiveButton(android.R.string.ok, null)
-            }.show()
+        val sizes = DynamicItemSizeResolver(resources, viewLifecycleOwner, settings, adjustWidth = false)
+        val adapter = TrackerCardAdapter(sizes, ::openCard).apply {
+            stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
         }
-        pendingAccountId = savedInstanceState?.getLong("pending_tracker_account")
-        pendingRevision = savedInstanceState?.getLong("pending_tracker_revision") ?: -1
-        pendingEntry = savedInstanceState?.getString("pending_tracker_entry")?.let { runCatching { TrackerLibraryEntry.fromJson(org.json.JSONObject(it)) }.getOrNull() }
-        binding.recyclerView.layoutManager = GridLayoutManager(requireContext(), (resources.configuration.screenWidthDp / (120 * resources.configuration.fontScale)).toInt().coerceIn(1, 6))
-        binding.recyclerView.adapter = listAdapter
+        val grid = GridLayoutManager(requireContext(), 1)
+        grid.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int) = if (adapter.currentList.getOrNull(position) is TrackerSectionHeading)
+                grid.spanCount else 1
+        }
+        binding.recyclerView.layoutManager = grid
+        binding.recyclerView.adapter = adapter
+        fun columns() {
+            grid.spanCount = if (settings.isFixedGridColumnsEnabled) settings.gridColumns else
+                ((binding.recyclerView.width - binding.recyclerView.paddingLeft - binding.recyclerView.paddingRight) /
+                    sizes.cellWidth.coerceAtLeast(1)).coerceIn(1, 12)
+        }
+        binding.recyclerView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> columns() }
+        settings.observe(AppSettings.KEY_GRID_SIZE, AppSettings.KEY_FIXED_GRID_COLUMNS, AppSettings.KEY_GRID_COLUMNS).observe(viewLifecycleOwner) { columns() }
         binding.swipeRefresh.setOnRefreshListener(viewModel::refresh)
         binding.buttonLogin.setOnClickListener { router.openScrobblerSettings(viewModel.service.value) }
-        binding.buttonSort.setOnClickListener {
-            viewModel.toggleSort()
+        binding.textBeta.setOnClickListener {
+            MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.tracker_library_beta)
+                .setMessage(R.string.tracker_beta_risks).setPositiveButton(android.R.string.ok, null).show()
         }
-        binding.editSearch.setText(viewModel.search.value)
-        binding.editSearch.addTextChangedListener { text -> viewModel.setSearch(text?.toString().orEmpty()) }
-        buildStatusTabs(binding)
-        viewModel.content.observe(viewLifecycleOwner) {
-            listAdapter.submitList(it)
-            binding.textEmpty.isVisible = it.isEmpty() && viewModel.isConnected.value && !viewModel.isLoading.value
+        binding.chipService.setOnClickListener {
+            val services = ScrobblerService.entries
+            MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.tracking)
+                .setSingleChoiceItems(services.map { getString(it.titleResId) }.toTypedArray(), services.indexOf(viewModel.service.value)) { d, i ->
+                    viewModel.selectService(services[i]); d.dismiss()
+                }.show()
         }
-        ScrobblerService.entries.forEach { service ->
-            binding.tabsServices.addTab(binding.tabsServices.newTab().setText(service.titleResId).setTag(service))
+        val statuses = listOf(null to R.string.anilist_all, "CURRENT" to R.string.status_reading,
+            "COMPLETED" to R.string.status_completed, "PLANNING" to R.string.status_planned,
+            "PAUSED" to R.string.status_on_hold, "DROPPED" to R.string.status_dropped, "REPEATING" to R.string.status_re_reading)
+        fun statusLabels() = statuses.map { (status, label) ->
+            val count = viewModel.cards.value.count { status == null || it.saved?.status?.let { raw ->
+                trackerStatus(viewModel.service.value, raw) } == status }
+            getString(R.string.anilist_status_count, getString(label), count)
         }
-        binding.tabsServices.getTabAt(ScrobblerService.entries.indexOf(viewModel.service.value))?.select()
-        binding.tabsServices.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab) { viewModel.selectService(tab.tag as ScrobblerService) }
-            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
-            override fun onTabReselected(tab: TabLayout.Tab) = Unit
-        })
-        viewModel.userName.observe(viewLifecycleOwner) { binding.textAccount.text = it.orEmpty() }
-        viewModel.service.observe(viewLifecycleOwner) { binding.buttonLogin.text = getString(R.string.tracker_connect, getString(it.titleResId)) }
-        viewModel.entries.observe(viewLifecycleOwner) { entries ->
-            statusTabs.forEach { (chip, filter) ->
-                val count = entries.count { filter.first == null || it.status == filter.first }
-                chip.text = getString(R.string.anilist_status_count, getString(filter.second), count)
+        binding.chipStatus.setOnClickListener {
+            MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.tracking)
+                .setSingleChoiceItems(statusLabels().toTypedArray(), statuses.indexOfFirst { it.first == viewModel.filter.value.status }) { d, i ->
+                    viewModel.updateFilter(viewModel.filter.value.copy(status = statuses[i].first)); d.dismiss()
+                }.show()
+        }
+        binding.chipSource.setOnClickListener {
+            showReadingSourceSelector(requireContext(), viewModel.availableSources.value) {
+                viewModel.updateFilter(viewModel.filter.value.copy(sources = it))
             }
         }
-        viewModel.sortByTitle.observe(viewLifecycleOwner) { alphabetical ->
-            binding.buttonSort.tag = alphabetical
-            binding.buttonSort.setText(if (alphabetical) R.string.sort_recently_updated else R.string.sort_title)
+        binding.chipLink.setOnClickListener {
+            val states = listOf("ALL" to R.string.tracker_link_filter_all, "LINKED" to R.string.tracker_link_filter_linked,
+                "UNLINKED" to R.string.tracker_link_filter_unlinked)
+            MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.tracker_link_filter_all)
+                .setSingleChoiceItems(states.map { getString(it.second) }.toTypedArray(), states.indexOfFirst { it.first == viewModel.filter.value.linkState }) { d, i ->
+                    viewModel.updateFilter(viewModel.filter.value.copy(linkState = states[i].first)); d.dismiss()
+                }.show()
         }
-        viewModel.syncMessage.observe(viewLifecycleOwner) { (pending, error) ->
-            binding.textSync.isVisible = pending > 0 || error != null
-            binding.textSync.text = if (error != null) getString(R.string.tracker_sync_error, error)
-                else getString(R.string.tracker_sync_pending, pending)
+        binding.chipDownloaded.setOnClickListener { viewModel.updateFilter(viewModel.filter.value.copy(downloaded = !viewModel.filter.value.downloaded)) }
+        binding.chipSort.setOnClickListener { viewModel.updateFilter(viewModel.filter.value.copy(alphabetical = !viewModel.filter.value.alphabetical)) }
+        fun chips() {
+            val filter = viewModel.filter.value
+            binding.chipService.setText(viewModel.service.value.titleResId)
+            binding.chipStatus.text = statusLabels()[statuses.indexOfFirst { it.first == filter.status }.coerceAtLeast(0)]
+            binding.chipSource.text = filter.sources.label(requireContext(), viewModel.availableSources.value)
+            binding.chipSource.isChecked = filter.sources.kind != SourceScopeKind.ENABLED
+            binding.chipDownloaded.isChecked = filter.downloaded
+            binding.chipLink.setText(when (filter.linkState) { "LINKED" -> R.string.tracker_link_filter_linked
+                "UNLINKED" -> R.string.tracker_link_filter_unlinked; else -> R.string.tracker_link_filter_all })
+            binding.chipSort.setText(if (filter.alphabetical) R.string.sort_title else R.string.sort_recently_updated)
         }
-        viewModel.error.observe(viewLifecycleOwner) { error ->
-            binding.textError.isVisible = error != null
-            val message = if (error is TrackerHttpException && error.code == 429) {
-                getString(R.string.tracker_retry_after, (error.retryAfterMillis + 999) / 1000)
-            } else error?.message.orEmpty()
-            binding.textError.text = error?.let { getString(R.string.tracker_refresh_error, message) }.orEmpty()
+        viewModel.filter.observe(viewLifecycleOwner) { chips() }
+        viewModel.cards.observe(viewLifecycleOwner) { chips() }
+        viewModel.availableSources.observe(viewLifecycleOwner) { chips() }
+        viewModel.service.observe(viewLifecycleOwner) {
+            chips(); binding.buttonLogin.text = getString(R.string.tracker_connect, getString(it.titleResId))
         }
-        viewModel.isConnected.observe(viewLifecycleOwner) { connected ->
-            binding.buttonLogin.isVisible = !connected
-            binding.recyclerView.isVisible = connected
-            binding.textEmpty.isVisible = connected && viewModel.content.value.isEmpty() && !viewModel.isLoading.value
+        viewModel.content.observe(viewLifecycleOwner) { cards ->
+            val rows = mutableListOf<ListModel>()
+            if (viewModel.filter.value.sources.kind == SourceScopeKind.SINGLE) {
+                val linked = cards.filter { it.editions.isNotEmpty() }
+                val unknown = cards.filter { it.editions.isEmpty() }
+                if (linked.isNotEmpty()) { rows += TrackerSectionHeading(getString(R.string.tracker_source_matches), "matched"); rows += linked }
+                if (unknown.isNotEmpty()) { rows += TrackerSectionHeading(getString(R.string.tracker_source_unknown), "unknown"); rows += unknown }
+            } else rows += cards
+            adapter.submitList(rows)
+            binding.textEmpty.isVisible = rows.isEmpty() && viewModel.isConnected.value && !viewModel.isLoading.value
         }
-        viewModel.isLoading.observe(viewLifecycleOwner) {
-            binding.swipeRefresh.isRefreshing = it
-            binding.textEmpty.isVisible = !it && viewModel.isConnected.value && viewModel.content.value.isEmpty()
+        fun accountLine() {
+            binding.textAccount.text = buildString {
+                append(viewModel.userName.value.orEmpty())
+                if (viewModel.syncMessage.value.first > 0) {
+                    append(" · ").append(getString(R.string.tracker_sync_pending, viewModel.syncMessage.value.first))
+                }
+            }
         }
+        viewModel.userName.observe(viewLifecycleOwner) { accountLine() }
+        fun warning() { binding.buttonWarning.isVisible = viewModel.error.value != null || viewModel.syncMessage.value.second != null }
+        viewModel.error.observe(viewLifecycleOwner) { warning() }
+        viewModel.syncMessage.observe(viewLifecycleOwner) { warning(); accountLine() }
+        binding.buttonWarning.setOnClickListener {
+            showTrackerSearchError(requireContext(), viewModel.error.value ?: IllegalStateException(viewModel.syncMessage.value.second))
+        }
+        viewModel.isConnected.observe(viewLifecycleOwner) {
+            binding.buttonLogin.isVisible = !it; binding.recyclerView.isVisible = it
+        }
+        viewModel.isLoading.observe(viewLifecycleOwner) { binding.swipeRefresh.isRefreshing = it }
         viewModel.refreshIfStale()
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        pendingEntry?.let {
-            outState.putString("pending_tracker_entry", it.toJson().toString())
-            pendingAccountId?.let { account -> outState.putLong("pending_tracker_account", account) }
-            outState.putLong("pending_tracker_revision", pendingRevision)
-        }
+    private fun openCard(card: TrackerSearchCard) {
+        showTrackerSearchCard(requireActivity(), card, viewModel.filter.value.sources)
     }
-
-    override fun onResume() {
-        super.onResume()
-        viewModel.refreshIfStale()
-    }
-
-    override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat = insets
-
-    private fun buildStatusTabs(binding: FragmentAnilistLibraryBinding) {
-        statusTabs.clear()
-        val statuses = listOf(
-            null to R.string.anilist_all,
-            "CURRENT" to R.string.status_reading,
-            "COMPLETED" to R.string.status_completed,
-            "PLANNING" to R.string.status_planned,
-            "PAUSED" to R.string.status_on_hold,
-            "DROPPED" to R.string.status_dropped,
-            "REPEATING" to R.string.status_re_reading,
-        )
-        binding.tabsStatuses.clearOnTabSelectedListeners()
-        binding.tabsStatuses.removeAllTabs()
-        statuses.forEach { (value, title) ->
-            val tab = binding.tabsStatuses.newTab().setText(title).setTag(value)
-            statusTabs += tab to (value to title)
-            binding.tabsStatuses.addTab(tab, false)
-        }
-        binding.tabsStatuses.getTabAt(statuses.indexOfFirst { it.first == viewModel.selectedStatus.value }.coerceAtLeast(0))?.select()
-        binding.tabsStatuses.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab) { viewModel.setStatus(tab.tag as? String) }
-            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
-            override fun onTabReselected(tab: TabLayout.Tab) = Unit
-        })
-    }
-
-    private fun onEntryClicked(entry: TrackerLibraryEntry) {
-        if (entry.localMangaId != null) {
-            router.openDetails(entry.localMangaId)
-        } else {
-            pendingEntry = entry
-            val storage = viewModel.repository.scrobbler(entry.service).trackerRepository.storage
-            pendingAccountId = storage.user?.id
-            pendingRevision = storage.sessionVersion
-            picker.launch(AppRouter.pickMangaIntent(requireContext(), entry.title)
-                .putExtra(AppRouter.KEY_TRACKER_TARGET_ID, entry.mediaId)
-                .putExtra(AppRouter.KEY_TRACKER_TITLE, entry.title))
-        }
-    }
-}
-
-private class AniListLibraryAdapter(
-    private val onClick: (TrackerLibraryEntry) -> Unit,
-) : ListAdapter<TrackerLibraryEntry, AniListLibraryAdapter.Holder>(object : DiffUtil.ItemCallback<TrackerLibraryEntry>() {
-    override fun areItemsTheSame(oldItem: TrackerLibraryEntry, newItem: TrackerLibraryEntry) =
-        oldItem.service == newItem.service && oldItem.mediaId == newItem.mediaId
-    override fun areContentsTheSame(oldItem: TrackerLibraryEntry, newItem: TrackerLibraryEntry) = oldItem == newItem
-}) {
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder =
-        Holder(ItemAnilistLibraryEntryBinding.inflate(LayoutInflater.from(parent.context), parent, false), onClick)
-    override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(getItem(position))
-
-    class Holder(private val binding: ItemAnilistLibraryEntryBinding, private val onClick: (TrackerLibraryEntry) -> Unit) :
-        RecyclerView.ViewHolder(binding.root) {
-        fun bind(item: TrackerLibraryEntry) {
-            binding.imageCover.setImageAsync(item.coverUrl.takeIf(String::isNotBlank), null)
-            binding.textTitle.text = item.title
-            binding.textProgress.text = buildString {
-                append(item.progress).append(" / ").append(item.chapters?.toString() ?: "—")
-                append(" • ").append(binding.root.context.getString(R.string.anilist_score, item.score))
-            }
-            binding.textLinkState.setText(if (item.localMangaId != null) R.string.open_in_library else R.string.search_sources_for_title)
-            binding.root.setOnClickListener { onClick(item) }
-        }
-    }
+    override fun onResume() { super.onResume(); viewModel.refreshIfStale() }
+    override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat) = insets
 }

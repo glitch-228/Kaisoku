@@ -47,6 +47,12 @@
         android:title="@string/reading_time_estimation" />
 
     <PreferenceCategory android:title="@string/tracking">
+        <SwitchPreferenceCompat
+            android:key="combined_tracker_search"
+            android:defaultValue="false"
+            android:title="@string/combined_tracker_search_beta"
+            android:summary="@string/combined_tracker_search_summary" />
+
         <Preference
             android:key="tracker_link_review"
             android:persistent="false"

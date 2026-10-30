@@ -299,8 +299,54 @@ class BulkTrackerEngineTest {
         assertEquals(0, f.access.creates)
     }
 
+    @Test fun sourceRestrictionAfterConfirmationBlocksRemoteCreation() = runTest {
+        val f = fixture()
+        val local = f.access.locals.getValue(1)
+        val candidate = BulkTrackerCandidate("chosen", "Chosen", emptySet(), "https://tracker.test/chosen", "MANGA")
+        val draft = f.engine.prepareSearchLink(account, local, candidate, "selected-source")
+        f.engine.choose(draft.id, draft.items.single().id, candidate, local, null, true)
+        f.access.readable = false
+        f.engine.apply(draft.id)
+        assertEquals(0, f.access.creates)
+        assertTrue(f.access.commits.isEmpty())
+        assertEquals(BulkTrackerItemState.FAILED, f.engine.draft(draft.id).items.single().state)
+    }
+
     private suspend fun matched(f: Fixture): BulkTrackerDraft = f.engine.match(account, f.access.locals.values.toList())
         .also { f.engine.search(it.id) }
+
+    @Test fun singleSearchPairPreparationIsReadOnlyDurableAndNeedsConfirmation() = runTest {
+        val f = fixture()
+        val candidate = BulkTrackerCandidate("opaque-media", "Chosen title", emptySet(), "https://tracker.test/title", "MANGA")
+        val local = f.access.locals.getValue(1)
+        val draft = f.engine.prepareSearchLink(account, local, candidate, "search-pair")
+        assertEquals(0, f.access.reads); assertEquals(0, f.access.creates); assertTrue(f.access.commits.isEmpty())
+        assertEquals(BulkTrackerItemState.UNRESOLVED, draft.items.single().state)
+        val recreated = BulkTrackerEngine(BulkTrackerStore(f.file), f.access) { f.access.nowMillis }
+        assertEquals(draft, recreated.prepareSearchLink(account, local, candidate, "search-pair"))
+        recreated.apply(draft.id)
+        assertEquals(0, f.access.creates)
+        assertTrue(f.access.commits.isEmpty())
+        f.access.entries[candidate.mediaId] = remote(candidate.mediaId).copy(progress = TrackerRawProgress("12.50"), notes = "keep")
+        recreated.choose(draft.id, draft.items.single().id, candidate, local, null, false)
+        recreated.apply(draft.id)
+        assertEquals("12.50", f.access.commits.getValue(1).progress?.number)
+        assertEquals("keep", f.access.commits.getValue(1).notes)
+        assertEquals(0, f.access.creates)
+    }
+
+    @Test fun reusedSearchPairCannotSwitchAccountOrEdition() = runTest {
+        val f = fixture()
+        val local = f.access.locals.getValue(1)
+        val candidate = BulkTrackerCandidate("opaque-media", "Chosen", emptySet(), "https://tracker.test/a", null)
+        f.engine.prepareSearchLink(account, local, candidate, "saved-search")
+        try { f.engine.prepareSearchLink(account, local.copy(url = "/other"), candidate, "saved-search"); fail() }
+        catch (_: IllegalStateException) { }
+        f.access.current = account.copy(account = "other")
+        try { f.engine.prepareSearchLink(account, local, candidate, "another-search"); fail() }
+        catch (_: IllegalStateException) { }
+        assertEquals(0, f.access.reads); assertEquals(0, f.access.creates)
+    }
 
     private suspend fun confirmed(f: Fixture): BulkTrackerDraft = matched(f).also { draft ->
         val item = f.engine.draft(draft.id).items.single()
@@ -335,6 +381,8 @@ class BulkTrackerEngineTest {
         val pages = hashMapOf<String?, BulkTrackerPage>()
         val queries = mutableListOf<String>()
         val commits = linkedMapOf<Long, TrackerRemoteEntry>()
+        var readable = true
+        override suspend fun checkReadable(local: BulkTrackerLocal) { check(readable) { "Source is restricted" } }
         var reads = 0
         var creates = 0
         var failAfterCreate: Exception? = null

@@ -772,6 +772,8 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
         get() = prefs.getBoolean(KEY_SUGGESTIONS_WIFI_ONLY, false)
 
     val useLegacySuggestions: Boolean get() = prefs.getBoolean(KEY_SUGGESTIONS_LEGACY, false)
+    val useCombinedTrackerSearch: Boolean get() = prefs.getBoolean(KEY_COMBINED_TRACKER_SEARCH, false)
+
     val useTitleOnlySuggestions: Boolean get() = prefs.getBoolean(KEY_SUGGESTIONS_TITLE_ONLY, false)
     val recommendationDiversity: Int get() = prefs.getInt(KEY_SUGGESTIONS_DIVERSITY, 50).coerceIn(0, 100)
     val publicRecommendations: Boolean get() = prefs.getBoolean(KEY_SUGGESTIONS_PUBLIC, false)
@@ -1323,6 +1325,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
         const val KEY_SUGGESTIONS_DISABLED_SOURCES = "suggestions_disabled_sources"
         const val KEY_SUGGESTIONS_NOTIFICATIONS = "suggestions_notifications"
         const val KEY_SHIKIMORI = "shikimori"
+        const val KEY_COMBINED_TRACKER_SEARCH = "combined_tracker_search"
         const val KEY_ANILIST = "anilist"
         const val KEY_MAL = "mal"
         const val KEY_KITSU = "kitsu"

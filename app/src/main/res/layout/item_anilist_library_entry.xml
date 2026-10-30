@@ -1,23 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:layout_margin="4dp" android:clickable="true" android:focusable="true">
-    <androidx.constraintlayout.widget.ConstraintLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="6dp">
-        <org.koitharu.kotatsu.image.ui.CoverImageView android:id="@+id/imageCover"
-            android:layout_width="0dp" android:layout_height="0dp" android:scaleType="centerCrop"
-            android:contentDescription="@string/cover" app:layout_constraintDimensionRatio="2:3"
-            app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" />
-        <TextView android:id="@+id/textTitle" android:layout_width="0dp" android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" android:minLines="2" android:maxLines="2" android:ellipsize="end"
-            android:textAppearance="?attr/textAppearanceTitleSmall" app:layout_constraintTop_toBottomOf="@id/imageCover"
-            app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" />
-        <TextView android:id="@+id/textProgress" android:layout_width="0dp" android:layout_height="wrap_content"
-            android:maxLines="2" android:textAppearance="?attr/textAppearanceBodySmall"
-            app:layout_constraintTop_toBottomOf="@id/textTitle" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent" />
-        <TextView android:id="@+id/textLinkState" android:layout_width="0dp" android:layout_height="wrap_content"
-            android:layout_marginTop="3dp" android:maxLines="2" android:textAppearance="?attr/textAppearanceLabelSmall"
-            app:layout_constraintTop_toBottomOf="@id/textProgress" app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" app:layout_constraintBottom_toBottomOf="parent" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</com.google.android.material.card.MaterialCardView>
+    android:layout_margin="2dp" android:orientation="vertical" android:padding="6dp"
+    android:background="@drawable/custom_selectable_item_background" android:clickable="true" android:focusable="true">
+    <org.koitharu.kotatsu.image.ui.CoverImageView android:id="@+id/imageCover"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:contentDescription="@string/cover" android:background="?attr/colorSurfaceContainer"
+        app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.Kotatsu.Cover" />
+    <TextView android:id="@+id/textTitle" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:lines="2" android:ellipsize="end" android:paddingVertical="4dp"
+        android:textAppearance="?attr/textAppearanceTitleSmall" />
+    <TextView android:id="@+id/textProgress" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:maxLines="2" android:textAppearance="?attr/textAppearanceBodySmall" />
+    <TextView android:id="@+id/textLinkState" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:maxLines="2" android:textAppearance="?attr/textAppearanceLabelSmall" />
+</LinearLayout>

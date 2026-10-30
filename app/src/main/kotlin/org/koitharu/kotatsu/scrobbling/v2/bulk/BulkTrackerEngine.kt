@@ -77,6 +77,25 @@ class BulkTrackerEngine internal constructor(
         }).also { result -> store.mutate { it.copy(drafts = it.drafts + result) } }
     }
 
+    /** A single explicitly selected search pair reuses the durable creation/readback journal. No remote write. */
+    suspend fun prepareSearchLink(account: BulkTrackerAccount, local: BulkTrackerLocal,
+        candidate: BulkTrackerCandidate, requestId: String): BulkTrackerDraft = operations.withLock {
+        access.check(account)
+        store.current().drafts.singleOrNull { it.id == requestId }?.let { existing ->
+            check(existing.account == account && existing.items.singleOrNull()?.let {
+                it.local?.sameEdition(local) == true && it.candidates.singleOrNull() == candidate
+            } == true) { "The saved search selection changed" }
+            return@withLock existing
+        }
+        val actual = access.local(local.id)
+        check(actual?.sameEdition(local) ?: local.fromSearch) { "The selected source edition changed" }
+        access.checkReadable(local)
+        val previous = access.link(account, local.id)
+        BulkTrackerDraft(requestId, account, BulkTrackerDirection.MATCH_FAVORITES, now(), listOf(
+            BulkTrackerItem(uuid(), local, candidates = listOf(candidate), expectedLink = previous),
+        )).also { result -> store.mutate { it.copy(drafts = it.drafts + result) } }
+    }
+
     suspend fun loadLibrary(account: BulkTrackerAccount, append: Boolean): Unit = operations.withLock {
         access.check(account)
         val previous = library(account)
@@ -291,6 +310,7 @@ class BulkTrackerEngine internal constructor(
         check(actual.account == expected.account && actual.items.single { it.id == item.id } == item) { "This draft choice changed" }
         access.check(expected.account)
         val local = requireNotNull(item.local)
+        access.checkReadable(local)
         val current = access.local(local.id)
         check(current?.sameEdition(local) ?: local.fromSearch) { "The local source edition is missing or changed" }
         check(access.link(expected.account, local.id) == item.expectedLink) { "The local tracker link changed; review it again" }

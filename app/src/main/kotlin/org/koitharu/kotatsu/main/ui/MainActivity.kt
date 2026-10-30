@@ -134,6 +134,8 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 
     private var lastBottomInset = 0
 
+    private val trackerSearchTarget = kotlinx.coroutines.flow.MutableStateFlow<org.koitharu.kotatsu.search.unified.TrackerSearchTarget?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(ActivityMainBinding.inflate(layoutInflater))
@@ -246,6 +248,12 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 
 
     override fun onFragmentChanged(fragment: Fragment, fromUser: Boolean) {
+        trackerSearchTarget.value = fragment as? org.koitharu.kotatsu.search.unified.TrackerSearchTarget
+        trackerSearchTarget.value?.let { target ->
+            if (viewBinding.searchView.editText.text.toString() != target.trackerSearchQuery)
+                viewBinding.searchView.setText(target.trackerSearchQuery)
+        }
+
         adjustFabVisibility(topFragment = fragment)
         adjustAppbar(topFragment = fragment)
         if (fromUser) {
@@ -478,13 +486,21 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
     }
 
     private fun initSearch() {
-        val listener = SearchSuggestionListenerImpl(router, viewBinding.searchView, searchSuggestionViewModel)
+        val listener = SearchSuggestionListenerImpl(router, viewBinding.searchView, searchSuggestionViewModel,
+            scopedRequest = { query, kind -> trackerSearchTarget.value?.searchRequest(query, kind) },
+            onQueryChanged = { trackerSearchTarget.value?.onSearchQueryChanged(it) })
         val adapter = SearchSuggestionAdapter(listener)
         viewBinding.searchView.toolbar.addMenuProvider(
             SearchSuggestionMenuProvider(this, voiceInputLauncher, searchSuggestionViewModel),
         )
         viewBinding.searchView.editText.addTextChangedListener(listener)
-        viewBinding.recyclerViewSearch.adapter = adapter
+        val preview = org.koitharu.kotatsu.search.unified.TrackerPreviewAdapter(
+            org.koitharu.kotatsu.list.ui.size.DynamicItemSizeResolver(resources, this, settings, adjustWidth = true),
+        ) { trackerSearchTarget.value?.onTrackerSearchClick(it); viewBinding.searchView.hide() }
+        viewBinding.recyclerViewSearch.adapter = androidx.recyclerview.widget.ConcatAdapter(preview, adapter)
+        trackerSearchTarget.flatMapLatest { target ->
+            target?.trackerSearchPreview ?: kotlinx.coroutines.flow.flowOf(emptyList())
+        }.observe(this) { preview.submit(it) }
         viewBinding.searchView.editText.setOnEditorActionListener(listener)
 
         viewBinding.searchView.observeState()

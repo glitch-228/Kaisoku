@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="combined_tracker_search_beta">Общий поиск с трекером · Бета</string>
+    <string name="combined_tracker_search_summary">Искать в вашем списке, источниках чтения и каталоге выбранного трекера. Запросы отправляются только при запуске поиска.</string>
+    <string name="tracker_remote_progress">Трекер: %1$s / %2$s</string>
+    <string name="tracker_score_raw">Оценка: %1$s</string>
+    <string name="tracker_link_filter_all">Все привязки</string>
+    <string name="tracker_link_filter_linked">Привязанные</string>
+    <string name="tracker_link_filter_unlinked">Без привязки</string>
+    <string name="tracker_source_matches">Привязаны к этому источнику</string>
+    <string name="tracker_source_unknown">Нет подтверждённой привязки к этому источнику</string>
+    <string name="tracker_search_warnings">Ошибки поиска</string>
+    <string name="tracker_search_saved">Ваш список в трекере</string>
+    <string name="tracker_search_linked">Подтверждённые совпадения в источниках</string>
+    <string name="tracker_search_catalogue">Другие произведения трекера</string>
+    <string name="tracker_catalogue_more">Ещё результаты трекера</string>
+    <string name="tracker_search_provider">Каталог трекера</string>
+    <string name="tracker_search_link">Привязать это издание источника</string>
+    <string name="tracker_search_confirm">Привязать «%1$s» из %2$s к «%3$s»? Проверьте произведение и тип адаптации.</string>
+    <string name="tracker_search_pending">Действие требует проверки. Проверьте результат в инструментах трекера перед повторной попыткой.</string>
+    <string name="tracker_remote_progress_unit">Трекер: %1$s %2$s</string>
+</resources>

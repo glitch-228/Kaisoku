@@ -162,6 +162,12 @@ class AppRouter private constructor(
         )
     }
 
+    fun openSearch(request: org.koitharu.kotatsu.search.domain.SearchRequest) {
+        startActivity(Intent(contextOrNull() ?: return, org.koitharu.kotatsu.search.ui.multi.SearchActivity::class.java)
+            .putExtra(KEY_QUERY, request.query).putExtra(KEY_KIND, request.kind)
+            .putExtra(org.koitharu.kotatsu.search.domain.SearchRequest.EXTRA, request.encode()))
+    }
+
     fun openSearch(source: MangaSource, query: String) = openList(source, MangaListFilter(query = query), null)
 
     fun openDetails(manga: Manga) {

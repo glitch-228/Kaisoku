@@ -36,6 +36,12 @@ interface ScrobblerRepository {
         throw UnsupportedOperationException("This tracker does not support incoming progress")
     }
 
+    /** Independent read-only catalogue page; never adopts a list entry or updates progress. */
+    suspend fun readCataloguePage(query: String, cursor: String? = null):
+        org.koitharu.kotatsu.search.unified.CataloguePage {
+        throw UnsupportedOperationException("This tracker has no catalogue search")
+    }
+
     suspend fun fetchLibrary(): List<org.koitharu.kotatsu.scrobbling.common.domain.model.TrackerLibraryEntry>
 
     val storage: ScrobblerStorage

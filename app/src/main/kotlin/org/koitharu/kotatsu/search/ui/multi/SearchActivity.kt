@@ -8,6 +8,11 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import androidx.core.view.isVisible
+import org.koitharu.kotatsu.core.util.ext.getParcelableExtraCompat
+import org.koitharu.kotatsu.search.unified.label
 import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.MenuProvider
@@ -62,6 +67,8 @@ class SearchActivity :
         if (result.resultCode == Activity.RESULT_OK) { setResult(Activity.RESULT_OK, result.data); finish() }
     }
 
+    private val matchSourceKey = "tracker_search_match_source"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(ActivitySearchBinding.inflate(layoutInflater))
@@ -80,7 +87,13 @@ class SearchActivity :
         }
 
         val itemClickListener = OnListItemClickListener<SearchResultsListModel> { item, view ->
-            if (intent.hasExtra(AppRouter.KEY_TRACKER_TARGET_ID)) {
+            if (viewModel.scopedRequest().trackerTarget != null) {
+                val request = viewModel.scopedRequest().copy(sources = org.koitharu.kotatsu.search.domain.ReadingSourceScope(
+                    org.koitharu.kotatsu.search.domain.SourceScopeKind.SINGLE, item.source.name))
+                sourcePicker.launch(AppRouter.listIntent(this, item.source,
+                    item.listFilter ?: org.koitharu.kotatsu.parsers.model.MangaListFilter(query = viewModel.query), item.sortOrder)
+                    .putExtra(org.koitharu.kotatsu.search.domain.SearchRequest.EXTRA, request.encode()))
+            } else if (intent.hasExtra(AppRouter.KEY_TRACKER_TARGET_ID)) {
                 sourcePicker.launch(AppRouter.listIntent(this, item.source,
                     item.listFilter ?: org.koitharu.kotatsu.parsers.model.MangaListFilter(query = viewModel.query), item.sortOrder)
                     .putExtra(AppRouter.KEY_TRACKER_TARGET_ID, intent.getLongExtra(AppRouter.KEY_TRACKER_TARGET_ID, 0))
@@ -104,6 +117,11 @@ class SearchActivity :
             itemClickListener = itemClickListener,
             sizeResolver = sizeResolver,
             selectionDecoration = selectionDecoration,
+            trackerClick = { card ->
+                org.koitharu.kotatsu.search.unified.showTrackerSearchCard(this, card, viewModel.sourceScope,
+                    intent.getParcelableExtraCompat<ParcelableManga>(matchSourceKey)?.manga)
+            },
+            loadCatalogueMore = viewModel::loadCatalogueMore,
         )
         viewBinding.recyclerView.adapter = adapter
         viewBinding.recyclerView.setHasFixedSize(true)
@@ -116,9 +134,41 @@ class SearchActivity :
         )
 
         addMenuProvider(SearchMenuProvider(this, viewModel))
-        if (pickMode) {
-            addMenuProvider(PickModeSearchMenuProvider())
+        addMenuProvider(PickModeSearchMenuProvider())
+        viewBinding.chipReadingSource.setOnClickListener {
+            org.koitharu.kotatsu.search.unified.showReadingSourceSelector(this, viewModel.availableSources.value) {
+                viewModel.setSourceScope(it); updateSearchChips()
+            }
         }
+        viewBinding.chipTracker.setOnClickListener {
+            val services = org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblerService.entries.filter {
+                viewModel.trackerSearch.tools.legacyRepository(it.name)?.isAuthorized == true
+            }
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.tracker_search_provider)
+                .setItems((listOf(getString(R.string.none)) + services.map { getString(it.titleResId) }).toTypedArray()) { _, index ->
+                    if (index == 0) { viewModel.setTracker(null); updateSearchChips() }
+                    else lifecycleScope.launch {
+                        try {
+                            val account = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                viewModel.trackerSearch.connect(services[index - 1])
+                            }
+                            viewModel.setTracker(account); updateSearchChips()
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e
+                        } catch (e: Exception) { org.koitharu.kotatsu.search.unified.showTrackerSearchError(this@SearchActivity, e) }
+                    }
+                }.show()
+        }
+        viewBinding.buttonSearchWarning.setOnClickListener {
+            org.koitharu.kotatsu.search.unified.showTrackerSearchError(this,
+                IllegalStateException(viewModel.warnings.value.joinToString("\n") {
+                    org.koitharu.kotatsu.remote.library.LibraryDiagnostics.text(it)
+                }))
+        }
+        viewModel.availableSources.observe(this) { updateSearchChips() }
+        viewModel.warnings.observe(this) { viewBinding.buttonSearchWarning.isVisible = it.isNotEmpty() }
+        settings.observe(AppSettings.KEY_COMBINED_TRACKER_SEARCH).observe(this) { updateSearchChips() }
+        updateSearchChips()
 
         viewModel.list.observe(this, adapter)
         viewModel.onError.observeEvent(this, SnackbarErrorObserver(viewBinding.recyclerView, null))
@@ -152,6 +202,10 @@ class SearchActivity :
 
     private fun confirmPick(item: MangaListModel) {
         val target = item.toMangaWithOverride()
+        if (viewModel.scopedRequest().trackerTarget != null) {
+            setResult(Activity.RESULT_OK, Intent().putExtra(AppRouter.KEY_MANGA, ParcelableManga(target, withDescription = false)))
+            finish(); return
+        }
         buildAlertDialog(this, isCentered = true) {
             setTitle(if (intent.hasExtra(AppRouter.KEY_TRACKER_TARGET_ID)) R.string.tracker_link_source else R.string.manga_migration)
             setMessage(
@@ -225,11 +279,26 @@ class SearchActivity :
         menu: Menu
     ): Boolean {
         menuInflater.inflate(R.menu.mode_remote, menu)
+        if (settings.useCombinedTrackerSearch && viewModel.trackerAccount != null)
+            menu.add(Menu.NONE, R.id.action_tracker_search_match, Menu.NONE, R.string.tracker_search_link)
         return true
     }
 
     override fun onActionItemClicked(controller: ListSelectionController, mode: ActionMode?, item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_tracker_search_match -> {
+                val manga = collectSelectedItems().singleOrNull()
+                val account = viewModel.trackerAccount
+                if (manga != null && account != null) {
+                    startActivity(Intent(this, SearchActivity::class.java)
+                        .putExtra(AppRouter.KEY_QUERY, manga.title)
+                        .putExtra(org.koitharu.kotatsu.search.domain.SearchRequest.EXTRA,
+                            viewModel.scopedRequest().copy(query = manga.title, kind = SearchKind.SIMPLE, trackerTarget = null).encode())
+                        .putExtra(matchSourceKey, ParcelableManga(manga, withDescription = false)))
+                    mode?.finish()
+                }
+                true
+            }
             R.id.action_share -> {
                 ShareHelper(this).shareMangaLinks(collectSelectedItems())
                 mode?.finish()
@@ -250,6 +319,12 @@ class SearchActivity :
 
             else -> false
         }
+    }
+
+    private fun updateSearchChips() {
+        viewBinding.chipReadingSource.text = viewModel.sourceScope.label(this, viewModel.availableSources.value)
+        viewBinding.chipTracker.isVisible = settings.useCombinedTrackerSearch && viewModel.scopedRequest().trackerTarget == null
+        viewBinding.chipTracker.text = viewModel.trackerAccount?.provider ?: getString(R.string.tracker_search_provider)
     }
 
     private fun collectSelectedItems(): Set<Manga> {

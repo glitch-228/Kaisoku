@@ -22,6 +22,8 @@ class SearchAdapter(
 	itemClickListener: OnListItemClickListener<SearchResultsListModel>,
 	sizeResolver: ItemSizeResolver,
 	selectionDecoration: MangaSelectionDecoration,
+    trackerClick: (org.koitharu.kotatsu.search.unified.TrackerSearchCard) -> Unit = {},
+    loadCatalogueMore: () -> Unit = {},
 ) : BaseListAdapter<ListModel>(), FastScroller.SectionIndexer {
 
 	init {
@@ -41,6 +43,10 @@ class SearchAdapter(
 		addDelegate(ListItemType.STATE_EMPTY, emptyStateListAD(listener))
 		addDelegate(ListItemType.STATE_ERROR, errorStateListAD(listener))
 		addDelegate(ListItemType.FOOTER_BUTTON, buttonFooterAD(listener))
+        addDelegate(ListItemType.TRACKER_SEARCH_SECTION,
+            org.koitharu.kotatsu.search.unified.trackerSearchSectionAD(sizeResolver, trackerClick))
+        addDelegate(ListItemType.TRACKER_CATALOGUE_MORE,
+            org.koitharu.kotatsu.search.unified.catalogueMoreAD(loadCatalogueMore))
 	}
 
 	override fun getSectionText(context: Context, position: Int): CharSequence? {
