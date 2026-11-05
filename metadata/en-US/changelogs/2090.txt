@@ -1,0 +1,6 @@
+- Add optional Top chart tab and hidden reader pages (off by default).
+- Add Arabic to the page translator; improve overlay placement.
+- Add imported colour themes and cover refresh.
+- Fix crashes in main-tab search and tab switching.
+- Fix backup restore, novel loading and Feed refresh issues.
+- Add and fix many sources.
