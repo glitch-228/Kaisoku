@@ -45,6 +45,16 @@ abstract class MangaDao {
     @Query("SELECT * FROM manga WHERE manga_id IN (:ids)")
     abstract suspend fun findAll(ids: LongArray): List<MangaWithTags>
 
+    /** Keeps a stored manga's cover current. A cover that stays put keeps its large variant unless a new one is given. */
+    @Query(
+        """
+        UPDATE manga SET cover_url = :coverUrl,
+            large_cover_url = COALESCE(:largeCoverUrl, CASE WHEN cover_url = :coverUrl THEN large_cover_url END)
+        WHERE manga_id = :id AND (cover_url != :coverUrl OR (:largeCoverUrl IS NOT NULL AND large_cover_url IS NOT :largeCoverUrl))
+        """,
+    )
+    abstract suspend fun updateCover(id: Long, coverUrl: String, largeCoverUrl: String?): Int
+
     @Query("SELECT EXISTS(SELECT * FROM manga WHERE manga_id = :id)")
     abstract suspend operator fun contains(id: Long): Boolean
 

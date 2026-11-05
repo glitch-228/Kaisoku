@@ -27,6 +27,7 @@ import org.koitharu.kotatsu.core.util.ext.firstVisibleItemPosition
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.removeItemDecoration
 import org.koitharu.kotatsu.databinding.FragmentReaderWebtoonBinding
+import org.koitharu.kotatsu.reader.domain.indexOfPosition
 import org.koitharu.kotatsu.reader.domain.PageLoader
 import org.koitharu.kotatsu.reader.ui.ReaderState
 import org.koitharu.kotatsu.reader.ui.config.ReaderZoomScope
@@ -255,9 +256,7 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
             }
         }
         if (pendingState != null) {
-            val position = pages.indexOfFirst {
-                it.chapterId == pendingState.chapterId && it.index == pendingState.page
-            }
+            val position = pages.indexOfPosition(pendingState.chapterId, pendingState.page) ?: -1
             setItems.join()
             if (position != -1) {
                 val restoreTarget = WebtoonPageKey(pages[position].chapterId, pages[position].id)

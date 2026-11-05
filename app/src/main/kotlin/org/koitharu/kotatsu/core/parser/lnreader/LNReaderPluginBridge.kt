@@ -56,8 +56,8 @@ class LNReaderPluginBridge(
 			"""
 			(function() {
 				var plugin = globalThis.__plugin_${sanitizedId};
-				if (!plugin) return JSON.stringify({error: 'plugin not found'});
-				return JSON.stringify({
+				if (!plugin) return __lnreaderStringifyForHost({error: 'plugin not found'});
+				return __lnreaderStringifyForHost({
 					id: plugin.id || '',
 					name: plugin.name || 'Unknown',
 					site: plugin.site || '',
@@ -89,7 +89,7 @@ class LNReaderPluginBridge(
 			(function() {
 				try {
 					var plugin = globalThis.__plugin_${sanitizedId};
-					if (!plugin || !plugin.filters) return JSON.stringify({ success: true, data: [] });
+					if (!plugin || !plugin.filters) return __lnreaderStringifyForHost({ success: true, data: [] });
 
 					var result = [];
 					for (var key in plugin.filters) {
@@ -110,9 +110,9 @@ class LNReaderPluginBridge(
 							options: opts
 						});
 					}
-					return JSON.stringify({ success: true, data: result });
+					return __lnreaderStringifyForHost({ success: true, data: result });
 				} catch (e) {
-					return JSON.stringify({ success: false, error: String(e) });
+					return __lnreaderStringifyForHost({ success: false, error: String(e) });
 				}
 			})();
 		""".trimIndent()
@@ -346,7 +346,7 @@ class LNReaderPluginBridge(
 			qjs.evaluate<Any?>("globalThis.$resultVar = undefined;\n" + script, "<$methodName>")
 			while (true) {
 				val result = qjs.evaluate<String?>(
-					"JSON.stringify(globalThis.$resultVar) || null", "<result>",
+					"__lnreaderStringifyForHost(globalThis.$resultVar) || null", "<result>",
 				)
 				if (result != null) {
 					val obj = json.parseToJsonElement(result).jsonObject
@@ -369,18 +369,21 @@ class LNReaderPluginBridge(
 		}
 	}
 
-	suspend fun resolveUrl(path: String, isNovel: Boolean = true): String? = qjs.evaluate<String?>(
-		"""
-		(function() {
-			var plugin = globalThis.__plugin_${sanitizedId};
-			return typeof plugin.resolveUrl === 'function' ? plugin.resolveUrl('${escapeForJS(path)}', $isNovel) : null;
-		})();
-		""".trimIndent(), "<resolveUrl>",
-	)
+	suspend fun resolveUrl(path: String, isNovel: Boolean = true): String? {
+		val result = qjs.evaluate<String?>(
+			"""
+			__lnreaderStringifyForHost((function() {
+				var plugin = globalThis.__plugin_${sanitizedId};
+				return typeof plugin.resolveUrl === 'function' ? plugin.resolveUrl('${escapeForJS(path)}', $isNovel) : null;
+			})());
+			""".trimIndent(), "<resolveUrl>",
+		)
+		return result?.let { json.parseToJsonElement(it).jsonPrimitive.contentOrNull }
+	}
 
 	suspend fun imageHeaders(): Map<String, String> {
 		val result = qjs.evaluate<String>(
-			"JSON.stringify(globalThis.__plugin_${sanitizedId}.imageRequestInit?.headers || {})", "<imageHeaders>",
+			"__lnreaderStringifyForHost(globalThis.__plugin_${sanitizedId}.imageRequestInit?.headers || {})", "<imageHeaders>",
 		)
 		return json.parseToJsonElement(result).jsonObject.mapValues { it.value.jsonPrimitive.content }
 	}

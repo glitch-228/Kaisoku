@@ -26,6 +26,7 @@ import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.recyclerView
 import org.koitharu.kotatsu.core.util.ext.resetTransformations
 import org.koitharu.kotatsu.databinding.FragmentReaderPagerBinding
+import org.koitharu.kotatsu.reader.domain.indexOfPosition
 import org.koitharu.kotatsu.reader.domain.PageLoader
 import org.koitharu.kotatsu.reader.ui.ReaderState
 import org.koitharu.kotatsu.reader.ui.config.ReaderZoomScope
@@ -125,9 +126,7 @@ abstract class BasePagerReaderFragment : BaseReaderFragment<FragmentReaderPagerB
             pagerLifecycleDispatcher?.postInvalidate()
         }
         if (pendingState != null) {
-            val position = adapterPages(pages).indexOfFirst {
-                it.chapterId == pendingState.chapterId && it.index == pendingState.page
-            }
+            val position = adapterPages(pages).indexOfPosition(pendingState.chapterId, pendingState.page) ?: -1
             items.join()
             if (position != -1) {
                 requireViewBinding().pager.setCurrentItem(position, false)

@@ -84,8 +84,8 @@ data class MangaDetails(
 
     fun toManga() = mergedManga
 
-    fun getLocale(): Locale? {
-        findAppropriateLocale(chapters.keys.singleOrNull())?.let {
+    fun getLocale(branch: String? = null): Locale? {
+        findAppropriateLocale(branch ?: chapters.keys.singleOrNull())?.let {
             return it
         }
         return manga.source.getLocale()
@@ -124,11 +124,12 @@ data class MangaDetails(
         if (name.isNullOrEmpty()) {
             return null
         }
+        fun matches(label: String): Boolean = label.isNotBlank() && name.contains(label, ignoreCase = true)
         return Locale.getAvailableLocales().find { lc ->
-            name.contains(lc.getDisplayName(lc), ignoreCase = true) ||
-                name.contains(lc.getDisplayName(Locale.ENGLISH), ignoreCase = true) ||
-                name.contains(lc.getDisplayLanguage(lc), ignoreCase = true) ||
-                name.contains(lc.getDisplayLanguage(Locale.ENGLISH), ignoreCase = true)
+            matches(lc.getDisplayName(lc)) ||
+                matches(lc.getDisplayName(Locale.ENGLISH)) ||
+                matches(lc.getDisplayLanguage(lc)) ||
+                matches(lc.getDisplayLanguage(Locale.ENGLISH))
         }
     }
 }

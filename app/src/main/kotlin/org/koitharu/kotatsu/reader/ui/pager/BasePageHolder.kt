@@ -119,10 +119,14 @@ abstract class BasePageHolder<B : ViewBinding>(
         }
         val clickListener = View.OnClickListener { v ->
             when (v.id) {
-                R.id.button_retry -> viewModel.retry(
-                    page = boundData?.toMangaPage() ?: return@OnClickListener,
-                    isFromUser = true,
-                )
+                R.id.button_retry -> if (viewModel.state.value is PageState.Hidden) {
+                    viewModel.showHiddenPage()
+                } else {
+                    viewModel.retry(
+                        page = boundData?.toMangaPage() ?: return@OnClickListener,
+                        isFromUser = true,
+                    )
+                }
 
                 R.id.button_error_details -> viewModel.showErrorDetails(boundData?.url)
             }
@@ -378,7 +382,7 @@ abstract class BasePageHolder<B : ViewBinding>(
     final override fun onLowMemory() = onTrimMemory(TRIM_MEMORY_COMPLETE)
 
     protected open fun onStateChanged(state: PageState) {
-        bindingInfo.layoutError.isVisible = state is PageState.Error
+        bindingInfo.layoutError.isVisible = state is PageState.Error || (state is PageState.Hidden && !viewModel.removesHiddenPages)
         bindingInfo.layoutProgress.isGone = state.isFinalState()
         val progress = (state as? PageState.Loading)?.progress ?: -1
         if (progress in 0..100) {
@@ -395,6 +399,18 @@ abstract class BasePageHolder<B : ViewBinding>(
             }
 
             is PageState.Empty -> Unit
+
+            is PageState.Hidden -> {
+                // The page slot stays, so page numbers, chapter positions and saved progress do not move
+                // By default the list drops this page and nothing is shown; with the placeholder option
+                // its place stays, with a tap to show it
+                bindingInfo.textViewError.setText(R.string.hidden_page_placeholder)
+                bindingInfo.buttonRetry.setText(R.string.hidden_page_show)
+                bindingInfo.buttonErrorDetails.isVisible = false
+                bindingInfo.layoutError.isVisible = !viewModel.removesHiddenPages
+                bindingInfo.progressBar.hide()
+                ssiv.recycle()
+            }
 
             is PageState.Error -> {
                 val e = state.error

@@ -65,6 +65,10 @@ data class TasteTitle(
     val favorite: Boolean,
     val lastRead: Long,
     val durationMillis: Long = 0,
+    /** How far through it the reader got, 0..1, or negative when not known. */
+    val progress: Float = -1f,
+    /** Chapters in the reading history, for estimating time spent when statistics are off. */
+    val historyChapters: Int = 0,
 )
 
 data class RecommendationSnapshot(

@@ -145,6 +145,15 @@ class LNReaderFetchBridge(
      */
 	fun toJavaScriptFunction(): String {
 		return """
+			// Escape surrogate code units only in JSON crossing the JNI string bridge.
+			// JSON parsing restores the original text; ordinary plugin serialization is unchanged.
+			globalThis.__lnreaderStringifyForHost = function(value) {
+				var text = JSON.stringify(value);
+				return typeof text === 'string' ? text.replace(/[\uD800-\uDFFF]/g, function(ch) {
+					return '\\u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4);
+				}) : text;
+			};
+
 			class Headers {
 				constructor(init) {
 					this.map = {};
@@ -193,9 +202,11 @@ class LNReaderFetchBridge(
 
 			globalThis.fetchApi = function(url, init) {
 				url = String(url);
+				url = url.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(pair) { return encodeURIComponent(pair); });
+				if (/[\uD800-\uDFFF]/.test(url)) return Promise.reject(new Error('Invalid Unicode in URL'));
 				init = init || {};
 				if (init.headers) init = Object.assign({}, init, {headers: new Headers(init.headers)});
-				var initStr = JSON.stringify(init);
+				var initStr = __lnreaderStringifyForHost(init);
 				var responseStr = __nativeFetch(url, initStr);
 				var response = responseStr ? JSON.parse(responseStr) : {};
 

@@ -43,12 +43,22 @@ class PageViewModel(
     private val scope = loader.loaderScope + Dispatchers.Main.immediate
     private var job: Job? = null
     private var cachedBounds: Rect? = null
+    private var boundPage: MangaPage? = null
+    private var loadedUri: Uri? = null
+    private var showHiddenAnyway = false
+    private var hiddenChangesJob: Job? = null
 
     val state = MutableStateFlow<PageState>(PageState.Empty)
 
     fun isLoading() = job?.isActive == true
 
+    /** Whether a hidden page is dropped from the list (the default) rather than kept as a tap-to-show placeholder. */
+    val removesHiddenPages: Boolean get() = loader.removesHiddenPages
+
     fun onBind(page: MangaPage) {
+        boundPage = page
+        showHiddenAnyway = false
+        observeHiddenPages()
         val prevJob = job
         job = scope.launch(Dispatchers.Default) {
             prevJob?.cancelAndJoin()
@@ -80,7 +90,36 @@ class PageViewModel(
     fun onRecycle() {
         state.value = PageState.Empty
         cachedBounds = null
+        boundPage = null
+        loadedUri = null
+        showHiddenAnyway = false
+        hiddenChangesJob?.cancel()
+        hiddenChangesJob = null
         job?.cancel()
+    }
+
+    /** Shows a page that matches a hidden one, for as long as it stays on this screen. */
+    fun showHiddenPage() {
+        val page = boundPage ?: return
+        showHiddenAnyway = true
+        retry(page, isFromUser = false)
+    }
+
+    /** Beta: hiding or showing pages again takes effect on the page already open, not only on the next one. */
+    private fun observeHiddenPages() {
+        if (hiddenChangesJob?.isActive == true) return
+        hiddenChangesJob = scope.launch(Dispatchers.Default) {
+            loader.hiddenPageIds.collect { ids ->
+                val page = boundPage ?: return@collect
+                val isHidden = !showHiddenAnyway && page.id in ids
+                val current = state.value
+                if (isHidden && (current is PageState.Loaded || current is PageState.Shown)) {
+                    state.value = PageState.Hidden
+                } else if (!isHidden && current is PageState.Hidden) {
+                    retry(page, isFromUser = false)
+                }
+            }
+        }
     }
 
     override fun onImageLoaded() {
@@ -169,6 +208,11 @@ class PageViewModel(
             val uri = task.await()
             progressObserver.cancelAndJoin()
             previewJob.cancel()
+            loadedUri = uri
+            if (!showHiddenAnyway && loader.checkHiddenPage(data, uri)) {
+                state.value = PageState.Hidden
+                return@coroutineScope
+            }
             // Keep content metadata when playback is off, so toggling reuses this downloaded file.
             val isAnimated = isAnimationSupported &&
                 runInterruptible(Dispatchers.IO) { AnimatedImageDetector.isAnimated(uri) }

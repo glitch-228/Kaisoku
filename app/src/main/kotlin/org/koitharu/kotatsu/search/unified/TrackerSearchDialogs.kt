@@ -9,8 +9,18 @@ import org.koitharu.kotatsu.remote.library.LibraryDiagnostics
 
 fun showTrackerSearchError(context: Context, error: Throwable) {
     val details = LibraryDiagnostics.text(error).redactSecrets()
+    showSearchWarningDialog(context, LibraryDiagnostics.message(error).redactSecrets(), details)
+}
+
+fun showTrackerSearchErrors(context: Context, errors: List<Throwable>) {
+    if (errors.isEmpty()) return
+    val report = searchWarningReport(errors)
+    showSearchWarningDialog(context, report.summary, report.details)
+}
+
+private fun showSearchWarningDialog(context: Context, message: String, details: String) {
     MaterialAlertDialogBuilder(context).setTitle(R.string.tracker_search_warnings)
-        .setMessage(LibraryDiagnostics.message(error).redactSecrets())
+        .setMessage(message)
         .setPositiveButton(R.string.copy) { _, _ -> context.copyToClipboard(context.getString(R.string.error), details) }
         .setNegativeButton(android.R.string.ok, null).show()
 }

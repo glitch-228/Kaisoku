@@ -107,7 +107,7 @@ class RecommendationEngine @Inject constructor(
     private fun observeCached(request: RecommendationRequest): Flow<RecommendationSnapshot> = combine(
         store.dao.observe(contextKey(request)),
         library.getMangaDao().recommendationTaste().distinctUntilChangedBy { rows -> rows.map {
-            listOf(it.manga, it.tags, it.favorite, it.lastRead / 86400000, it.durationMillis / 300000, it.progress >= 1f, it.historyChapters)
+            listOf(it.manga, it.tags, it.favorite, it.lastRead / 86400000, it.durationMillis / 300000, it.progress >= 1f, it.progress in 0f..RecommendationRanker.DROPPED_MAX_PROGRESS, it.historyChapters)
         } },
         store.dao.dismissals(),
         combine(store.changes, library.invalidationTracker.createFlow("manga", "manga_tags", "preferences",
@@ -135,7 +135,7 @@ class RecommendationEngine @Inject constructor(
             val profile = taste.mapNotNull { title -> available[title.manga.source]?.let { source ->
                 title.manga.toManga(title.tags.toMangaTags(), null).copy(source = source)
                     .takeUnless { excludeNsfw() && RecommendationContentPolicy.isNsfw(it, settings.useSeparateSourceContentClasses) }
-                    ?.let { TasteTitle(it, title.favorite, title.lastRead, title.durationMillis) }
+                    ?.let { TasteTitle(it, title.favorite, title.lastRead, title.durationMillis, title.progress, title.historyChapters) }
             } }
             val publicRelationKeys = if (request is RecommendationRequest.Details && settings.useTitleOnlySuggestions) {
                 publicProviders.links(request.seed).mapTo(mutableSetOf()) { it.relationKey(request.seed) }

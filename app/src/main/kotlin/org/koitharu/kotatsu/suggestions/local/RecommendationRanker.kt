@@ -9,6 +9,27 @@ import kotlin.math.sqrt
 
 /** Small content vectors; no model, embeddings, or library data leaves the device. */
 object RecommendationRanker {
+
+    /** Opened, barely read and left for weeks: not something to recommend more of, unless it is a favourite. */
+    const val DROPPED_MAX_PROGRESS = 0.1f
+    private const val DROPPED_AFTER_MILLIS = 21L * 86_400_000L
+
+    /** What was read long ago still says something about the reader, only less than what is read now. */
+    private const val RECENCY_FLOOR = 0.25
+
+    /** Reading statistics are off for most people, so time spent is estimated from how far through a title they are. */
+    private const val PAGES_PER_CHAPTER = 25
+    private const val MILLIS_PER_PAGE = 20_000L
+
+    internal fun isDropped(title: TasteTitle, now: Long): Boolean =
+        !title.favorite && title.lastRead > 0 && title.progress in 0f..DROPPED_MAX_PROGRESS &&
+            now - title.lastRead > DROPPED_AFTER_MILLIS
+
+    /** Recorded time, or else what how far they got and how many chapters it has comes to; never less than either. */
+    internal fun engagementMillis(title: TasteTitle): Long {
+        if (title.durationMillis > 0 || title.progress < 0f || title.historyChapters <= 0) return title.durationMillis
+        return (title.progress.coerceIn(0f, 1f) * title.historyChapters * PAGES_PER_CHAPTER * MILLIS_PER_PAGE).toLong()
+    }
     private val stopWords = setOf("the", "a", "an", "of", "and", "to", "in", "my", "is", "no", "i", "и", "в", "на")
     private val separators = Regex("[\\p{P}\\p{Z}\\s]+")
 
@@ -83,11 +104,14 @@ object RecommendationRanker {
         val weightedTasteVectors = tasteVectors.map { (title, vector) -> title to Weights(downweight(vector)) }
         val seed = (request as? RecommendationRequest.Details)?.seed
         val seedVector = seed?.let { Weights(downweight(features(it))) } ?: emptyWeights
-        val tasteByKind = weightedTasteVectors.groupBy { it.first.manga.recommendationKind() }
+        val tasteByKind = weightedTasteVectors.filterNot { isDropped(it.first, now) }
+            .groupBy { it.first.manga.recommendationKind() }
         val profiles = tasteByKind.mapValues { (_, input) ->
             val weighted = input.map { (title, vector) ->
-                val recency = if (title.lastRead > 0) exp(-ln(2.0) * (now - title.lastRead).coerceAtLeast(0) / (90.0 * 86400000)) else 1.0
-                val engagement = ln(1.0 + title.durationMillis.coerceIn(0, 36_000_000) / 60000.0).coerceAtMost(6.0)
+                val recency = if (title.lastRead > 0) {
+                    exp(-ln(2.0) * (now - title.lastRead).coerceAtLeast(0) / (90.0 * 86400000)).coerceAtLeast(RECENCY_FLOOR)
+                } else 1.0
+                val engagement = ln(1.0 + engagementMillis(title).coerceIn(0, 36_000_000) / 60000.0).coerceAtMost(6.0)
                 vector to ((if (title.favorite) 4.0 else 0.0) + (if (title.lastRead > 0) 1.0 else 0.0) + engagement) * recency
             }
             val total = weighted.sumOf { it.second }.coerceAtLeast(1.0)

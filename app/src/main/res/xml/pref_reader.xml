@@ -5,6 +5,26 @@
     android:title="@string/reader_settings">
 
     <SwitchPreferenceCompat
+        android:key="reader_hidden_pages"
+        android:defaultValue="false"
+        android:title="@string/hidden_pages_title"
+        android:summary="@string/hidden_pages_summary" />
+
+    <SwitchPreferenceCompat
+        android:key="reader_hidden_pages_placeholder"
+        android:dependency="reader_hidden_pages"
+        android:defaultValue="false"
+        android:title="@string/hidden_pages_placeholder_title"
+        android:summary="@string/hidden_pages_placeholder_summary" />
+
+    <Preference
+        android:key="reader_hidden_pages_manage"
+        android:dependency="reader_hidden_pages"
+        android:persistent="false"
+        android:title="@string/hidden_pages_manage"
+        android:summary="@string/hidden_pages_manage_summary" />
+
+    <SwitchPreferenceCompat
         android:key="extra_page_retention"
         android:defaultValue="false"
         android:title="@string/extra_page_retention"

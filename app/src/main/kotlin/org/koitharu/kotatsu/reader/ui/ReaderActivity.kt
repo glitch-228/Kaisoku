@@ -385,6 +385,13 @@ class ReaderActivity :
         }
         viewModel.readerMode.observe(this, Lifecycle.State.STARTED, this::onInitReader)
         viewModel.onPageSaved.observeEvent(this, PagesSavedObserver(viewBinding.container))
+        viewModel.onPageHidden.observeEvent(this) { hidden ->
+            android.widget.Toast.makeText(
+                this,
+                if (hidden) R.string.hide_page_done else R.string.hide_page_failed,
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
         viewModel.uiState.zipWithPrevious().observe(this, this::onUiStateChanged)
         combine(
             viewModel.isLoading,
@@ -875,6 +882,10 @@ class ReaderActivity :
 
     override fun onSavePageClick(page: ReaderPage?) {
         viewModel.saveCurrentPage(pageSaveHelper, page)
+    }
+
+    override fun onHidePageClick(page: ReaderPage?) {
+        viewModel.hidePage(page)
     }
 
     override fun onSharePageClick(page: ReaderPage?) {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.ShortcutManager
 import android.os.Build
+import android.os.PersistableBundle
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -39,6 +40,7 @@ import org.koitharu.kotatsu.parsers.model.MangaSource
 import org.koitharu.kotatsu.parsers.util.ifNullOrEmpty
 import org.koitharu.kotatsu.parsers.util.mapNotNullToSet
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -119,9 +121,17 @@ class AppShortcutManager @Inject constructor(
 
 	private suspend fun updateShortcutsImpl() = runCatchingCancellable {
 		val maxShortcuts = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context).coerceAtLeast(5)
-		val shortcuts = historyRepository.getList(0, maxShortcuts)
+		val mangaList = historyRepository.getList(0, maxShortcuts)
 			.filter { x -> x.title.isNotEmpty() }
-			.map { buildShortcutInfo(it) }
+		val published = ShortcutManagerCompat.getDynamicShortcuts(context).sortedBy { it.rank }
+		// Page turns invalidate history too. Do not send another set of bitmap files to the launcher
+		// when the ordered shortcut metadata has not changed (including after process recreation).
+		if (canReuseDynamicShortcuts(
+				mangaList.map { it.shortcutFingerprint() },
+				published.map { it.extras?.getString(EXTRA_SHORTCUT_FINGERPRINT) },
+				published.map { it.extras?.getLong(EXTRA_ICON_RETRY_AT) ?: 0L },
+			)) return@runCatchingCancellable
+		val shortcuts = mangaList.mapIndexed { rank, manga -> buildShortcutInfo(manga, rank) }
 		ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
 	}.onFailure {
 		it.printStackTraceDebug()
@@ -134,7 +144,8 @@ class AppShortcutManager @Inject constructor(
 		}
 	}
 
-	private suspend fun buildShortcutInfo(manga: Manga): ShortcutInfoCompat = withContext(Dispatchers.Default) {
+	private suspend fun buildShortcutInfo(manga: Manga, rank: Int = 0): ShortcutInfoCompat = withContext(Dispatchers.Default) {
+		var coverFailed = false
 		val icon = runCatchingCancellable {
 			coil.execute(
 				ImageRequest.Builder(context)
@@ -147,7 +158,10 @@ class AppShortcutManager @Inject constructor(
 			).getDrawableOrThrow().toBitmap()
 		}.fold(
 			onSuccess = { IconCompat.createWithAdaptiveBitmap(it) },
-			onFailure = { IconCompat.createWithResource(context, R.drawable.ic_shortcut_default) },
+			onFailure = {
+				coverFailed = !manga.coverUrl.isNullOrBlank()
+				IconCompat.createWithResource(context, R.drawable.ic_shortcut_default)
+			},
 		)
 		mangaRepository.storeManga(manga, replaceExisting = true)
 		val title = manga.title.ifEmpty {
@@ -159,6 +173,11 @@ class AppShortcutManager @Inject constructor(
 			.setShortLabel(title)
 			.setLongLabel(title)
 			.setIcon(icon)
+			.setRank(rank)
+			.setExtras(PersistableBundle(2).apply {
+				putString(EXTRA_SHORTCUT_FINGERPRINT, manga.shortcutFingerprint())
+				putLong(EXTRA_ICON_RETRY_AT, if (coverFailed) System.currentTimeMillis() + ICON_RETRY_DELAY_MS else 0L)
+			})
 			.setLongLived(true)
 			.setIntent(
 				ReaderIntent.Builder(context)
@@ -191,4 +210,29 @@ class AppShortcutManager @Inject constructor(
 			.setIntent(AppRouter.listIntent(context, source, null, null))
 			.build()
 	}
+}
+
+private const val EXTRA_SHORTCUT_FINGERPRINT = "kaisoku_shortcut_metadata_v1"
+private const val EXTRA_ICON_RETRY_AT = "kaisoku_shortcut_icon_retry_at"
+private const val ICON_RETRY_DELAY_MS = 10 * 60_000L
+
+/** Length framing avoids collisions between metadata fields containing separators or newlines. */
+internal fun Manga.shortcutFingerprint(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    for (value in listOf(id.toString(), title, altTitles.firstOrNull().orEmpty(), coverUrl.orEmpty())) {
+        val bytes = value.toByteArray(Charsets.UTF_8)
+        digest.update(bytes.size.toString().toByteArray(Charsets.US_ASCII))
+        digest.update(':'.code.toByte())
+        digest.update(bytes)
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+internal fun canReuseDynamicShortcuts(
+    desired: List<String>,
+    published: List<String?>,
+    retryAt: List<Long> = emptyList(),
+    now: Long = System.currentTimeMillis(),
+): Boolean = desired.size == published.size && desired.indices.all {
+    desired[it] == published[it] && (retryAt.getOrElse(it) { 0L }.let { due -> due <= 0 || now < due })
 }

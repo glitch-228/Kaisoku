@@ -40,7 +40,14 @@ enum class BackupSection(
     companion object {
 
         fun of(entry: ZipEntry): BackupSection? {
-            val name = entry.name.lowercase(Locale.ROOT)
+            if (entry.isDirectory) {
+                return null
+            }
+            // By file name alone: a backup unzipped and zipped again usually sits in a folder
+            val name = entry.name.replace('\\', '/')
+                .substringAfterLast('/')
+                .removeSuffix(".json")
+                .lowercase(Locale.ROOT)
             return entries.find { x -> x.entryName == name }
         }
     }

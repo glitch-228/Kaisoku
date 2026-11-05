@@ -924,6 +924,41 @@
     <string name="error_no_data_received">No data was received from server</string>
     <string name="error_empty_file_on_server">The source served an empty file for this page</string>
     <string name="unsupported_backup_message">Please select a proper Kaisoku backup file</string>
+    <string name="theme_name_custom">Custom</string>
+    <string name="custom_themes">Custom themes</string>
+    <string name="custom_themes_none">No custom themes imported</string>
+    <string name="custom_theme_import">Import theme file</string>
+    <string name="custom_theme_import_summary">Import an Idle Fantasy compatible Material 3 theme JSON. Colors follow its primary color.</string>
+    <string name="custom_theme_imported">Theme imported and applied</string>
+    <string name="custom_theme_import_failed">Could not import this theme file</string>
+    <string name="custom_theme_delete">Delete selected theme</string>
+    <string name="custom_theme_delete_confirm">Delete “%1$s”?</string>
+    <string name="top_title">Top</string>
+    <string name="top_today">Top today</string>
+    <string name="top_this_week">Top this week</string>
+    <string name="top_this_month">Top this month</string>
+    <string name="top_period">Period</string>
+    <string name="top_filter_type">Type</string>
+    <string name="top_filter_genre">Genre</string>
+    <string name="top_filter_any">Any</string>
+    <string name="top_empty">None of your sources has a popularity chart for this. Try another period or filter.</string>
+    <string name="top_not_interested">Not interested</string>
+    <string name="top_hidden">Hidden from Top</string>
+    <string name="top_reset_hidden">Show hidden titles again</string>
+    <string name="hidden_pages_title">Hidden pages · Beta</string>
+    <string name="hidden_pages_summary">Hide pages you do not want to see again, such as an ad page. Only a page whose file is exactly the same is hidden, so no other page can be hidden by mistake. Hidden pages are left out of the chapter.</string>
+    <string name="hidden_pages_placeholder_title">Keep a placeholder for hidden pages</string>
+    <string name="hidden_pages_placeholder_summary">Instead of leaving a hidden page out, keep its place with a tap-to-show placeholder</string>
+    <string name="hidden_pages_manage">Manage hidden pages</string>
+    <string name="hidden_pages_none">No hidden pages</string>
+    <string name="hidden_pages_manage_summary">Choose pages to show again</string>
+    <string name="hidden_pages_show_again">Show again</string>
+    <string name="hide_page">Hide this page</string>
+    <string name="hide_page_done">Page hidden wherever this exact page appears</string>
+    <string name="hide_page_failed">This page cannot be hidden</string>
+    <string name="hidden_page_placeholder">Hidden page</string>
+    <string name="hidden_page_show">Show</string>
+    <string name="backup_file_incomplete">This backup file is incomplete. It was probably not fully saved or copied</string>
     <string name="list_ellipsize_pattern" translatable="false">(+%d)</string>
     <!-- Short hours format pattern -->
     <string name="hours_short">%d h</string>
@@ -1470,4 +1505,13 @@
     <string name="plugin_load_error">Failed to load: %s</string>
     <string name="plugin_select_file">Choose a plugin file</string>
     <string name="plugins_deleted">Plugins deleted</string>
+    <plurals name="tracker_stale_title">
+        <item quantity="one">%1$d regularly updated manga has had no new chapter for over 4 weeks</item>
+        <item quantity="other">%1$d regularly updated manga have had no new chapter for over 4 weeks</item>
+    </plurals>
+    <string name="tracker_stale_text">The source may be down: %1$s</string>
+    <string name="tracker_stale_summary">The source may be down</string>
+    <string name="tracker_stale_line">%1$s (%2$s)</string>
+    <string name="tracker_stale_channel">Sources that may be down</string>
+    <string name="tracker_stale_channel_description">At most once a week, when manga that usually update regularly have had no new chapter for 4 weeks</string>
 </resources>

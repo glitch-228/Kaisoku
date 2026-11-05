@@ -90,7 +90,8 @@ class AvifImageDecoder(
 		override fun hashCode() = javaClass.hashCode()
 
 		private fun isApplicable(result: SourceFetchResult): Boolean {
-			return result.mimeType == "image/avif"
+			// By content too: sites serve AVIF labelled as JPEG or WebP
+			return result.mimeType == "image/avif" || BitmapDecoderCompat.isAvif(result.source.source())
 		}
 	}
 }

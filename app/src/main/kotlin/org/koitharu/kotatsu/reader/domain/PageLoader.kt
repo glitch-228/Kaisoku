@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -102,6 +105,7 @@ class PageLoader @Inject constructor(
     private val downloadSlowdownDispatcher: DownloadSlowdownDispatcher,
     private val remoteLibraries: org.koitharu.kotatsu.remote.library.RemoteLibraryManager,
     private val libraryImages: org.koitharu.kotatsu.remote.library.RemoteLibraryImageCache,
+    private val hiddenPages: HiddenPagesStore,
 ) {
 
     val loaderScope = lifecycle.lifecycleScope + InternalErrorHandler() + Dispatchers.Default
@@ -151,6 +155,68 @@ class PageLoader @Inject constructor(
     suspend fun decodeBitmap(uri: Uri): android.graphics.Bitmap = runInterruptible(Dispatchers.IO) {
         if (ArchiveImageUris.isSensitive(context, uri)) org.koitharu.kotatsu.core.image.ArchiveBitmapDecoder.decode(context, uri)
         else BitmapDecoderCompat.decode(uri.toFile())
+    }
+
+    private val hashes = object : LinkedHashMap<String, Pair<String, Long>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<String, Long>>?) = size > HASH_CACHE_SIZE
+    }
+
+    private val hiddenIds = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** Beta: ids of pages found to be exactly a hidden page. The reader leaves them out of its list. */
+    val hiddenPageIds: StateFlow<Set<Long>> = hiddenIds.asStateFlow()
+
+    /** Whether hidden pages are left out of the list (the default), or kept as a tap-to-show placeholder. */
+    val removesHiddenPages: Boolean get() = !settings.isHiddenPagesPlaceholder
+
+    /**
+     * Hidden pages (beta): whether this page's file is exactly one that was hidden, remembering the answer for the
+     * page. Protected archives are never read.
+     */
+    suspend fun checkHiddenPage(page: MangaPage, uri: Uri): Boolean {
+        if (!settings.isHiddenPagesEnabled || hiddenPages.isEmpty()) {
+            if (page.id in hiddenIds.value) hiddenIds.update { it - page.id }
+            return false
+        }
+        val (hash, size) = contentHash(uri) ?: return false
+        val isHidden = hiddenPages.contains(hash, size)
+        if (isHidden != (page.id in hiddenIds.value)) {
+            hiddenIds.update { if (isHidden) it + page.id else it - page.id }
+        }
+        return isHidden
+    }
+
+    /** Remembers the page behind [uri] as hidden. @return false if its content could not be read */
+    suspend fun hidePage(page: MangaPage, uri: Uri, label: String): Boolean {
+        val (hash, size) = contentHash(uri) ?: return false
+        hiddenPages.add(HiddenPage(hash, size, System.currentTimeMillis(), label))
+        hiddenIds.update { it + page.id }
+        return true
+    }
+
+    /** Beta: forgets what was found, after pages were shown again. */
+    fun resetHiddenPages() {
+        hiddenIds.value = emptySet()
+    }
+
+    private suspend fun contentHash(uri: Uri): Pair<String, Long>? = runInterruptible(Dispatchers.IO) {
+        val key = uri.toString()
+        synchronized(hashes) { hashes[key] }?.let { return@runInterruptible it }
+        if (ArchiveImageUris.isSensitive(context, uri)) return@runInterruptible null
+        runCatching {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            var size = 0L
+            org.koitharu.kotatsu.core.image.ReaderImageInput(context, uri).read { stream ->
+                val buffer = ByteArray(16 * 1024)
+                while (true) {
+                    val count = stream.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                    size += count
+                }
+            }
+            (digest.digest().joinToString("") { "%02x".format(it) } to size).also { synchronized(hashes) { hashes[key] = it } }
+        }.getOrNull()
     }
 
     fun isPrefetchApplicable(): Boolean {
@@ -305,6 +371,8 @@ class PageLoader @Inject constructor(
                     isPrefetch = isPrefetch,
                     skipCache = skipCache,
                 ).also {
+                    // Known as soon as the file is there, so a hidden page is left out of the list before it is reached
+                    runCatchingCancellable { checkHiddenPage(page, it) }.onFailure { e -> e.printStackTraceDebug() }
                     if (!isPrefetch) pageResultsFlow.tryEmit(PageLoadResult.Loaded(page.id))
                 }
             } catch (e: Throwable) {
@@ -446,6 +514,7 @@ class PageLoader @Inject constructor(
 
         private const val PROGRESS_UNDEFINED = -1f
         private const val PREFETCH_LIMIT_DEFAULT = 6
+        private const val HASH_CACHE_SIZE = 64
         private const val PREFETCH_MIN_RAM_MB = 80L
 
         private fun shouldValidateInkStoryCache(pageUrl: String, mangaSource: MangaSource): Boolean {

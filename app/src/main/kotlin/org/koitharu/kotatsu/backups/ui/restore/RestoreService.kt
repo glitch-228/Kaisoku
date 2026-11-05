@@ -17,6 +17,7 @@ import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.backups.data.BackupRepository
 import org.koitharu.kotatsu.backups.domain.BackupSection
 import org.koitharu.kotatsu.backups.ui.BaseBackupRestoreService
+import org.koitharu.kotatsu.core.exceptions.BadBackupFormatException
 import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.util.ext.checkNotificationPermission
 import org.koitharu.kotatsu.core.util.ext.getSerializableExtraCompat
@@ -25,6 +26,7 @@ import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toUriOrNull
 import org.koitharu.kotatsu.core.util.ext.withPartialWakeLock
 import org.koitharu.kotatsu.core.util.progress.Progress
+import java.io.EOFException
 import java.io.FileNotFoundException
 import java.util.zip.ZipInputStream
 import javax.inject.Inject
@@ -62,8 +64,12 @@ class RestoreService : BaseBackupRestoreService() {
 			} else {
 				null
 			}
-			val result = ZipInputStream(contentResolver.openInputStream(source)).use { input ->
-				repository.restoreBackup(input, sections, progress, isMerge)
+			val result = try {
+				ZipInputStream(contentResolver.openInputStream(source)).use { input ->
+					repository.restoreBackup(input, sections, progress, isMerge)
+				}
+			} catch (e: EOFException) {
+				throw BadBackupFormatException(e)
 			}
 			progressUpdateJob?.cancelAndJoin()
 			showResultNotification(source, result)

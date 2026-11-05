@@ -2,16 +2,26 @@ package org.koitharu.kotatsu.search.unified
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.databinding.ItemListGroupBinding
 import org.koitharu.kotatsu.list.ui.size.ItemSizeResolver
+import org.koitharu.kotatsu.search.ui.suggestion.adapter.SearchSuggestionAdapter
 
 /** Cached account-list preview above ordinary search suggestions. */
 class TrackerPreviewAdapter(private val sizes: ItemSizeResolver, private val onClick: (TrackerSearchCard) -> Unit) :
     RecyclerView.Adapter<TrackerPreviewAdapter.Holder>() {
     private var cards = emptyList<TrackerSearchCard>()
+
+    fun withSuggestions(suggestions: SearchSuggestionAdapter) = ConcatAdapter(
+        // AdapterDelegates uses holder.itemViewType for bind/recycle dispatch, so it must stay local.
+        ConcatAdapter.Config.Builder().setIsolateViewTypes(false).build(),
+        this,
+        suggestions,
+    )
+
     fun submit(value: List<TrackerSearchCard>) {
         val old = itemCount
         cards = value
@@ -22,6 +32,8 @@ class TrackerPreviewAdapter(private val sizes: ItemSizeResolver, private val onC
         }
     }
     override fun getItemCount() = if (cards.isEmpty()) 0 else 1
+    // The suggestions adapter allocates nonnegative delegate IDs starting at zero.
+    override fun getItemViewType(position: Int) = Int.MIN_VALUE
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         Holder(ItemListGroupBinding.inflate(LayoutInflater.from(parent.context), parent, false))
     override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(cards)

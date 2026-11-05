@@ -48,6 +48,7 @@ import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.exception.TooManyRequestExceptions
 import org.koitharu.kotatsu.parsers.util.ifNullOrEmpty
 import org.koitharu.kotatsu.scrobbling.common.domain.ScrobblerAuthRequiredException
+import java.io.EOFException
 import java.io.File
 import java.net.ConnectException
 import java.net.HttpURLConnection
@@ -117,7 +118,9 @@ private fun Throwable.getDisplayMessageOrNull(resources: Resources): String? = w
     }
     is SQLiteFullException -> resources.getString(R.string.error_no_space_left)
     is UnsupportedFileException -> resources.getString(R.string.text_file_not_supported)
-    is BadBackupFormatException -> resources.getString(R.string.unsupported_backup_message)
+    is BadBackupFormatException -> resources.getString(
+        if (cause is EOFException) R.string.backup_file_incomplete else R.string.unsupported_backup_message,
+    )
     is FileNotFoundException -> parseMessage(resources) ?: message
     is AccessDeniedException -> resources.getString(R.string.no_access_to_file)
     is NonFileUriException -> resources.getString(R.string.error_non_file_uri)

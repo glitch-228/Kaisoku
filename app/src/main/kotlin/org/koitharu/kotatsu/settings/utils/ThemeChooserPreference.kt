@@ -17,6 +17,8 @@ import androidx.core.view.updatePaddingRelative
 import androidx.customview.view.AbsSavedState
 import androidx.preference.Preference
 import androidx.preference.PreferenceViewHolder
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.color.DynamicColorsOptions
 import dagger.hilt.android.EntryPointAccessors
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.prefs.ColorScheme
@@ -34,7 +36,18 @@ class ThemeChooserPreference @JvmOverloads constructor(
     defStyleRes: Int = R.style.Preference_ThemeChooser,
 ) : Preference(context, attrs, defStyleAttr, defStyleRes) {
 
-    private val entries = ColorScheme.getAvailableList()
+    private val settings by lazy {
+        EntryPointAccessors.fromApplication<BaseActivityEntryPoint>(context.applicationContext).settings
+    }
+    private val entries: List<ColorScheme>
+        get() {
+            val available = ColorScheme.getAvailableList(includeCustom = settings.importedThemes.isNotEmpty())
+            return if (currentValue == ColorScheme.CUSTOM && !available.contains(ColorScheme.CUSTOM)) {
+                available + ColorScheme.CUSTOM
+            } else {
+                available
+            }
+        }
     private var currentValue: ColorScheme = ColorScheme.default
     private val lastScrollPosition = intArrayOf(-1)
     private val itemClickListener = View.OnClickListener {
@@ -48,6 +61,9 @@ class ThemeChooserPreference @JvmOverloads constructor(
         set(value) = setValueInternal(value, notifyChanged = true)
 
     fun refreshPalettePreview() = notifyChanged()
+
+    /** Redraws the previews after the imported themes changed. */
+    fun refresh() = notifyChanged()
 
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
@@ -63,7 +79,17 @@ class ThemeChooserPreference @JvmOverloads constructor(
                 EntryPointAccessors.fromApplication<BaseActivityEntryPoint>(context.applicationContext)
                     .wallpaperPalette.preview(themed)
             } else null
-            val context = wallpaperPreview ?: themed
+            val customTheme = settings.selectedCustomTheme.takeIf { theme == ColorScheme.CUSTOM }
+            // Colours derived from the imported primary colour, in an isolated Resources so other themes are unaffected
+            val customPreview = customTheme?.let {
+                runCatching {
+                    DynamicColors.wrapContextIfAvailable(
+                        themed,
+                        DynamicColorsOptions.Builder().setContentBasedSource(it.primaryColor).build(),
+                    )
+                }.getOrNull()
+            }
+            val context = wallpaperPreview ?: customPreview ?: themed
             val item =
                 ItemColorSchemeBinding.inflate(LayoutInflater.from(context), binding.linear, false)
             if (binding.linear.isEmpty()) {
@@ -74,7 +100,7 @@ class ThemeChooserPreference @JvmOverloads constructor(
             item.card.strokeWidth = if (isSelected) context.resources.getDimensionPixelSize(
                 materialR.dimen.m3_comp_outlined_card_outline_width,
             ) else 0
-            item.textViewTitle.setText(theme.titleResId)
+            item.textViewTitle.text = customTheme?.displayName ?: context.getString(theme.titleResId)
             val pendingWallpaper = theme == ColorScheme.WALLPAPER && wallpaperPreview == null
             item.palettePreview.isVisible = !pendingWallpaper
             item.textViewPalettePending.isVisible = pendingWallpaper

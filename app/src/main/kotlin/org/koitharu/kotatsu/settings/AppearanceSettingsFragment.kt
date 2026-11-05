@@ -1,5 +1,6 @@
 package org.koitharu.kotatsu.settings
 
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
@@ -7,6 +8,8 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -15,12 +18,17 @@ import androidx.preference.ListPreference
 import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
 import androidx.preference.TwoStatePreference
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.os.AppShortcutManager
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.ColorScheme
+import org.koitharu.kotatsu.core.prefs.ImportedThemeFile
 import org.koitharu.kotatsu.core.prefs.ListMode
 import org.koitharu.kotatsu.core.prefs.ProgressIndicatorMode
 import org.koitharu.kotatsu.core.prefs.ScreenshotsPolicy
@@ -37,6 +45,8 @@ import org.koitharu.kotatsu.core.util.ext.sortedWithSafe
 import org.koitharu.kotatsu.core.util.ext.toList
 import org.koitharu.kotatsu.parsers.util.mapToSet
 import org.koitharu.kotatsu.parsers.util.names
+import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
+import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.parsers.util.toTitleCase
 import org.koitharu.kotatsu.settings.protect.ProtectSetupActivity
 import org.koitharu.kotatsu.settings.utils.ActivityListPreference
@@ -54,6 +64,10 @@ class AppearanceSettingsFragment :
 
     @Inject
     lateinit var activityRecreationHandle: ActivityRecreationHandle
+
+    private val customThemeFilePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) importCustomTheme(uri)
+    }
 
     @Inject
     lateinit var appShortcutManager: AppShortcutManager
@@ -123,6 +137,7 @@ class AppearanceSettingsFragment :
         }
         bindNavSummary()
         bindWallpaperStatus()
+        bindCustomThemes()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -148,6 +163,14 @@ class AppearanceSettingsFragment :
             AppSettings.KEY_THEME -> {
                 AppCompatDelegate.setDefaultNightMode(settings.theme)
             }
+
+            AppSettings.KEY_CUSTOM_THEME -> {
+                updateCustomThemeSummaries()
+                // The selected theme is applied by every activity
+                if (settings.colorScheme == ColorScheme.CUSTOM) postRestart()
+            }
+
+            AppSettings.KEY_CUSTOM_THEMES -> updateCustomThemeSummaries()
 
             AppSettings.KEY_COLOR_THEME,
             AppSettings.KEY_THEME_AMOLED,
@@ -199,6 +222,116 @@ class AppearanceSettingsFragment :
         }
     }
 
+    private fun bindCustomThemes() {
+        val isAvailable = DynamicColors.isDynamicColorAvailable()
+        listOf(KEY_CUSTOM_THEMES_MANAGEMENT, KEY_CUSTOM_THEME_IMPORT, KEY_CUSTOM_THEME_DELETE).forEach {
+            findPreference<Preference>(it)?.isVisible = isAvailable
+        }
+        if (!isAvailable) return
+        findPreference<Preference>(KEY_CUSTOM_THEMES_MANAGEMENT)?.setOnPreferenceClickListener {
+            showCustomThemes()
+            true
+        }
+        findPreference<Preference>(KEY_CUSTOM_THEME_IMPORT)?.setOnPreferenceClickListener {
+            customThemeFilePicker.launch(arrayOf("*/*"))
+            true
+        }
+        findPreference<Preference>(KEY_CUSTOM_THEME_DELETE)?.setOnPreferenceClickListener {
+            confirmDeleteCustomTheme()
+            true
+        }
+        updateCustomThemeSummaries()
+    }
+
+    private fun showCustomThemes() {
+        val themes = settings.importedThemes
+        if (themes.isEmpty()) {
+            customThemeFilePicker.launch(arrayOf("*/*"))
+            return
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.custom_themes)
+            .setSingleChoiceItems(
+                themes.map { it.displayName }.toTypedArray(),
+                themes.indexOfFirst { it.id == settings.selectedCustomThemeId },
+            ) { dialog, index ->
+                settings.selectedCustomThemeId = themes[index].id
+                findPreference<ThemeChooserPreference>(AppSettings.KEY_COLOR_THEME)?.value = ColorScheme.CUSTOM.name
+                updateCustomThemeSummaries()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun importCustomTheme(uri: Uri) {
+        val appContext = context?.applicationContext ?: return
+        viewLifecycleOwner.lifecycleScope.launch {
+            runCatchingCancellable {
+                // Cloud storage providers can be slow, so the file is read off the main thread
+                val json = withContext(Dispatchers.IO) { readThemeFile(appContext, uri) }
+                val imported = settings.importCustomThemes(json)
+                settings.selectedCustomThemeId = imported.last().id
+                findPreference<ThemeChooserPreference>(AppSettings.KEY_COLOR_THEME)?.let {
+                    it.value = ColorScheme.CUSTOM.name
+                    it.refresh()
+                }
+                updateCustomThemeSummaries()
+                context?.let { Toast.makeText(it, R.string.custom_theme_imported, Toast.LENGTH_SHORT).show() }
+            }.onFailure {
+                it.printStackTraceDebug()
+                context?.let { ctx -> Toast.makeText(ctx, R.string.custom_theme_import_failed, Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+
+    private fun readThemeFile(context: Context, uri: Uri): String {
+        val input = context.contentResolver.openInputStream(uri)
+            ?: throw IllegalArgumentException("Cannot open theme file")
+        return input.bufferedReader(Charsets.UTF_8).use { reader ->
+            val result = StringBuilder()
+            val buffer = CharArray(4096)
+            while (true) {
+                val length = reader.read(buffer)
+                if (length < 0) break
+                require(result.length + length <= ImportedThemeFile.MAX_FILE_SIZE) { "Theme file is too large" }
+                result.append(buffer, 0, length)
+            }
+            result.toString()
+        }
+    }
+
+    private fun confirmDeleteCustomTheme() {
+        val selected = settings.selectedCustomTheme
+        if (selected == null) {
+            context?.let { Toast.makeText(it, R.string.custom_themes_none, Toast.LENGTH_SHORT).show() }
+            return
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.custom_theme_delete)
+            .setMessage(getString(R.string.custom_theme_delete_confirm, selected.displayName))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                settings.deleteCustomTheme(selected.id)
+                if (settings.selectedCustomTheme == null && settings.colorScheme == ColorScheme.CUSTOM) {
+                    findPreference<ThemeChooserPreference>(AppSettings.KEY_COLOR_THEME)?.value = ColorScheme.default.name
+                }
+                findPreference<ThemeChooserPreference>(AppSettings.KEY_COLOR_THEME)?.refresh()
+                updateCustomThemeSummaries()
+            }
+            .show()
+    }
+
+    private fun updateCustomThemeSummaries() {
+        val customTheme = settings.selectedCustomTheme
+        val emptySummary = getString(R.string.custom_themes_none)
+        findPreference<Preference>(KEY_CUSTOM_THEMES_MANAGEMENT)?.summary = customTheme?.displayName ?: emptySummary
+        findPreference<Preference>(KEY_CUSTOM_THEME_DELETE)?.apply {
+            summary = customTheme?.displayName ?: emptySummary
+            isEnabled = customTheme != null
+        }
+    }
+
     private fun postRestart() {
         viewLifecycleOwner.lifecycle.postDelayed(400) {
             activityRecreationHandle.recreateAll()
@@ -244,5 +377,12 @@ class AppearanceSettingsFragment :
         pref.summary = settings.mainNavItems.joinToString {
             getString(it.title)
         }
+    }
+
+    private companion object {
+
+        const val KEY_CUSTOM_THEMES_MANAGEMENT = "custom_themes_management"
+        const val KEY_CUSTOM_THEME_IMPORT = "custom_theme_import"
+        const val KEY_CUSTOM_THEME_DELETE = "custom_theme_delete"
     }
 }

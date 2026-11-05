@@ -19,6 +19,44 @@ import java.net.Socket
  */
 @RunWith(AndroidJUnit4::class)
 class LNReaderEngineInstrumentedTest {
+	@Test fun supplementaryCharactersSurviveNativeResults() = runBlocking {
+		val engine = LNReaderEngine(LNReaderFetchBridge(OkHttpClient(), "unicode"))
+		engine.createPluginContext("""
+			var text = String.fromCodePoint(0x1f916) + '小说';
+			exports.default = {
+				parseNovel: function() {return {path: text, name: text, summary: text, chapters: [{name: text, path: text}]};},
+				parseChapter: function() {return text.repeat(4000);},
+				resolveUrl: function() {return 'https://example.test/' + text;}
+			};
+		""".trimIndent(), "unicode").use { qjs ->
+			val bridge = LNReaderPluginBridge(qjs, "unicode")
+			val title = "🤖小说"
+			val details = bridge.parseNovel(title)
+			assertEquals(title, details.summary)
+			assertEquals(title, details.chapters.single().path)
+			assertEquals(title.repeat(4000), bridge.parseChapter(title))
+			assertEquals("https://example.test/$title", bridge.resolveUrl(title))
+		}
+	}
+
+	@Test fun synopsisSiblingInsertionsRemainChainableAndPreserveTheDocument() = runBlocking {
+		val engine = LNReaderEngine(LNReaderFetchBridge(OkHttpClient(), "synopsis"))
+		engine.createPluginContext("exports.default = {};", "synopsis").use { qjs ->
+			val synopsis = qjs.evaluate<String>("""
+				(function() {
+					var ${'$'} = require('cheerio').load('<p>First<br>Second</p><p>Last</p>');
+					var paragraphs = ${'$'}('p');
+					if (paragraphs.after('\n\n') !== paragraphs) throw new Error('after lost its selection');
+					${'$'}('br').replaceWith('\n');
+					${'$'}('missing').before('Ignored').after('Ignored');
+					${'$'}.root().after('Ignored');
+					return ${'$'}.root().text().trim();
+				})();
+			""".trimIndent())
+			assertEquals("First\nSecond\n\nLast", synopsis)
+		}
+	}
+
 	@Test fun coverHeadersLoadOnColdOpenWithoutFetchingDetailsOrChapters() = runBlocking {
 		val application = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
 		val entity = org.koitharu.kotatsu.core.db.entity.LnReaderSourceEntity(

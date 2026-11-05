@@ -39,4 +39,41 @@ class LNReaderDomBridgeTest {
 		assertEquals(3, (call("contents", paragraph) as JSONArray).length())
 		assertEquals("Writer", call("text", call("find", paragraph, "b")!!))
 	}
+
+	@Test fun siblingInsertionsPreserveMarkupOrderAndSelectedNodeIdentities() {
+		val root = call("parse", "<main><p>A</p><p>B</p></main>")!!
+		val paragraphs = call("find", root, "p")!!
+		call("before", paragraphs, "<b>1</b><i>2</i>")
+		call("after", paragraphs, "<b>3</b><i>4</i>")
+		assertEquals("12A3412B34", call("text", root))
+		assertEquals(paragraphs.toString(), call("find", root, "p").toString())
+		assertEquals("AB", call("text", paragraphs))
+		call("setText", paragraphs, "Updated")
+		assertEquals("12Updated3412Updated34", call("text", root))
+	}
+
+	@Test fun synopsisBreaksRemainTextInsteadOfEscapedMarkup() {
+		val root = call("parse", "<div><p>First<br>line</p><p>Second &amp; third</p></div>")!!
+		call("replaceWith", call("find", root, "br")!!, "\n")
+		call("after", call("find", root, "p, div")!!, "\n\n")
+		assertEquals("First\nline\n\nSecond & third\n\n\n\n", call("text", root))
+	}
+
+	@Test fun siblingInsertionsHandleTextNodesEmptySelectionsAndDetachedNodes() {
+		val root = call("parse", "<p>Text<b>End</b></p>")!!
+		val paragraph = call("find", root, "p")!!
+		val textNode = JSONArray().put((call("contents", paragraph) as JSONArray).getInt(0))
+		call("before", textNode, "<i>Before</i>")
+		call("after", textNode, "After")
+		assertEquals("BeforeTextAfterEnd", call("text", root))
+		for (op in listOf("before", "after")) {
+			call(op, JSONArray(), "Ignored")
+			call(op, root, "Ignored")
+		}
+		call("remove", paragraph)
+		call("after", paragraph, "Ignored")
+		call("before", paragraph, "Ignored")
+		assertEquals("BeforeTextAfterEnd", call("text", paragraph))
+		assertEquals("", call("text", root))
+	}
 }

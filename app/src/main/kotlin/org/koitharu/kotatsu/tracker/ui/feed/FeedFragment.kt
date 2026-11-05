@@ -107,6 +107,8 @@ class FeedFragment :
 
 	override fun onRefresh() {
 		viewModel.update()
+		// The pull raises the spinner; if the check does not start (no connection, say) nothing would lower it
+		requireViewBinding().swipeRefreshLayout.isRefreshing = viewModel.isRunning.value
 	}
 
 	override fun onResume() {

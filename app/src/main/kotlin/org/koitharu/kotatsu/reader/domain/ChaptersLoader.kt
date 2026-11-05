@@ -18,6 +18,40 @@ import javax.inject.Inject
 
 private const val PAGES_TRIM_THRESHOLD = 120
 
+/**
+ * Leaves out [hidden] pages, except that a chapter always keeps one: the reader has no notion of a
+ * chapter with no pages, and would report it as not found rather than move on.
+ */
+internal fun withoutHidden(pages: List<ReaderPage>, hidden: Set<Long>): List<ReaderPage> {
+	if (hidden.isEmpty()) {
+		return pages
+	}
+	val visibleChapters = pages.mapNotNullTo(HashSet()) { page -> page.chapterId.takeIf { page.id !in hidden } }
+	val keptChapters = HashSet<Long>()
+	return pages.filter { page ->
+		page.id !in hidden || (page.chapterId !in visibleChapters && keptChapters.add(page.chapterId))
+	}
+}
+
+/**
+ * Where to go for a saved position in [this]: the page itself or, if it has since been hidden, the next
+ * one still there. Null if the chapter is not in the list at all.
+ */
+internal fun List<ReaderPage>.indexOfPosition(chapterId: Long, page: Int): Int? {
+	var last: Int? = null
+	for (i in indices) {
+		val item = this[i]
+		if (item.chapterId == chapterId) {
+			if (item.index >= page) {
+				return i
+			}
+			last = i
+		}
+	}
+	return last
+}
+
+
 @ViewModelScoped
 class ChaptersLoader internal constructor(
 	private val repositoryForSource: (MangaSource) -> MangaRepository,

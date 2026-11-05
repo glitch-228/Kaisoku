@@ -22,6 +22,9 @@ sealed class PageState {
 
     class Converting() : PageState()
 
+    /** A page whose file is one the reader hid (beta). The slot stays, so page numbers and positions do not move. */
+    data object Hidden : PageState()
+
     data class Shown(
         val source: ImageSource,
         val isConverted: Boolean,
@@ -34,5 +37,5 @@ sealed class PageState {
         val error: Throwable,
     ) : PageState()
 
-    fun isFinalState(): Boolean = this is Error || this is Shown
+    fun isFinalState(): Boolean = this is Error || this is Shown || this is Hidden
 }

@@ -59,6 +59,8 @@ internal class LNReaderDomBridge {
 				"setHtml" -> { elements.forEach { it.html(value) }; null }
 				"append" -> { elements.forEach { it.append(value) }; null }
 				"prepend" -> { elements.forEach { it.prepend(value) }; null }
+				"before" -> { selected.forEach { if (it.parentNode() != null) it.before(value) }; null }
+				"after" -> { selected.forEach { if (it.parentNode() != null) it.after(value) }; null }
 				else -> error("Unsupported DOM operation: $operation")
 			}
 		}

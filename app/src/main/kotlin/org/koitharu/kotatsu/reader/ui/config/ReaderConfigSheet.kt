@@ -108,6 +108,8 @@ class ReaderConfigSheet :
         binding.checkableGroup.addOnButtonCheckedListener(this)
         binding.buttonSavePage.setOnClickListener(this)
         binding.buttonSharePage.setOnClickListener(this)
+        binding.buttonHidePage.isVisible = settings.isHiddenPagesEnabled
+        binding.buttonHidePage.setOnClickListener(this)
         binding.buttonScreenRotate.setOnClickListener(this)
         binding.buttonSettings.setOnClickListener(this)
         binding.buttonImageServer.setOnClickListener(this)
@@ -189,6 +191,11 @@ class ReaderConfigSheet :
 
             R.id.button_save_page -> {
                 findParentCallback(Callback::class.java)?.onSavePageClick(actionPage) ?: return
+                dismissAllowingStateLoss()
+            }
+
+            R.id.button_hide_page -> {
+                findParentCallback(Callback::class.java)?.onHidePageClick(actionPage) ?: return
                 dismissAllowingStateLoss()
             }
 
@@ -377,6 +384,8 @@ class ReaderConfigSheet :
         fun onSavePageClick(page: org.koitharu.kotatsu.reader.ui.pager.ReaderPage?)
 
         fun onSharePageClick(page: org.koitharu.kotatsu.reader.ui.pager.ReaderPage?)
+
+        fun onHidePageClick(page: org.koitharu.kotatsu.reader.ui.pager.ReaderPage?)
 
         fun onScrollTimerClick(isLongClick: Boolean)
 

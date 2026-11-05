@@ -113,6 +113,7 @@ class DetailsLoadUseCase @Inject constructor(
             emit(mangaDetails)
             if (remoteDetails != null && (force || !mangaRepositoryFactory.isMetadataRefreshPaused(remoteManga))) {
                 mangaDataRepository.updateChapters(mangaDetails.toManga())
+                mangaDataRepository.updateCover(remoteDetails)
             }
         }
     }
@@ -161,6 +162,7 @@ class DetailsLoadUseCase @Inject constructor(
         emit(mangaDetails)
         if (force || !mangaRepositoryFactory.isMetadataRefreshPaused(manga)) {
             mangaDataRepository.updateChapters(mangaDetails.toManga())
+            mangaDataRepository.updateCover(remoteDetails)
         }
     }
 

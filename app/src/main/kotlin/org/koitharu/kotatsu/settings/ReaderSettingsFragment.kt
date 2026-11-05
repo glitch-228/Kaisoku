@@ -20,6 +20,7 @@ import org.koitharu.kotatsu.core.model.ZoomMode
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.EInkFlashColor
+import org.koitharu.kotatsu.reader.domain.HiddenPagesStore
 import org.koitharu.kotatsu.reader.translate.TranslateProvider
 import org.koitharu.kotatsu.reader.translate.TranslationCoordinator
 import org.koitharu.kotatsu.core.prefs.ReaderAnimation
@@ -44,12 +45,19 @@ class ReaderSettingsFragment :
     @Inject
     lateinit var translationCoordinator: TranslationCoordinator
 
+    @Inject
+    lateinit var hiddenPages: HiddenPagesStore
+
     private val cacheScope = MainScope()
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         ReaderZoomMemory.normalizePreferences(PreferenceManager.getDefaultSharedPreferences(requireContext()))
         addPreferencesFromResource(R.xml.pref_reader)
         bindTranslateConfigPreferences()
+        findPreference<Preference>(AppSettings.KEY_HIDDEN_PAGES_MANAGE)?.setOnPreferenceClickListener {
+            showHiddenPages()
+            true
+        }
         findPreference<ListPreference>(AppSettings.KEY_READER_MODE)?.run {
             entryValues = ReaderMode.entries.names()
             setDefaultValueCompat(ReaderMode.STANDARD.name)
@@ -247,5 +255,28 @@ class ReaderSettingsFragment :
             AppSettings.KEY_TRANSLATE_RPM,
             AppSettings.KEY_TRANSLATE_CLEAR_CACHE,
         )
+    }
+
+    private fun showHiddenPages() {
+        val pages = hiddenPages.all()
+        val context = requireContext()
+        if (pages.isEmpty()) {
+            android.widget.Toast.makeText(context, R.string.hidden_pages_none, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val format = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
+        val labels = pages.map { page ->
+            val title = page.label.ifBlank { getString(R.string.hidden_page_placeholder) }
+            "$title \u00b7 ${format.format(java.util.Date(page.addedAt))}"
+        }.toTypedArray()
+        val selected = BooleanArray(pages.size)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.hidden_pages_manage)
+            .setMultiChoiceItems(labels, selected) { _, index, checked -> selected[index] = checked }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.hidden_pages_show_again) { _, _ ->
+                hiddenPages.remove(pages.filterIndexed { index, _ -> selected[index] }.map { it.hash })
+            }
+            .show()
     }
 }

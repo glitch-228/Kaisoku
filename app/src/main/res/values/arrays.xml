@@ -93,6 +93,7 @@
 		<item>Italiano</item>
 		<item>Português</item>
 		<item>Русский</item>
+		<item>العربية</item>
 	</string-array>
 	<string-array name="translate_languages_values" translatable="false">
 		<item>auto</item>
@@ -107,6 +108,7 @@
 		<item>it</item>
 		<item>pt</item>
 		<item>ru</item>
+		<item>ar</item>
 	</string-array>
 	<string-array name="themes" translatable="false">
 		<item>@string/follow_system</item>

@@ -22,5 +22,21 @@
     "version": "1.0.1",
     "url": "https://raw.githubusercontent.com/lnreader/lnreader-plugins/plugins/v3.0.0/.js/src/plugins/russian/Rulate[rulate].js",
     "sha256": "eaca70363cf4e979bfe89ca3597505c33e8d62af0a6b8f3988038ce92135bf5e"
+  },
+  {
+    "id": "rulate-api",
+    "version": "1.0.2",
+    "fixture": "rulate-api-1.0.2.js",
+    "url": "https://raw.githubusercontent.com/lnreader/lnreader-plugins/plugins/v3.0.0/.js/src/plugins/russian/Rulate[rulate].js",
+    "sha256": "d1f9690bf37981cafcadff27b7602092e1cd6065682a392e8011c7752246fefa",
+    "retrieved": "2026-11-02"
+  },
+  {
+    "id": "RLIB",
+    "version": "2.2.8",
+    "fixture": "RLIB-2.2.8.js",
+    "url": "https://raw.githubusercontent.com/lnreader/lnreader-plugins/plugins/v3.0.0/.js/src/plugins/russian/ranobelib.js",
+    "sha256": "236d98f7260b36ae29cf541ddeaa02a8fa0721547317ba1102be822c9ebf172c",
+    "retrieved": "2026-11-02"
   }
 ]

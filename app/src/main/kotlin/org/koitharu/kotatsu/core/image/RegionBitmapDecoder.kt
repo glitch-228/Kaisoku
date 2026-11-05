@@ -34,7 +34,12 @@ class RegionBitmapDecoder(
 ) : Decoder {
 
 	override suspend fun decode(): DecodeResult? {
-		val regionDecoder = BitmapDecoderCompat.createRegionDecoder(fetchResult.source.source().inputStream())
+		// Platform region decoding of AVIF is unreliable (some phones open it, then fail every tile)
+		val regionDecoder = if (BitmapDecoderCompat.isAvif(fetchResult.source.source())) {
+			null
+		} else {
+			BitmapDecoderCompat.createRegionDecoder(fetchResult.source.source().inputStream())
+		}
 		if (regionDecoder == null) {
 			return decodeFullImage()
 		}

@@ -32,6 +32,7 @@ import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.NavItem
+import org.koitharu.kotatsu.top.ui.TopFragment
 import org.koitharu.kotatsu.core.ui.util.RecyclerViewOwner
 import org.koitharu.kotatsu.core.ui.widgets.SlidingBottomNavigationView
 import org.koitharu.kotatsu.core.util.ext.buildBundle
@@ -197,6 +198,7 @@ class MainNavigationDelegate(
 			R.id.nav_bookmarks -> AllBookmarksFragment::class.java
 			R.id.nav_updated -> UpdatesFragment::class.java
 			R.id.nav_anilist -> AniListLibraryFragment::class.java
+			R.id.nav_top -> TopFragment::class.java
 			else -> return false
 		}
 		if (!setPrimaryFragment(newFragment)) {
@@ -216,6 +218,7 @@ class MainNavigationDelegate(
 		is AllBookmarksFragment -> R.id.nav_bookmarks
 		is UpdatesFragment -> R.id.nav_updated
 		is AniListLibraryFragment -> R.id.nav_anilist
+		is TopFragment -> R.id.nav_top
 		else -> 0
 	}
 
@@ -231,7 +234,7 @@ class MainNavigationDelegate(
 		fragmentManager.beginTransaction()
 			.setReorderingAllowed(true)
 			.replace(R.id.container, fragmentClass, args, TAG_PRIMARY)
-			.runOnCommit { onFragmentChanged(fragment, fromUser = true) }
+			.runOnCommit { primaryFragment?.let { onFragmentChanged(it, fromUser = true) } }
 			.commit()
 		return true
 	}

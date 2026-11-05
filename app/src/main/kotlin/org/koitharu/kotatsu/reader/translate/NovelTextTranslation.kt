@@ -58,6 +58,7 @@ internal object NovelTextTranslation {
 		if (targetCode == "auto" || targetCode.isBlank()) return false
 		val expectedScripts = when (targetCode) {
 			"ru" -> setOf(Character.UnicodeScript.CYRILLIC)
+			"ar" -> setOf(Character.UnicodeScript.ARABIC)
 			"en", "es", "fr", "de", "it", "pt" -> setOf(Character.UnicodeScript.LATIN)
 			"zh" -> setOf(Character.UnicodeScript.HAN)
 			"ja" -> setOf(Character.UnicodeScript.HAN, Character.UnicodeScript.HIRAGANA, Character.UnicodeScript.KATAKANA)
@@ -182,6 +183,7 @@ internal object NovelTextTranslation {
 	private fun languageName(code: String): String = when (code.lowercase()) {
 		"en" -> "English (en)"
 		"ru" -> "Russian (ru)"
+		"ar" -> "Arabic (ar)"
 		"ja" -> "Japanese (ja)"
 		"zh-cn" -> "Simplified Chinese (zh-CN)"
 		"zh-tw" -> "Traditional Chinese (zh-TW)"

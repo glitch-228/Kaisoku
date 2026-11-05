@@ -27,6 +27,24 @@
         android:title="@string/color_theme" />
 
     <Preference
+        android:key="custom_themes_management"
+        android:persistent="false"
+        android:title="@string/custom_themes"
+        android:summary="@string/custom_themes_none" />
+
+    <Preference
+        android:key="custom_theme_import"
+        android:persistent="false"
+        android:title="@string/custom_theme_import"
+        android:summary="@string/custom_theme_import_summary" />
+
+    <Preference
+        android:key="custom_theme_delete"
+        android:persistent="false"
+        android:title="@string/custom_theme_delete"
+        android:summary="@string/custom_themes_none" />
+
+    <Preference
         android:key="wallpaper_palette_refresh"
         android:persistent="false"
         android:title="@string/wallpaper_palette_refresh" />

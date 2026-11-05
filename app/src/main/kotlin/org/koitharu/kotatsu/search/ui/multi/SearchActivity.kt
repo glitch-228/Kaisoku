@@ -160,10 +160,7 @@ class SearchActivity :
                 }.show()
         }
         viewBinding.buttonSearchWarning.setOnClickListener {
-            org.koitharu.kotatsu.search.unified.showTrackerSearchError(this,
-                IllegalStateException(viewModel.warnings.value.joinToString("\n") {
-                    org.koitharu.kotatsu.remote.library.LibraryDiagnostics.text(it)
-                }))
+            org.koitharu.kotatsu.search.unified.showTrackerSearchErrors(this, viewModel.warnings.value)
         }
         viewModel.availableSources.observe(this) { updateSearchChips() }
         viewModel.warnings.observe(this) { viewBinding.buttonSearchWarning.isVisible = it.isNotEmpty() }

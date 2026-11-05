@@ -171,6 +171,51 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
     val colorScheme: ColorScheme
         get() = prefs.getEnumValue(KEY_COLOR_THEME, ColorScheme.default)
 
+    /** Parsed imported themes, cached in memory and invalidated on write. */
+    val importedThemes: List<ImportedTheme>
+        get() = cachedImportedThemes ?: ImportedThemeFile
+            .parseStored(prefs.getString(KEY_CUSTOM_THEMES, "{}") ?: "{}")
+            .also { cachedImportedThemes = it }
+
+    var selectedCustomThemeId: String?
+        get() = prefs.getString(KEY_CUSTOM_THEME, null)
+        set(value) = prefs.edit { putString(KEY_CUSTOM_THEME, value) }
+
+    val selectedCustomTheme: ImportedTheme?
+        get() = importedThemes.firstOrNull { it.id == selectedCustomThemeId }
+
+    fun importCustomThemes(source: String): List<ImportedTheme> {
+        val imported = ImportedThemeFile.parseImport(source)
+        val stored = prefs.getString(KEY_CUSTOM_THEMES, "{}") ?: "{}"
+        prefs.edit { putString(KEY_CUSTOM_THEMES, ImportedThemeFile.mergeStored(stored, imported)) }
+        cachedImportedThemes = null
+        return imported
+    }
+
+    fun deleteCustomTheme(id: String) {
+        val themes = importedThemes.filterNot { it.id == id }
+        prefs.edit {
+            putString(KEY_CUSTOM_THEMES, ImportedThemeFile.mergeStored("{}", themes))
+            if (selectedCustomThemeId == id) {
+                val nextThemeId = themes.firstOrNull()?.id
+                if (nextThemeId != null) {
+                    putString(KEY_CUSTOM_THEME, nextThemeId)
+                } else {
+                    remove(KEY_CUSTOM_THEME)
+                }
+            }
+        }
+        cachedImportedThemes = null
+    }
+
+    /** Beta: pages whose file matches one the reader hid are replaced by a placeholder. */
+    val isHiddenPagesEnabled: Boolean
+        get() = prefs.getBoolean(KEY_HIDDEN_PAGES, false)
+
+    /** Beta: keep a tap-to-show placeholder where a hidden page was, instead of leaving the page out. */
+    val isHiddenPagesPlaceholder: Boolean
+        get() = prefs.getBoolean(KEY_HIDDEN_PAGES_PLACEHOLDER, false)
+
     val isAmoledTheme: Boolean
         get() = prefs.getBoolean(KEY_THEME_AMOLED, false)
 
@@ -1213,6 +1258,9 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
     }
 
     companion object {
+
+        @Volatile
+        private var cachedImportedThemes: List<ImportedTheme>? = null
         const val KEY_TRACKER_AUTO_MATCH = "tracker_auto_match"
 
         const val TRACK_HISTORY = "history"
@@ -1226,6 +1274,11 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
         const val KEY_LIST_MODE_SUGGESTIONS = "list_mode_suggestions"
         const val KEY_THEME = "theme"
         const val KEY_COLOR_THEME = "color_theme"
+        const val KEY_HIDDEN_PAGES = "reader_hidden_pages"
+        const val KEY_HIDDEN_PAGES_PLACEHOLDER = "reader_hidden_pages_placeholder"
+        const val KEY_HIDDEN_PAGES_MANAGE = "reader_hidden_pages_manage"
+        const val KEY_CUSTOM_THEMES = "custom_themes"
+        const val KEY_CUSTOM_THEME = "custom_theme"
         const val KEY_THEME_AMOLED = "amoled_theme"
         const val KEY_THEME_AMOLED_NAVBAR = "amoled_navbar"
         const val KEY_OFFLINE_DISABLED = "no_offline"

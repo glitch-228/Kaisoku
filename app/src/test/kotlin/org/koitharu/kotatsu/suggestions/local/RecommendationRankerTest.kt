@@ -106,6 +106,49 @@ class RecommendationRankerTest {
         assertTrue(candidates.single().chapters == null)
     }
 
+    @Test fun TitlesOpenedBarelyReadAndLeftForWeeksNoLongerShapeTheProfile() {
+        val dropped = TasteTitle(title(1, "Dropped", setOf("Horror")), false, now - 30 * 86400000L, progress = 0.03f)
+        val kept = TasteTitle(title(2, "Kept", setOf("Drama")), false, now - 30 * 86400000L, progress = 0.8f)
+        val candidates = listOf(title(3, "H", setOf("Horror")), title(4, "D", setOf("Drama")))
+        val result = rank(candidates, listOf(dropped, kept), 0)
+        assertEquals(4L, result.first().manga.id)
+        assertEquals(0.0, result.single { it.manga.id == 3L }.score, 0.0)
+    }
+
+    @Test fun DroppedRequiresKnownProgressWeeksOfSilenceAndNoFavouriteMark() {
+        val old = now - 30 * 86400000L
+        fun dropped(favorite: Boolean = false, lastRead: Long = old, progress: Float = 0.05f) =
+            RecommendationRanker.isDropped(TasteTitle(title(1, "A"), favorite, lastRead, progress = progress), now)
+        assertTrue(dropped())
+        assertFalse(dropped(favorite = true))
+        assertFalse(dropped(lastRead = now - 5 * 86400000L))
+        assertFalse(dropped(progress = -1f))
+        assertFalse(dropped(progress = 0.5f))
+        assertFalse(dropped(lastRead = 0))
+    }
+
+    @Test fun ReadingTimeIsEstimatedFromProgressWhenStatisticsAreOff() {
+        val recorded = TasteTitle(title(1, "A"), false, now, durationMillis = 90_000)
+        assertEquals(90_000L, RecommendationRanker.engagementMillis(recorded))
+        val estimated = TasteTitle(title(1, "A"), false, now, progress = 0.5f, historyChapters = 10)
+        assertEquals((0.5f * 10 * 25 * 20_000L).toLong(), RecommendationRanker.engagementMillis(estimated))
+        assertEquals(0L, RecommendationRanker.engagementMillis(TasteTitle(title(1, "A"), false, now)))
+        assertEquals(0L, RecommendationRanker.engagementMillis(TasteTitle(title(1, "A"), false, now, progress = 0.5f)))
+    }
+
+    @Test fun ALongReadWithoutStatisticsOutweighsAJustOpenedTitle() {
+        val long = TasteTitle(title(1, "Long", setOf("Drama")), false, now, progress = 0.9f, historyChapters = 80)
+        val opened = TasteTitle(title(2, "Opened", setOf("Romance")), false, now, progress = 0.12f, historyChapters = 1)
+        val result = rank(listOf(title(3, "D", setOf("Drama")), title(4, "R", setOf("Romance"))), listOf(long, opened), 0)
+        assertEquals(3L, result.first().manga.id)
+    }
+
+    @Test fun VeryOldHistoryStillCountsSomething() {
+        val old = TasteTitle(title(1, "A", setOf("Drama")), false, now - 5 * 365 * 86400000L)
+        val result = rank(listOf(title(2, "B", setOf("Drama"))), listOf(old), 0)
+        assertTrue(result.single().score > 0.0)
+    }
+
     private fun rank(manga: List<Manga>, taste: List<TasteTitle>, slider: Int) = RecommendationRanker.rank(
         manga.map { Recommendation(RecommendationTarget.SourceTitle(it)) }, taste, RecommendationRequest.Explore, slider, now)
 

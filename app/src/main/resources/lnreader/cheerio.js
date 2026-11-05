@@ -2,7 +2,7 @@
 globalThis.cheerio = {
     load: function (html, options, isDocument) {
         function native(op, args) {
-            var result = JSON.parse(__nativeDom(op, JSON.stringify(args)));
+            var result = JSON.parse(__nativeDom(op, __lnreaderStringifyForHost(args)));
             if (result.error) throw new Error(result.error);
             return result.value;
         }
@@ -82,7 +82,7 @@ globalThis.cheerio = {
                 return selector ? selection(result.filter(selector)._ids, this) : result;
             };
         });
-        ['remove', 'replaceWith', 'append', 'prepend', 'removeAttr'].forEach(function (op) {
+        ['remove', 'replaceWith', 'append', 'prepend', 'before', 'after', 'removeAttr'].forEach(function (op) {
             methods[op] = function (value) { native(op, [this._ids, value == null ? '' : String(value)]); return this; };
         });
         function $(selector, context) {

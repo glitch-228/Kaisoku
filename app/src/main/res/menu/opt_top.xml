@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+
+	<item
+		android:id="@+id/action_top_period"
+		android:orderInCategory="10"
+		android:title="@string/top_period"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/action_top_filter"
+		android:orderInCategory="20"
+		android:title="@string/filter"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/action_update"
+		android:orderInCategory="50"
+		android:title="@string/update"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/action_top_reset_hidden"
+		android:orderInCategory="60"
+		android:title="@string/top_reset_hidden"
+		app:showAsAction="never" />
+
+</menu>

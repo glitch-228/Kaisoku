@@ -26,6 +26,7 @@ enum class ColorScheme(
     MAMIMI(R.style.ThemeOverlay_Kotatsu_Mamimi, R.string.theme_name_mamimi),
     KANADE(R.style.ThemeOverlay_Kotatsu_Kanade, R.string.theme_name_kanade),
     ITSUKA(R.style.ThemeOverlay_Kotatsu_Itsuka, R.string.theme_name_itsuka),
+    CUSTOM(R.style.ThemeOverlay_Kotatsu_Custom, R.string.theme_name_custom),
     ;
 
     companion object {
@@ -37,8 +38,9 @@ enum class ColorScheme(
                 DEFAULT
             }
 
-        fun getAvailableList(): List<ColorScheme> {
+        fun getAvailableList(includeCustom: Boolean = false): List<ColorScheme> {
             val list = ColorScheme.entries.toMutableList()
+            if (!includeCustom || !DynamicColors.isDynamicColorAvailable()) list.remove(CUSTOM)
             if (Build.VERSION.SDK_INT != Build.VERSION_CODES.R) list.remove(WALLPAPER)
             if (!DynamicColors.isDynamicColorAvailable()) {
                 list.remove(MONET)

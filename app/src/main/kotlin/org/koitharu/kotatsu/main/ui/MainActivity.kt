@@ -248,7 +248,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 
 
     override fun onFragmentChanged(fragment: Fragment, fromUser: Boolean) {
-        trackerSearchTarget.value = fragment as? org.koitharu.kotatsu.search.unified.TrackerSearchTarget
+        trackerSearchTarget.value = fragment.takeIf { it.isAdded } as? org.koitharu.kotatsu.search.unified.TrackerSearchTarget
         trackerSearchTarget.value?.let { target ->
             if (viewBinding.searchView.editText.text.toString() != target.trackerSearchQuery)
                 viewBinding.searchView.setText(target.trackerSearchQuery)
@@ -497,7 +497,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
         val preview = org.koitharu.kotatsu.search.unified.TrackerPreviewAdapter(
             org.koitharu.kotatsu.list.ui.size.DynamicItemSizeResolver(resources, this, settings, adjustWidth = true),
         ) { trackerSearchTarget.value?.onTrackerSearchClick(it); viewBinding.searchView.hide() }
-        viewBinding.recyclerViewSearch.adapter = androidx.recyclerview.widget.ConcatAdapter(preview, adapter)
+        viewBinding.recyclerViewSearch.adapter = preview.withSuggestions(adapter)
         trackerSearchTarget.flatMapLatest { target ->
             target?.trackerSearchPreview ?: kotlinx.coroutines.flow.flowOf(emptyList())
         }.observe(this) { preview.submit(it) }

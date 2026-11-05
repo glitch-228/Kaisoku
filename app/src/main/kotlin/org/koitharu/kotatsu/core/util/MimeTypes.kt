@@ -14,6 +14,10 @@ import coil3.util.MimeTypeMap as CoilMimeTypeMap
 
 object MimeTypes {
 
+	// The platform's table only knows AVIF on recent Android versions
+	private const val EXTENSION_AVIF = "avif"
+	val AVIF = MimeType("image/avif")
+
 	fun getMimeTypeFromExtension(fileName: String): MimeType? {
 		return CoilMimeTypeMap.getMimeTypeFromExtension(getNormalizedExtension(fileName) ?: return null)
 			?.toMimeTypeOrNull()
@@ -25,6 +29,7 @@ object MimeTypes {
 
 	fun getExtension(mimeType: MimeType?): String? {
 		if (mimeType == null) return null
+		if (mimeType == AVIF) return EXTENSION_AVIF
 		return MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType.toString())?.nullIfEmpty()
 	}
 

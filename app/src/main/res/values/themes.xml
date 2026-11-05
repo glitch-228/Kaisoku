@@ -98,6 +98,9 @@
 	<!-- Monet theme only support S+ -->
 	<style name="ThemeOverlay.Kotatsu.Monet" parent="ThemeOverlay.Material3.DynamicColors.Light" />
 
+	<!-- Imported themes: dynamic-color roles from the imported primary colour, S+ -->
+	<style name="ThemeOverlay.Kotatsu.Custom" parent="ThemeOverlay.Kotatsu.Monet" />
+
 	<!-- Expressive Monet theme -->
 	<style name="ThemeOverlay.Kotatsu.Expressive" parent="ThemeOverlay.Material3Expressive.DynamicColors.DayNight">
 		<item name="alertDialogTheme">@style/ThemeOverlay.Material3Expressive.Dialog.Alert</item>

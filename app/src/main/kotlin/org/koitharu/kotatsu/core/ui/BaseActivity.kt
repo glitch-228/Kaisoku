@@ -14,6 +14,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.Toolbar
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.color.DynamicColorsOptions
 import androidx.core.app.ActivityCompat
 import androidx.core.view.OnApplyWindowInsetsListener
 import androidx.core.view.ViewCompat
@@ -78,7 +80,21 @@ abstract class BaseActivity<B : ViewBinding> :
         val settings = entryPoint.settings
         isAmoledTheme = settings.isAmoledTheme
         if (applyColorSchemeTheme) {
-            setTheme(settings.colorScheme.styleResId)
+            val customTheme = settings.selectedCustomTheme
+                .takeIf { settings.colorScheme == ColorScheme.CUSTOM && DynamicColors.isDynamicColorAvailable() }
+            // Imported themes need dynamic colours, and a custom scheme without a theme (restored settings) falls back
+            val colorScheme = if (settings.colorScheme == ColorScheme.CUSTOM && customTheme == null) {
+                ColorScheme.default
+            } else {
+                settings.colorScheme
+            }
+            setTheme(colorScheme.styleResId)
+            if (customTheme != null) {
+                DynamicColors.applyToActivityIfAvailable(
+                    this,
+                    DynamicColorsOptions.Builder().setContentBasedSource(customTheme.primaryColor).build(),
+                )
+            }
             if (settings.colorScheme == ColorScheme.WALLPAPER && WallpaperPaletteCompat.isSupported) {
                 wallpaperSeedApplied = entryPoint.wallpaperPalette.apply(this)
             }

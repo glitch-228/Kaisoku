@@ -22,6 +22,7 @@ enum class NavItem(
     UPDATED(R.id.nav_updated, R.string.updated, R.drawable.ic_updated_selector),
     BOOKMARKS(R.id.nav_bookmarks, R.string.bookmarks, R.drawable.ic_bookmark_selector),
     ANILIST(R.id.nav_anilist, R.string.tracker_library_beta, R.drawable.ic_anilist),
+    TOP(R.id.nav_top, R.string.top_title, R.drawable.ic_top_selector),
     ;
 
     fun isAvailable(settings: AppSettings): Boolean = when (this) {

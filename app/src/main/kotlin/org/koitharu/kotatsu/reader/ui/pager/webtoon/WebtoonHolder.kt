@@ -68,7 +68,7 @@ class WebtoonHolder internal constructor(
     }
 
     override fun onStateChanged(state: PageState) {
-        if (state is PageState.Error) {
+        if (state is PageState.Error || state is PageState.Hidden) {
             val recyclerView = itemView.parent as? RecyclerView
             val isAlreadyAboveViewport = recyclerView != null && itemView.bottom <= recyclerView.paddingTop
             if (!isAlreadyAboveViewport) {

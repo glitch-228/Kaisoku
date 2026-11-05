@@ -104,11 +104,21 @@ class TranslationRenderer @Inject constructor(
 			}
 			occupied += rect
 			if (overlayBg) {
-				canvas.drawRoundRect(rect, 6f * density.density / fitScale, 6f * density.density / fitScale, background)
-				canvas.drawRoundRect(rect, 6f * density.density / fitScale, 6f * density.density / fitScale, outline)
+				// Cover the whole recognised text region, not only the translated text: a shorter translation would
+				// otherwise leave the original lettering visible around it.
+				val cover = RectF(
+					min(rect.left, sourceBox.left - padding / 2f).coerceAtLeast(0f),
+					min(rect.top, sourceBox.top - padding / 2f).coerceAtLeast(0f),
+					max(rect.right, sourceBox.right + padding / 2f).coerceAtMost(out.width.toFloat()),
+					max(rect.bottom, sourceBox.bottom + padding / 2f).coerceAtMost(out.height.toFloat()),
+				)
+				canvas.drawRoundRect(cover, 6f * density.density / fitScale, 6f * density.density / fitScale, background)
+				canvas.drawRoundRect(cover, 6f * density.density / fitScale, 6f * density.density / fitScale, outline)
 			}
 			canvas.save()
-			canvas.translate(rect.left + padding, rect.top + padding)
+			// The layout is as wide as the region while the box hugs the text: centre the layout on the box
+			val layoutOffset = (layout.width - usedWidth) / 2f
+			canvas.translate(rect.left + padding - layoutOffset, rect.top + padding)
 			layout.draw(canvas)
 			canvas.restore()
 		}

@@ -490,7 +490,7 @@ class LNReaderEngine(
 						return raw ? item : item.value;
 					},
 					set: function(key, value, expires) {
-						__nativeStorage('set', prefix + String(key), JSON.stringify({created: Date.now(), value: value,
+						__nativeStorage('set', prefix + String(key), __lnreaderStringifyForHost({created: Date.now(), value: value,
 							expires: expires instanceof Date ? expires.getTime() : expires}));
 					},
 					delete: function(key) { __nativeStorage('delete', prefix + String(key)); },

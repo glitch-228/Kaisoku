@@ -115,8 +115,9 @@ class GoogleLensTranslator @Inject constructor(
 				}
 				sb.append(' ')
 			}
-			val text = sb.toString().replace(WHITESPACE, " ").trim()
-			if (text.isEmpty()) continue
+			val text = OcrTextCleanup.normalizeScript(sb.toString().replace(WHITESPACE, " ").trim())
+			// A lone "!" or a stray mark is not something to translate, and would only become a numbered marker
+			if (!OcrTextCleanup.hasContent(text)) continue
 			val box = paragraph.geometry?.boundingBox
 				?: paragraph.lines.firstNotNullOfOrNull { it.geometry?.boundingBox }
 				?: continue
@@ -128,7 +129,7 @@ class GoogleLensTranslator @Inject constructor(
 			if (left >= right || top >= bottom) continue
 			out += TranslatedBlock(originalText = text, translatedText = "", rect = RectF(left, top, right, bottom))
 		}
-		return out
+		return OcrTextCleanup.mergeHyphenated(out)
 	}
 
 	private suspend fun translateBlocks(

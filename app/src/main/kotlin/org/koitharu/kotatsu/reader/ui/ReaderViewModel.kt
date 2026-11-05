@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
@@ -87,6 +88,7 @@ import org.koitharu.kotatsu.reader.domain.ChapterSwitchCursor
 import org.koitharu.kotatsu.reader.domain.ChaptersLoader
 import org.koitharu.kotatsu.reader.domain.DetectReaderModeUseCase
 import org.koitharu.kotatsu.reader.domain.PageLoader
+import org.koitharu.kotatsu.reader.domain.withoutHidden
 import org.koitharu.kotatsu.reader.domain.itemsInReadingOrder
 import org.koitharu.kotatsu.reader.domain.boundedPrefetchPages
 import org.koitharu.kotatsu.reader.domain.nextChapterPrefetchPages
@@ -172,6 +174,16 @@ class ReaderViewModel @Inject constructor(
     // old scroll callback can pass a page-count check after a same-sized chapter switch and put the
     // reader back into the previous chapter.
     private val contentStateLock = Any()
+
+    /** The chapters' pages, without the hidden ones (beta) unless they are kept as placeholders. */
+    private fun visibleSnapshot(): List<ReaderPage> {
+        val pages = chaptersLoader.snapshot()
+        return if (settings.isHiddenPagesEnabled && pageLoader.removesHiddenPages) {
+            withoutHidden(pages, pageLoader.hiddenPageIds.value)
+        } else {
+            pages
+        }
+    }
     private var stateRevision = 0L
     private var contentGeneration = 0L
     private var nextReaderReplacementId = 0L
@@ -190,6 +202,16 @@ class ReaderViewModel @Inject constructor(
                 if (updated != revision) {
                     sourceSuggestionJob?.cancel()
                     revision = updated
+                }
+            }
+        }
+        launchJob(Dispatchers.Default) {
+            // A page found to be exactly a hidden one leaves the list, wherever the reader is in it
+            pageLoader.hiddenPageIds.drop(1).collect {
+                synchronized(contentStateLock) {
+                    val pages = visibleSnapshot()
+                    // Empty means a chapter switch is under way, and it brings its own pages and position
+                    content.update { current -> if (current.pages.isEmpty() || current.pages == pages) current else ReaderContent(pages, null) }
                 }
             }
         }
@@ -532,6 +554,18 @@ class ReaderViewModel @Inject constructor(
 
     fun reportPageActionError(error: Throwable) { errorEvent.call(error) }
 
+    /** Beta: true once the page is hidden, false if its content cannot be read (protected archives are never read). */
+    val onPageHidden = MutableEventFlow<Boolean>()
+
+    fun hidePage(actionPage: ReaderPage?) {
+        val target = resolveActionPage(actionPage) ?: return
+        val title = manga.value?.title.orEmpty()
+        launchJob(Dispatchers.Default) {
+            val uri = pageLoader.loadPage(target.toMangaPage(), force = false)
+            onPageHidden.call(pageLoader.hidePage(target.toMangaPage(), uri, title))
+        }
+    }
+
     fun resolveActionPage(target: ReaderPage?): ReaderPage? {
         if (target != null) return content.value.pages.firstOrNull {
             it.id == target.id && it.chapterId == target.chapterId && it.index == target.index && it.source == target.source
@@ -684,7 +718,7 @@ class ReaderViewModel @Inject constructor(
                     state = state,
                     restoreExistingReader = true,
                 )
-                publishContentLocked(ReaderContent(chaptersLoader.snapshot(), state))
+                publishContentLocked(ReaderContent(visibleSnapshot(), state))
             }
         }
     }
@@ -736,7 +770,7 @@ class ReaderViewModel @Inject constructor(
             }
             ensureActive()
             val newState = ReaderState(chapterId, page, scroll)
-            replaceContent(ReaderContent(chaptersLoader.snapshot(), newState))
+            replaceContent(ReaderContent(visibleSnapshot(), newState))
             saveCurrentState(newState)
         }.also(::watchSlowLoad)
     }
@@ -755,7 +789,7 @@ class ReaderViewModel @Inject constructor(
                     runCatchingCancellable {
                         chaptersLoader.loadSingleChapter(state.chapterId)
                     }.onSuccess {
-                        replaceContent(ReaderContent(chaptersLoader.snapshot(), state))
+                        replaceContent(ReaderContent(visibleSnapshot(), state))
                     }
                 }
             }
@@ -989,7 +1023,7 @@ class ReaderViewModel @Inject constructor(
                             }
                         }
                         notifyStateChanged()
-                        replaceContent(ReaderContent(chaptersLoader.snapshot(), readingState.value))
+                        replaceContent(ReaderContent(visibleSnapshot(), readingState.value))
                     }
             } catch (e: CancellationException) {
                 throw e
@@ -1146,7 +1180,7 @@ class ReaderViewModel @Inject constructor(
                 synchronized(contentStateLock) {
                     ensureActive()
                     if (appended) {
-                        val pages = chaptersLoader.snapshot()
+                        val pages = visibleSnapshot()
                         replaceContent(ReaderContent(pages, null))
                         if (isNext && pageLoader.isPrefetchApplicable()) {
                             val nextPages = pages.nextChapterPrefetchPages(currentId, PREFETCH_LIMIT)
@@ -1234,7 +1268,10 @@ class ReaderViewModel @Inject constructor(
         if (chaptersCount == 0 || pagesCount == 0) {
             return PROGRESS_NONE
         }
-        return calculateReaderPercent(readingOrderIndex(chapterIndex, chaptersCount, isCurrentSourceChaptersReversed()), chaptersCount, pageIndex, pagesCount)
+        // With a hidden credit page at the end, the last page that can be reached still finishes the chapter
+        val lastVisibleIndex = content.value.pages.lastOrNull { it.chapterId == chapterId }?.index
+        val effectiveIndex = if (pageIndex == lastVisibleIndex && lastVisibleIndex < pagesCount - 1) pagesCount - 1 else pageIndex
+        return calculateReaderPercent(readingOrderIndex(chapterIndex, chaptersCount, isCurrentSourceChaptersReversed()), chaptersCount, effectiveIndex, pagesCount)
     }
 
     private fun observeIsWebtoonZoomEnabled() = settings.observeAsFlow(

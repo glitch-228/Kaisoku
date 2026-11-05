@@ -17,7 +17,13 @@ import org.koitharu.kotatsu.core.network.CloudFlareInterceptor
 /** Runs the shipped JS shims and pinned plugin bundles against the real Kotlin bridges.
  * Node provides the host JS VM; the separate instrumented test covers Android QuickJS JNI. */
 class LNReaderPublishedPluginsTest {
-	private fun runPlugin(id: String, html: (String) -> String, assertions: String, live: Boolean = false): JSONObject {
+	private fun runPlugin(
+		id: String,
+		html: (String) -> String,
+		assertions: String,
+		live: Boolean = false,
+		bundle: String = id,
+	): JSONObject {
 		val process = try { ProcessBuilder("node", "-e", HOST).start() } catch (_: java.io.IOException) {
 			assumeTrue("Node is required for the published plugin compatibility tests", false)
 			error("Node unavailable")
@@ -45,7 +51,7 @@ class LNReaderPublishedPluginsTest {
 			fetch.toJavaScriptFunction(), engine.globalPolyfillsScript(), engine.resource("cheerio.js"),
 			engine.resource("dayjs.min.js"), engine.resource("localizedFormat.js"),
 			"dayjs.extend(dayjs_plugin_localizedFormat);", engine.storageScript(), engine.moduleScript(),
-			checkNotNull(javaClass.getResourceAsStream("/lnreader/plugins/$id.js")).bufferedReader().use { it.readText() },
+			checkNotNull(javaClass.getResourceAsStream("/lnreader/plugins/$bundle.js")).bufferedReader().use { it.readText() },
 		)
 		val writer = process.outputStream.bufferedWriter()
 		writer.write(JSONObject().put("scripts", JSONArray(scripts)).put("assertions", assertions).toString() + "\n")
@@ -238,6 +244,52 @@ class LNReaderPublishedPluginsTest {
 			return {novels: novels, text: await exports.default.parseChapter(details.chapters[0].path)};
 		""".trimIndent())
 		assertEquals("One", result.getJSONArray("novels").getJSONObject(0).getString("name"))
+		assertTrue(result.getString("text").contains("Readable text"))
+	}
+
+	@Test fun updatedRulateKeepsSynopsisParagraphsAndOnlyReadableChapters() {
+		val result = runPlugin("rulate-api", { url -> when {
+			"/bookChapters?" in url -> """{"response":[
+				{"id":2,"title":"First","can_read":true,"subscription":0,"ord":1,"cdate":1789214400},
+				{"id":3,"title":"Paid","can_read":true,"subscription":1,"ord":2},
+				{"id":4,"title":"Locked","can_read":false,"subscription":0,"ord":3},
+				{"id":5,"title":"Last","can_read":true,"subscription":0,"ord":4,"cdate":1789214400}]}"""
+			"/chapter?" in url -> """{"response":{"text":"<p>Readable text</p>"}}"""
+			"/book?" in url -> """{"response":{"t_title":"One","genres":[],"tags":[],
+				"description":"<h2>Heading</h2><p>First<br>Second &amp; third</p><p>Last</p>"}}"""
+			else -> """{"status":"success","response":[{"id":1,"t_title":"One","img":"https://images/one"}]}"""
+		} }, """
+			var novels = await exports.default.searchNovels('One', 1);
+			var details = await exports.default.parseNovel(novels[0].path);
+			return {details: details, text: await exports.default.parseChapter(details.chapters[0].path)};
+		""".trimIndent(), bundle = "rulate-api-1.0.2")
+		val details = result.getJSONObject("details")
+		assertEquals("One", details.getString("name"))
+		assertEquals("1", details.getString("path"))
+		assertEquals("Heading\n\nFirst\nSecond & third\n\nLast", details.getString("summary"))
+		val chapters = details.getJSONArray("chapters")
+		assertEquals(2, chapters.length())
+		assertEquals("1/2", chapters.getJSONObject(0).getString("path"))
+		assertEquals("1/5", chapters.getJSONObject(1).getString("path"))
+		assertTrue(chapters.getJSONObject(0).getString("releaseTime").contains("2026"))
+		assertEquals("<p>Readable text</p>", result.getString("text"))
+	}
+
+	@Test fun updatedRanobelibKeepsSynopsisAndChapterBranchIdentities() {
+		val result = runPlugin("RLIB", { url -> when {
+			"/chapter?" in url -> """{"data":{"content":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Readable text"}]}]}}}"""
+			url.endsWith("/chapters") -> """{"data":[{"volume":"1","number":"2.5","index":2,"branches":[{"branch_id":9,"created_at":"2026-09-12T12:00:00.000Z"}]}]}"""
+			"fields[]=summary" in java.net.URLDecoder.decode(url, "UTF-8") -> """{"data":{"rus_name":"One","genres":[{"name":"Fantasy"}],"summary":"<p>First<br>Second</p><p>Last</p>"}}"""
+			else -> """{"data":[{"rus_name":"One","slug_url":"1--one","cover":{"default":"https://images/one"}}]}"""
+		} }, """
+			var novels = await exports.default.searchNovels('One', 1);
+			var details = await exports.default.parseNovel(novels[0].path);
+			return {details: details, text: await exports.default.parseChapter(details.chapters[0].path)};
+		""".trimIndent(), bundle = "RLIB-2.2.8")
+		val details = result.getJSONObject("details")
+		assertEquals("First\nSecond\n\nLast", details.getString("summary"))
+		assertEquals("1--one", details.getString("path"))
+		assertEquals("1--one/1/2.5/9", details.getJSONArray("chapters").getJSONObject(0).getString("path"))
 		assertTrue(result.getString("text").contains("Readable text"))
 	}
 

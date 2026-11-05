@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.graphics.createBitmap
 import com.davemorrissey.labs.subscaleview.decoder.ImageDecodeException
+import okio.BufferedSource
 import okio.IOException
 import okio.buffer
 import okio.source
@@ -29,9 +30,26 @@ object BitmapDecoderCompat {
 
 	private const val FORMAT_AVIF = "avif"
 	private const val MIME_HEADER_SIZE = 32
+	private const val AVIF_HEADER_SIZE = 64
+
+	/**
+	 * Whether [source] starts with an AVIF `ftyp` box, without consuming it. Sites serve AVIF under JPEG or WebP
+	 * names and types, and HEIC shares the container, so only the brands tell them apart.
+	 */
+	fun isAvif(source: BufferedSource): Boolean {
+		val peek = source.peek()
+		peek.request(AVIF_HEADER_SIZE.toLong())
+		val header = peek.readByteArray(minOf(AVIF_HEADER_SIZE.toLong(), peek.buffer.size))
+		return ReaderImageHeader.detect(header, header.size) == ReaderImageHeader.Format.AVIF
+	}
 
 	@Blocking
-	fun decode(file: File): Bitmap = when (val format = probeMimeType(file)?.subtype) {
+	fun isAvif(file: File): Boolean = runCatchingCancellable {
+		file.source().buffer().use { isAvif(it) }
+	}.getOrDefault(false)
+
+	@Blocking
+	fun decode(file: File): Bitmap = when (val format = if (isAvif(file)) FORMAT_AVIF else probeMimeType(file)?.subtype) {
 		FORMAT_AVIF -> file.source().buffer().use { decodeAvif(it.readByteBuffer()) }
 		else -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 			ImageDecoder.decodeBitmap(ImageDecoder.createSource(file))
@@ -47,9 +65,14 @@ object BitmapDecoderCompat {
 			return decodeAvif(stream.toByteBuffer())
 		}
 		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+			val encoded = stream.toByteBuffer()
+			if (AvifDecoder.isAvifImage(encoded)) {
+				return decodeAvif(encoded)
+			}
+			val bytes = ByteArray(encoded.remaining()).also { encoded.get(it) }
 			val opts = BitmapFactory.Options()
 			opts.inMutable = isMutable
-			return checkBitmapNotNull(BitmapFactory.decodeStream(stream, null, opts), format)
+			return checkBitmapNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts), format)
 		}
 		val byteBuffer = stream.toByteBuffer()
 		return if (AvifDecoder.isAvifImage(byteBuffer)) {
@@ -74,7 +97,7 @@ object BitmapDecoderCompat {
 
 	@Blocking
 	fun probeMimeType(file: File): MimeType? {
-		return detectBitmapType(file) ?: MimeTypes.probeMimeType(file)
+		return detectBitmapType(file) ?: if (isAvif(file)) MimeTypes.AVIF else MimeTypes.probeMimeType(file)
 	}
 
 	@Blocking
@@ -110,6 +133,9 @@ object BitmapDecoderCompat {
 		bitmap ?: throw ImageDecodeException(null, format)
 
 	private fun detectBitmapType(bytes: ByteArray): MimeType? {
+		if (ReaderImageHeader.detect(bytes, minOf(bytes.size, AVIF_HEADER_SIZE)) == ReaderImageHeader.Format.AVIF) {
+			return MimeTypes.AVIF
+		}
 		if (bytes.size >= 12
 			&& bytes[0] == 'R'.code.toByte()
 			&& bytes[1] == 'I'.code.toByte()

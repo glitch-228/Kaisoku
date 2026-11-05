@@ -69,6 +69,8 @@ class AppWorkerFactory @Inject constructor(
     private val downloadSchedulerLazy: Lazy<DownloadWorker.Scheduler>,
     private val historyRepositoryLazy: Lazy<HistoryRepository>,
     private val storageManagerLazy: Lazy<LocalStorageManager>,
+    private val mangaDataRepositoryLazy: Lazy<MangaDataRepository>,
+    private val staleTracksUseCaseLazy: Lazy<org.koitharu.kotatsu.tracker.domain.StaleTracksUseCase>,
     private val deleteReadChaptersUseCase: Provider<DeleteReadChaptersUseCase>,
     private val coil: Provider<ImageLoader>,
     private val suggestionRepository: Provider<SuggestionRepository>,
@@ -128,6 +130,8 @@ class AppWorkerFactory @Inject constructor(
             downloadSchedulerLazy = downloadSchedulerLazy,
             historyRepositoryLazy = historyRepositoryLazy,
             storageManagerLazy = storageManagerLazy,
+            mangaDataRepositoryLazy = mangaDataRepositoryLazy,
+            staleTracksUseCaseLazy = staleTracksUseCaseLazy,
         )
 
         LocalStorageCleanupWorker::class.java.name -> LocalStorageCleanupWorker(

@@ -22,6 +22,7 @@ import org.koitharu.kotatsu.core.util.ext.firstVisibleItemPosition
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.resetTransformations
 import org.koitharu.kotatsu.databinding.FragmentReaderDoubleBinding
+import org.koitharu.kotatsu.reader.domain.indexOfPosition
 import org.koitharu.kotatsu.reader.domain.PageLoader
 import org.koitharu.kotatsu.reader.ui.ReaderState
 import org.koitharu.kotatsu.reader.ui.config.ReaderZoomScope
@@ -111,9 +112,7 @@ open class DoubleReaderFragment : BaseReaderFragment<FragmentReaderDoubleBinding
             }
         }
         if (pendingState != null) {
-            var position = paddedPages.indexOfFirst {
-                it.chapterId == pendingState.chapterId && it.index == pendingState.page
-            }
+            var position = paddedPages.indexOfPosition(pendingState.chapterId, pendingState.page) ?: -1
             items.join()
             if (position != -1) {
                 position = position.toPagePosition()
